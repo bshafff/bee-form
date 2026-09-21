@@ -1,5 +1,5 @@
 // Service Worker untuk offline support
-const CACHE_NAME = 'bee-form-v2';
+const CACHE_NAME = 'bee-form-v4';
 const urlsToCache = [
   './',
   './index.html',
