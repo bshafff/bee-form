@@ -1,5 +1,5 @@
 // Service Worker untuk offline support
-const CACHE_NAME = 'bee-form-v5';
+const CACHE_NAME = 'bee-form-v6';
 const urlsToCache = [
   './',
   './index.html',
@@ -8,15 +8,21 @@ const urlsToCache = [
   './icon-512.png'
 ];
 
+// ==================== INSTALL ====================
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-      .catch(err => console.log('Cache addAll error:', err))
+    caches.open(CACHE_NAME).then(cache =>
+      Promise.allSettled(
+        urlsToCache.map(url =>
+          cache.add(url).catch(err => console.warn('Gagal cache:', url, err))
+        )
+      )
+    )
   );
   self.skipWaiting();
 });
 
+// ==================== ACTIVATE ====================
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames =>
@@ -25,24 +31,28 @@ self.addEventListener('activate', event => {
           .filter(name => name !== CACHE_NAME)
           .map(name => caches.delete(name))
       )
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Network first, fallback ke cache saat offline
+// ==================== FETCH ====================
 self.addEventListener('fetch', event => {
-  // Jangan sentuh request ke Apps Script / Google API
-  if (event.request.url.includes('script.google') ||
-      event.request.url.includes('googleapis.com')) {
+  const url = event.request.url;
+
+  // Jangan intercept request ke Apps Script / Google API
+  if (url.includes('script.google') ||
+      url.includes('googleapis.com') ||
+      url.includes('gstatic.com')) {
     return;
   }
+
+  // Hanya handle GET
+  if (event.request.method !== 'GET') return;
 
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        // Hanya cache GET yang sukses
-        if (event.request.method === 'GET' && response.status === 200) {
+        if (response.status === 200 && response.type === 'basic') {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
