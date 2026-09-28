@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#2d5016">
     <title>Form Kunjungan Lebah - GH 1</title>
+
+    <!-- ===== PWA WAJIB ===== -->
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Kunjungan Lebah">
+    <meta name="mobile-web-app-capable" content="yes">
+    <!-- ==================== -->
+
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -267,7 +277,6 @@
 
         .kotak-input-group .unit { color: #666; font-size: 14px; font-weight: 600; }
 
-        /* ===== RIWAYAT ===== */
         .history-table {
             width: 100%;
             border-collapse: collapse;
@@ -390,7 +399,6 @@
         </div>
 
         <div class="content">
-            <!-- TAB 1: Kunjungan -->
             <div id="tab-kunjungan" class="tab-content active">
                 <div id="editIndicatorKunjungan" class="edit-indicator">✏️ Mode Edit — sedang mengedit data</div>
                 <form id="beeForm">
@@ -446,7 +454,6 @@
                 </form>
             </div>
 
-            <!-- TAB 2: Mortalitas -->
             <div id="tab-mortalitas" class="tab-content">
                 <div id="editIndicatorMortalitas" class="edit-indicator">✏️ Mode Edit — sedang mengedit data</div>
                 <form id="mortalitasForm">
@@ -497,7 +504,6 @@
                 </form>
             </div>
 
-            <!-- TAB 3: Riwayat -->
             <div id="tab-riwayat" class="tab-content">
                 <div class="history-toolbar">
                     <select id="historyType" onchange="renderHistory()">
@@ -531,7 +537,6 @@
 
     <script>
         // ==================== KONFIGURASI ====================
-        // GANTI LINK DI BAWAH INI DENGAN URL DEPLOY ANDA
         const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwkxe0yDX9KTtPquIBHBjm812bCnsG2Xkoo7qUCEmUMjgpdDl1Eg0AkqDPXU7X13dfEEg/exec';
 
         // ==================== STATE ====================
@@ -1110,8 +1115,48 @@
 
         // ==================== SERVICE WORKER ====================
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed'));
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js', { scope: './' })
+                    .then(reg => console.log('✅ SW registered:', reg.scope))
+                    .catch(err => console.error('❌ SW gagal:', err));
+            });
         }
+
+        // ==================== PWA INSTALL PROMPT ====================
+        let deferredPrompt = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            console.log('✅ PWA siap di-install');
+
+            if (document.getElementById('installBtn')) return;
+
+            const btn = document.createElement('button');
+            btn.textContent = '⬇️ Install Aplikasi';
+            btn.id = 'installBtn';
+            btn.style.cssText = `
+                position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+                background: #2d5016; color: white; padding: 12px 24px;
+                border: none; border-radius: 30px; font-weight: 700;
+                font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 9999; cursor: pointer;
+            `;
+            btn.onclick = async () => {
+                if (!deferredPrompt) return;
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log('User choice:', outcome);
+                deferredPrompt = null;
+                btn.remove();
+            };
+            document.body.appendChild(btn);
+        });
+
+        window.addEventListener('appinstalled', () => {
+            console.log('✅ PWA berhasil di-install');
+            const btn = document.getElementById('installBtn');
+            if (btn) btn.remove();
+        });
     </script>
 </body>
 </html>
