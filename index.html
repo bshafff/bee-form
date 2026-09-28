@@ -57,6 +57,36 @@
         .connection-status.online { background: rgba(76, 175, 80, 0.3); color: #fff; }
         .connection-status.offline { background: rgba(244, 67, 54, 0.3); color: #fff; }
 
+        /* Auth bar */
+        .auth-bar {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+        .hdr-btn {
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .hdr-btn-connect { background: #fff; color: #2d5016; }
+        .hdr-btn-sync { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.35); }
+        .hdr-btn-logout { background: #fee2e2; color: #dc2626; }
+
+        .auth-status-text {
+            font-size: 11px;
+            opacity: 0.95;
+            margin-top: 6px;
+        }
+        .auth-status-text.ok { color: #bbf7d0; }
+
         .content { padding: 20px; }
 
         .form-group { margin-bottom: 20px; }
@@ -369,17 +399,6 @@
         }
 
         .edit-indicator.show { display: block; }
-
-        .queue-badge {
-            display: inline-block;
-            background: #dc3545;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 10px;
-            font-weight: 700;
-            margin-left: 4px;
-        }
     </style>
 </head>
 <body>
@@ -390,6 +409,15 @@
             <div id="connectionStatus" class="connection-status online">
                 <span id="statusText">🟢 Online</span>
             </div>
+
+            <!-- ===== AUTH BAR ===== -->
+            <div class="auth-bar">
+                <button class="hdr-btn hdr-btn-sync" id="pushBtn" onclick="syncQueuedData()" style="display:none">⬆️ Sync</button>
+                <button class="hdr-btn hdr-btn-sync" id="pullBtn" onclick="fetchAllDataFromSheet()" style="display:none">⬇️ Muat</button>
+                <button class="hdr-btn hdr-btn-connect" id="authBtn" onclick="handleAuthClick()">☁️ Connect Sheets</button>
+            </div>
+            <div class="auth-status-text" id="authStatus"></div>
+            <!-- ==================== -->
         </div>
 
         <div class="tabs">
@@ -446,8 +474,8 @@
 
                     <div class="actions">
                         <button type="button" class="btn btn-reset" onclick="resetFormKunjungan()">Reset</button>
-                        <button type="submit" class="btn btn-submit" id="submitBtnKunjungan">Kirim ke Sheet</button>
-                        <button type="button" class="btn btn-delete" onclick="deleteDataKunjungan()">Hapus Terakhir dari Sheet</button>
+                        <button type="submit" class="btn btn-submit" id="submitBtnKunjungan">Kirim</button>
+                        <button type="button" class="btn btn-delete" onclick="deleteDataKunjungan()">Hapus Terakhir</button>
                     </div>
 
                     <div id="status" class="status"></div>
@@ -496,8 +524,8 @@
 
                     <div class="actions">
                         <button type="button" class="btn btn-reset" onclick="resetFormMortalitas()">Reset</button>
-                        <button type="submit" class="btn btn-submit" id="submitBtnMortalitas">Kirim ke Sheet</button>
-                        <button type="button" class="btn btn-delete" onclick="deleteDataMortalitas()">Hapus Terakhir dari Sheet</button>
+                        <button type="submit" class="btn btn-submit" id="submitBtnMortalitas">Kirim</button>
+                        <button type="button" class="btn btn-delete" onclick="deleteDataMortalitas()">Hapus Terakhir</button>
                     </div>
 
                     <div id="statusMortalitas" class="status"></div>
@@ -536,9 +564,6 @@
     </div>
 
     <script>
-        // ==================== KONFIGURASI ====================
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwoK5j5M2Va9SJjpmpvjg7KxY9QbEHWSKXU9ect4LI6y3CFJsGdaFiL7uFZmtfb22ZADA/exec';
-
         // ==================== STATE ====================
         let db;
         const dbName = 'BeeFormDB';
@@ -546,6 +571,49 @@
         let localHistory = { kunjungan: [], mortalitas: [] };
         let currentEditId = null;
         let currentEditType = null;
+
+        // ==================== KONFIGURASI AUTH ====================
+        let scriptUrl = localStorage.getItem('bee_script_url') || '';
+        let isAuthenticated = JSON.parse(localStorage.getItem('bee_auth') || 'false');
+
+        function updateAuthStatus() {
+            const s = document.getElementById('authStatus');
+            const a = document.getElementById('authBtn');
+            const p = document.getElementById('pushBtn');
+            const l = document.getElementById('pullBtn');
+            if (isAuthenticated && scriptUrl) {
+                s.innerHTML = '✓ Terhubung — Sheet sync aktif';
+                s.className = 'auth-status-text ok';
+                a.textContent = 'Putuskan';
+                a.className = 'hdr-btn hdr-btn-logout';
+                p.style.display = l.style.display = 'inline-flex';
+            } else {
+                s.innerHTML = '';
+                s.className = 'auth-status-text';
+                a.textContent = '☁️ Connect Sheets';
+                a.className = 'hdr-btn hdr-btn-connect';
+                p.style.display = l.style.display = 'none';
+            }
+        }
+
+        function handleAuthClick() {
+            if (isAuthenticated) {
+                isAuthenticated = false;
+                localStorage.setItem('bee_auth', 'false');
+                updateAuthStatus();
+                showStatus('Koneksi ke Sheets diputus', 'info');
+                return;
+            }
+            const url = prompt('Masukkan URL Apps Script Web App (/exec):', scriptUrl || '');
+            if (!url || !url.trim()) return;
+            scriptUrl = url.trim();
+            localStorage.setItem('bee_script_url', scriptUrl);
+            localStorage.setItem('bee_auth', 'true');
+            isAuthenticated = true;
+            updateAuthStatus();
+            showStatus('✓ Tersambung ke Sheets', 'success');
+            fetchAllDataFromSheet();
+        }
 
         // ==================== INDEXEDDB ====================
         function initDB() {
@@ -590,18 +658,27 @@
         }
 
         async function syncQueuedData() {
+            if (!isAuthenticated || !scriptUrl) {
+                showStatus('Belum connect ke Sheets. Klik "Connect Sheets" dulu.', 'error');
+                return;
+            }
             const queued = await getQueuedData();
+            let synced = 0;
             for (const item of queued) {
                 try {
-                    await fetch(APPS_SCRIPT_URL, {
+                    await fetch(scriptUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify(item.data)
                     });
                     await deleteFromQueue(item.id);
-                    console.log('Synced:', item.data);
-                } catch (e) { break; }
+                    synced++;
+                } catch (e) { 
+                    console.error('Sync error:', e);
+                    break; 
+                }
             }
+            showStatus(`✓ ${synced} data berhasil disinkronkan ke Sheet`, 'success');
         }
 
         // ==================== RIWAYAT LOKAL ====================
@@ -625,7 +702,7 @@
         function addLocalHistory(type, data) {
             if (!localHistory[type]) localHistory[type] = [];
             data._localId = generateLocalId();
-            data._syncedToSheet = navigator.onLine;
+            data._syncedToSheet = false;
             localHistory[type].push(data);
             saveLocalHistory();
         }
@@ -634,7 +711,7 @@
             if (!localHistory[type]) return;
             const idx = localHistory[type].findIndex(d => d._localId === localId);
             if (idx !== -1) {
-                localHistory[type][idx] = { ...newData, _localId: localId, _syncedToSheet: navigator.onLine };
+                localHistory[type][idx] = { ...newData, _localId: localId, _syncedToSheet: false };
                 saveLocalHistory();
             }
         }
@@ -654,7 +731,6 @@
                 el.classList.remove('offline');
                 el.classList.add('online');
                 txt.textContent = '🟢 Online';
-                syncQueuedData();
             } else {
                 el.classList.remove('online');
                 el.classList.add('offline');
@@ -671,6 +747,7 @@
         initDB().then(() => {
             loadLocalHistory();
             updateConnectionStatus();
+            updateAuthStatus();
             document.getElementById('tanggal').value = today;
             document.getElementById('tanggal2').value = today;
             console.log('Database initialized');
@@ -736,16 +813,16 @@
             if (isEdit) formData._localId = currentEditId;
 
             try {
-                if (navigator.onLine) {
-                    await fetch(APPS_SCRIPT_URL, {
+                if (isAuthenticated && scriptUrl && navigator.onLine) {
+                    await fetch(scriptUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify(formData)
                     });
-                    showStatus('Data berhasil dikirim! ✓', 'success');
+                    showStatus('Data berhasil dikirim ke Sheet! ✓', 'success');
                 } else {
                     await saveToQueue(formData, 'kunjungan');
-                    showStatus('Offline - Data tersimpan lokal', 'success');
+                    showStatus('Data tersimpan lokal. Klik Sync untuk kirim ke Sheet.', 'info');
                 }
 
                 if (isEdit) {
@@ -762,7 +839,7 @@
             } catch (error) {
                 console.error('Error:', error);
                 await saveToQueue(formData, 'kunjungan');
-                showStatus('Koneksi gagal - Data tersimpan lokal', 'success');
+                showStatus('Koneksi gagal - Data tersimpan lokal', 'error');
 
                 if (isEdit) {
                     updateLocalHistory('kunjungan', currentEditId, formData);
@@ -785,7 +862,7 @@
             currentEditId = null;
             currentEditType = null;
             document.getElementById('editIndicatorKunjungan').classList.remove('show');
-            document.getElementById('submitBtnKunjungan').textContent = 'Kirim ke Sheet';
+            document.getElementById('submitBtnKunjungan').textContent = 'Kirim';
         }
 
         function showStatus(message, type) {
@@ -801,8 +878,12 @@
 
         async function deleteDataKunjungan() {
             if (!confirm('Hapus data terakhir dari sheet Kunjungan? Tindakan ini tidak bisa dibatalkan.')) return;
+            if (!isAuthenticated || !scriptUrl) {
+                showStatus('Belum connect ke Sheets.', 'error');
+                return;
+            }
             try {
-                await fetch(APPS_SCRIPT_URL, {
+                await fetch(scriptUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify({ method: 'delete', sheet: 'kunjungan' })
@@ -857,16 +938,16 @@
             if (isEdit) formData._localId = currentEditId;
 
             try {
-                if (navigator.onLine) {
-                    await fetch(APPS_SCRIPT_URL, {
+                if (isAuthenticated && scriptUrl && navigator.onLine) {
+                    await fetch(scriptUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify(formData)
                     });
-                    showStatusMortalitas('Data berhasil dikirim! ✓', 'success');
+                    showStatusMortalitas('Data berhasil dikirim ke Sheet! ✓', 'success');
                 } else {
                     await saveToQueue(formData, 'mortalitas');
-                    showStatusMortalitas('Offline - Data tersimpan lokal', 'success');
+                    showStatusMortalitas('Data tersimpan lokal. Klik Sync untuk kirim ke Sheet.', 'info');
                 }
 
                 if (isEdit) {
@@ -882,7 +963,7 @@
                 renderHistory();
             } catch (error) {
                 await saveToQueue(formData, 'mortalitas');
-                showStatusMortalitas('Koneksi gagal - Data tersimpan lokal', 'success');
+                showStatusMortalitas('Koneksi gagal - Data tersimpan lokal', 'error');
 
                 if (isEdit) {
                     updateLocalHistory('mortalitas', currentEditId, formData);
@@ -908,7 +989,7 @@
             currentEditId = null;
             currentEditType = null;
             document.getElementById('editIndicatorMortalitas').classList.remove('show');
-            document.getElementById('submitBtnMortalitas').textContent = 'Kirim ke Sheet';
+            document.getElementById('submitBtnMortalitas').textContent = 'Kirim';
         }
 
         function showStatusMortalitas(message, type) {
@@ -924,8 +1005,12 @@
 
         async function deleteDataMortalitas() {
             if (!confirm('Hapus data terakhir dari sheet Mortalitas? Tindakan ini tidak bisa dibatalkan.')) return;
+            if (!isAuthenticated || !scriptUrl) {
+                showStatusMortalitas('Belum connect ke Sheets.', 'error');
+                return;
+            }
             try {
-                await fetch(APPS_SCRIPT_URL, {
+                await fetch(scriptUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify({ method: 'delete', sheet: 'mortalitas' })
@@ -1025,9 +1110,9 @@
 
             deleteLocalHistory(type, localId);
 
-            if (navigator.onLine) {
+            if (isAuthenticated && scriptUrl && navigator.onLine) {
                 try {
-                    await fetch(APPS_SCRIPT_URL, {
+                    await fetch(scriptUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify({
@@ -1050,6 +1135,12 @@
             syncStatus.className = 'status';
             syncStatus.textContent = '';
 
+            if (!isAuthenticated || !scriptUrl) {
+                syncStatus.className = 'status error';
+                syncStatus.textContent = '❌ Belum connect ke Sheets. Klik "Connect Sheets" dulu.';
+                return;
+            }
+
             if (!navigator.onLine) {
                 syncStatus.className = 'status error';
                 syncStatus.textContent = '❌ Offline - tidak dapat sinkronisasi';
@@ -1060,7 +1151,7 @@
             syncStatus.textContent = '🔄 Mengambil data dari Google Sheet...';
 
             try {
-                const res = await fetch(APPS_SCRIPT_URL + '?action=list');
+                const res = await fetch(scriptUrl + '?action=list');
                 const result = await res.json();
 
                 let sheetKunjungan = [];
