@@ -75,6 +75,7 @@
             display: inline-flex;
             align-items: center;
             gap: 4px;
+            position: relative;
         }
         .hdr-btn-connect { background: #fff; color: #2d5016; }
         .hdr-btn-sync { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.35); }
@@ -86,6 +87,19 @@
             margin-top: 6px;
         }
         .auth-status-text.ok { color: #bbf7d0; }
+
+        /* Badge counter di tombol sync */
+        .badge-count {
+            background: #dc3545;
+            color: white;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center;
+            display: inline-block;
+        }
 
         .content { padding: 20px; }
 
@@ -207,6 +221,7 @@
         button.btn-submit:active { transform: scale(0.98); }
         button.btn-submit:hover { background: #1f3810; }
         button.btn-submit:disabled { background: #999; cursor: not-allowed; }
+        button.btn-submit.loading { background: #6b8e4e; cursor: wait; }
 
         button.btn-reset { background: #f0f0f0; color: #666; }
         button.btn-reset:hover { background: #e0e0e0; }
@@ -222,6 +237,13 @@
             font-size: 14px;
             margin-top: 12px;
             display: none;
+            font-weight: 600;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .status.success {
@@ -242,6 +264,13 @@
             background: #e0f2fe;
             color: #0369a1;
             border: 1px solid #bae6fd;
+            display: block;
+        }
+
+        .status.loading {
+            background: #fff3e0;
+            color: #e65100;
+            border: 1px solid #ffcc80;
             display: block;
         }
 
@@ -399,9 +428,142 @@
         }
 
         .edit-indicator.show { display: block; }
+
+        /* ===== TOAST NOTIFICATION ===== */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+            width: calc(100% - 32px);
+            max-width: 460px;
+        }
+
+        .toast {
+            background: white;
+            border-radius: 12px;
+            padding: 14px 18px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            border-left: 5px solid #2d5016;
+            animation: toastIn 0.35s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+            pointer-events: auto;
+        }
+
+        .toast.toast-out {
+            animation: toastOut 0.3s ease-in forwards;
+        }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(-30px) scale(0.9); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateY(0) scale(1); }
+            to { opacity: 0; transform: translateY(-30px) scale(0.9); }
+        }
+
+        .toast-icon {
+            font-size: 22px;
+            flex-shrink: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        .toast-body { flex: 1; }
+        .toast-title { font-weight: 800; font-size: 14px; margin-bottom: 2px; }
+        .toast-message { font-size: 12px; font-weight: 500; opacity: 0.8; }
+
+        .toast.success { border-left-color: #2e7d32; }
+        .toast.success .toast-icon { background: #e8f5e9; color: #2e7d32; }
+
+        .toast.error { border-left-color: #dc3545; }
+        .toast.error .toast-icon { background: #fee2e2; color: #dc3545; }
+
+        .toast.info { border-left-color: #0284c7; }
+        .toast.info .toast-icon { background: #e0f2fe; color: #0284c7; }
+
+        .toast.loading { border-left-color: #e65100; }
+        .toast.loading .toast-icon { background: #fff3e0; color: #e65100; }
+        .toast.loading .toast-icon::before {
+            content: '';
+            width: 18px;
+            height: 18px;
+            border: 3px solid #e65100;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Overlay loading fullscreen */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 99998;
+            backdrop-filter: blur(2px);
+        }
+        .loading-overlay.show { display: flex; }
+
+        .loading-box {
+            background: white;
+            border-radius: 16px;
+            padding: 28px 36px;
+            text-align: center;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e0e0e0;
+            border-top-color: #2d5016;
+            border-radius: 50%;
+            margin: 0 auto 16px;
+            animation: spin 0.9s linear infinite;
+        }
+
+        .loading-text {
+            font-weight: 700;
+            color: #2d5016;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
+    <!-- ===== TOAST CONTAINER ===== -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ===== LOADING OVERLAY ===== -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-box">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">Memproses...</div>
+        </div>
+    </div>
+
     <div class="container">
         <div class="header">
             <h1>🐝 Kunjungan Lebah</h1>
@@ -412,7 +574,9 @@
 
             <!-- ===== AUTH BAR ===== -->
             <div class="auth-bar">
-                <button class="hdr-btn hdr-btn-sync" id="pushBtn" onclick="syncQueuedData()" style="display:none">⬆️ Sync</button>
+                <button class="hdr-btn hdr-btn-sync" id="pushBtn" onclick="syncQueuedData()" style="display:none">
+                    ⬆️ Sync <span class="badge-count" id="queueBadge" style="display:none">0</span>
+                </button>
                 <button class="hdr-btn hdr-btn-sync" id="pullBtn" onclick="fetchAllDataFromSheet()" style="display:none">⬇️ Muat</button>
                 <button class="hdr-btn hdr-btn-connect" id="authBtn" onclick="handleAuthClick()">☁️ Connect Sheets</button>
             </div>
@@ -576,6 +740,54 @@
         let scriptUrl = localStorage.getItem('bee_script_url') || '';
         let isAuthenticated = JSON.parse(localStorage.getItem('bee_auth') || 'false');
 
+        // ==================== TOAST SYSTEM ====================
+        function showToast(title, message, type = 'success', duration = 3500) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            let iconHtml = '';
+            if (type === 'loading') {
+                iconHtml = '<div class="toast-icon"></div>';
+            } else {
+                const icons = {
+                    success: '✓',
+                    error: '✕',
+                    info: 'ℹ'
+                };
+                iconHtml = `<div class="toast-icon">${icons[type] || '✓'}</div>`;
+            }
+
+            toast.innerHTML = `
+                ${iconHtml}
+                <div class="toast-body">
+                    <div class="toast-title">${title}</div>
+                    ${message ? `<div class="toast-message">${message}</div>` : ''}
+                </div>
+            `;
+
+            container.appendChild(toast);
+
+            if (duration > 0) {
+                setTimeout(() => {
+                    toast.classList.add('toast-out');
+                    setTimeout(() => toast.remove(), 300);
+                }, duration);
+            }
+
+            return toast;
+        }
+
+        function showLoadingOverlay(text = 'Memproses...') {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingOverlay').classList.add('show');
+        }
+
+        function hideLoadingOverlay() {
+            document.getElementById('loadingOverlay').classList.remove('show');
+        }
+
+        // ==================== AUTH STATUS ====================
         function updateAuthStatus() {
             const s = document.getElementById('authStatus');
             const a = document.getElementById('authBtn');
@@ -587,6 +799,7 @@
                 a.textContent = 'Putuskan';
                 a.className = 'hdr-btn hdr-btn-logout';
                 p.style.display = l.style.display = 'inline-flex';
+                updateQueueBadge();
             } else {
                 s.innerHTML = '';
                 s.className = 'auth-status-text';
@@ -596,12 +809,28 @@
             }
         }
 
+        // ==================== QUEUE BADGE ====================
+        async function updateQueueBadge() {
+            try {
+                const queued = await getQueuedData();
+                const badge = document.getElementById('queueBadge');
+                if (!badge) return;
+                if (queued.length > 0) {
+                    badge.textContent = queued.length;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            } catch (e) { console.error(e); }
+        }
+
         function handleAuthClick() {
             if (isAuthenticated) {
+                if (!confirm('Putuskan koneksi ke Google Sheets?')) return;
                 isAuthenticated = false;
                 localStorage.setItem('bee_auth', 'false');
                 updateAuthStatus();
-                showStatus('Koneksi ke Sheets diputus', 'info');
+                showToast('Koneksi Diputus', 'Aplikasi kembali ke mode lokal.', 'info');
                 return;
             }
             const url = prompt('Masukkan URL Apps Script Web App (/exec):', scriptUrl || '');
@@ -611,7 +840,7 @@
             localStorage.setItem('bee_auth', 'true');
             isAuthenticated = true;
             updateAuthStatus();
-            showStatus('✓ Tersambung ke Sheets', 'success');
+            showToast('Tersambung! ✓', 'Berhasil connect ke Google Sheets.', 'success');
             fetchAllDataFromSheet();
         }
 
@@ -636,6 +865,7 @@
                 tx.objectStore(storeName).add({
                     data, type, timestamp: new Date().toISOString(), synced: false
                 });
+                updateQueueBadge();
             } catch (e) { console.error('Queue error:', e); }
         }
 
@@ -653,32 +883,56 @@
                 const tx = db.transaction(storeName, 'readwrite');
                 const req = tx.objectStore(storeName).delete(id);
                 req.onerror = () => reject(req.error);
-                req.onsuccess = () => resolve();
+                req.onsuccess = () => {
+                    resolve();
+                    updateQueueBadge();
+                };
             });
         }
 
         async function syncQueuedData() {
             if (!isAuthenticated || !scriptUrl) {
-                showStatus('Belum connect ke Sheets. Klik "Connect Sheets" dulu.', 'error');
+                showToast('Belum Tersambung', 'Klik "Connect Sheets" dulu ya.', 'error');
                 return;
             }
+
             const queued = await getQueuedData();
+            if (queued.length === 0) {
+                showToast('Tidak Ada Data', 'Semua data sudah tersinkron.', 'info');
+                return;
+            }
+
+            if (!confirm(`Sinkronkan ${queued.length} data ke Google Sheets sekarang?`)) return;
+
+            showLoadingOverlay(`Mengirim ${queued.length} data...`);
+
             let synced = 0;
+            let failed = 0;
+
             for (const item of queued) {
                 try {
-                    await fetch(scriptUrl, {
+                    const res = await fetch(scriptUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify(item.data)
                     });
+                    await res.json();
                     await deleteFromQueue(item.id);
                     synced++;
-                } catch (e) { 
+                } catch (e) {
                     console.error('Sync error:', e);
-                    break; 
+                    failed++;
                 }
             }
-            showStatus(`✓ ${synced} data berhasil disinkronkan ke Sheet`, 'success');
+
+            hideLoadingOverlay();
+            updateQueueBadge();
+
+            if (failed === 0) {
+                showToast('Sinkron Berhasil! 🎉', `${synced} data terkirim ke Google Sheet.`, 'success', 4000);
+            } else {
+                showToast('Sinkron Sebagian', `${synced} berhasil, ${failed} gagal. Coba lagi nanti.`, 'error', 5000);
+            }
         }
 
         // ==================== RIWAYAT LOKAL ====================
@@ -738,8 +992,14 @@
             }
         }
 
-        window.addEventListener('online', updateConnectionStatus);
-        window.addEventListener('offline', updateConnectionStatus);
+        window.addEventListener('online', () => {
+            updateConnectionStatus();
+            showToast('Kembali Online', 'Koneksi internet tersambung.', 'success', 2500);
+        });
+        window.addEventListener('offline', () => {
+            updateConnectionStatus();
+            showToast('Mode Offline', 'Data akan disimpan lokal dulu.', 'info', 3000);
+        });
 
         const today = new Date().toISOString().split('T')[0];
 
@@ -748,6 +1008,7 @@
             loadLocalHistory();
             updateConnectionStatus();
             updateAuthStatus();
+            updateQueueBadge();
             document.getElementById('tanggal').value = today;
             document.getElementById('tanggal2').value = today;
             console.log('Database initialized');
@@ -812,17 +1073,39 @@
 
             if (isEdit) formData._localId = currentEditId;
 
+            // Disable tombol & kasih indikator
+            const submitBtn = document.getElementById('submitBtnKunjungan');
+            submitBtn.disabled = true;
+            submitBtn.classList.add('loading');
+            submitBtn.textContent = isEdit ? 'Mengupdate...' : 'Mengirim...';
+
+            showStatusKunjungan(isEdit ? 'Mengupdate data...' : 'Mengirim data...', 'loading');
+
             try {
                 if (isAuthenticated && scriptUrl && navigator.onLine) {
-                    await fetch(scriptUrl, {
+                    const res = await fetch(scriptUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify(formData)
                     });
-                    showStatus('Data berhasil dikirim ke Sheet! ✓', 'success');
+                    const result = await res.json().catch(() => ({}));
+
+                    if (result.status === 'error') throw new Error(result.message || 'Gagal');
+
+                    showStatusKunjungan(isEdit ? '✓ Data berhasil diupdate ke Sheet!' : '✓ Data berhasil dikirim ke Sheet!', 'success');
+                    showToast(
+                        isEdit ? 'Update Berhasil! ✏️' : 'Data Terkirim! ✓',
+                        isEdit ? 'Perubahan tersimpan di Google Sheet.' : 'Kunjungan tersimpan di Google Sheet.',
+                        'success', 4000
+                    );
                 } else {
                     await saveToQueue(formData, 'kunjungan');
-                    showStatus('Data tersimpan lokal. Klik Sync untuk kirim ke Sheet.', 'info');
+                    showStatusKunjungan('📥 Data tersimpan lokal. Klik Sync untuk kirim ke Sheet.', 'info');
+                    showToast(
+                        'Tersimpan Lokal 📥',
+                        'Klik tombol Sync untuk kirim ke Google Sheet.',
+                        'info', 4500
+                    );
                 }
 
                 if (isEdit) {
@@ -836,10 +1119,16 @@
 
                 resetFormKunjungan();
                 renderHistory();
+                updateQueueBadge();
             } catch (error) {
                 console.error('Error:', error);
                 await saveToQueue(formData, 'kunjungan');
-                showStatus('Koneksi gagal - Data tersimpan lokal', 'error');
+                showStatusKunjungan('⚠️ Koneksi gagal - Data tersimpan lokal', 'error');
+                showToast(
+                    'Gagal Kirim ⚠️',
+                    'Tersimpan lokal. Coba sync nanti.',
+                    'error', 5000
+                );
 
                 if (isEdit) {
                     updateLocalHistory('kunjungan', currentEditId, formData);
@@ -851,6 +1140,7 @@
                 }
                 resetFormKunjungan();
                 renderHistory();
+                updateQueueBadge();
             }
         });
 
@@ -858,40 +1148,24 @@
             document.getElementById('beeForm').reset();
             Object.keys(bays).forEach(bay => { bays[bay] = 0; updateBayDisplay(bay); });
             document.getElementById('tanggal').value = today;
-            hideStatus();
+            hideStatusKunjungan();
             currentEditId = null;
             currentEditType = null;
             document.getElementById('editIndicatorKunjungan').classList.remove('show');
-            document.getElementById('submitBtnKunjungan').textContent = 'Kirim';
+            const submitBtn = document.getElementById('submitBtnKunjungan');
+            submitBtn.textContent = 'Kirim';
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('loading');
         }
 
-        function showStatus(message, type) {
+        function showStatusKunjungan(message, type) {
             const status = document.getElementById('status');
             status.textContent = message;
             status.className = `status ${type}`;
-            setTimeout(() => {
-                status.className = 'status';
-            }, 4000);
         }
 
-        function hideStatus() { document.getElementById('status').className = 'status'; }
-
-        async function deleteDataKunjungan() {
-            if (!confirm('Hapus data terakhir dari sheet Kunjungan? Tindakan ini tidak bisa dibatalkan.')) return;
-            if (!isAuthenticated || !scriptUrl) {
-                showStatus('Belum connect ke Sheets.', 'error');
-                return;
-            }
-            try {
-                await fetch(scriptUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify({ method: 'delete', sheet: 'kunjungan' })
-                });
-                showStatus('Data terakhir berhasil dihapus! ✓', 'success');
-            } catch (error) {
-                showStatus('Gagal menghapus. Periksa koneksi internet.', 'error');
-            }
+        function hideStatusKunjungan() {
+            document.getElementById('status').className = 'status';
         }
 
         // ==================== TAB 2: MORTALITAS ====================
@@ -937,17 +1211,38 @@
 
             if (isEdit) formData._localId = currentEditId;
 
+            const submitBtn = document.getElementById('submitBtnMortalitas');
+            submitBtn.disabled = true;
+            submitBtn.classList.add('loading');
+            submitBtn.textContent = isEdit ? 'Mengupdate...' : 'Mengirim...';
+
+            showStatusMortalitas(isEdit ? 'Mengupdate data...' : 'Mengirim data...', 'loading');
+
             try {
                 if (isAuthenticated && scriptUrl && navigator.onLine) {
-                    await fetch(scriptUrl, {
+                    const res = await fetch(scriptUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify(formData)
                     });
-                    showStatusMortalitas('Data berhasil dikirim ke Sheet! ✓', 'success');
+                    const result = await res.json().catch(() => ({}));
+
+                    if (result.status === 'error') throw new Error(result.message || 'Gagal');
+
+                    showStatusMortalitas(isEdit ? '✓ Data berhasil diupdate ke Sheet!' : '✓ Data berhasil dikirim ke Sheet!', 'success');
+                    showToast(
+                        isEdit ? 'Update Berhasil! ✏️' : 'Data Terkirim! ✓',
+                        isEdit ? 'Perubahan tersimpan di Google Sheet.' : 'Data mortalitas tersimpan di Google Sheet.',
+                        'success', 4000
+                    );
                 } else {
                     await saveToQueue(formData, 'mortalitas');
-                    showStatusMortalitas('Data tersimpan lokal. Klik Sync untuk kirim ke Sheet.', 'info');
+                    showStatusMortalitas('📥 Data tersimpan lokal. Klik Sync untuk kirim ke Sheet.', 'info');
+                    showToast(
+                        'Tersimpan Lokal 📥',
+                        'Klik tombol Sync untuk kirim ke Google Sheet.',
+                        'info', 4500
+                    );
                 }
 
                 if (isEdit) {
@@ -961,9 +1256,15 @@
 
                 resetFormMortalitas();
                 renderHistory();
+                updateQueueBadge();
             } catch (error) {
                 await saveToQueue(formData, 'mortalitas');
-                showStatusMortalitas('Koneksi gagal - Data tersimpan lokal', 'error');
+                showStatusMortalitas('⚠️ Koneksi gagal - Data tersimpan lokal', 'error');
+                showToast(
+                    'Gagal Kirim ⚠️',
+                    'Tersimpan lokal. Coba sync nanti.',
+                    'error', 5000
+                );
 
                 if (isEdit) {
                     updateLocalHistory('mortalitas', currentEditId, formData);
@@ -975,6 +1276,7 @@
                 }
                 resetFormMortalitas();
                 renderHistory();
+                updateQueueBadge();
             }
         });
 
@@ -989,35 +1291,66 @@
             currentEditId = null;
             currentEditType = null;
             document.getElementById('editIndicatorMortalitas').classList.remove('show');
-            document.getElementById('submitBtnMortalitas').textContent = 'Kirim';
+            const submitBtn = document.getElementById('submitBtnMortalitas');
+            submitBtn.textContent = 'Kirim';
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('loading');
         }
 
         function showStatusMortalitas(message, type) {
             const status = document.getElementById('statusMortalitas');
             status.textContent = message;
             status.className = `status ${type}`;
-            setTimeout(() => {
-                status.className = 'status';
-            }, 4000);
         }
 
-        function hideStatusMortalitas() { document.getElementById('statusMortalitas').className = 'status'; }
+        function hideStatusMortalitas() {
+            document.getElementById('statusMortalitas').className = 'status';
+        }
+
+        // ==================== HAPUS ====================
+        async function deleteDataKunjungan() {
+            if (!confirm('Hapus data terakhir dari sheet Kunjungan? Tindakan ini tidak bisa dibatalkan.')) return;
+            if (!isAuthenticated || !scriptUrl) {
+                showToast('Belum Tersambung', 'Klik "Connect Sheets" dulu.', 'error');
+                return;
+            }
+            showLoadingOverlay('Menghapus data...');
+            try {
+                await fetch(scriptUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ method: 'delete', sheet: 'kunjungan' })
+                });
+                hideLoadingOverlay();
+                showToast('Data Dihapus! 🗑️', 'Baris terakhir sheet Kunjungan dihapus.', 'success');
+                showStatusKunjungan('✓ Data terakhir berhasil dihapus!', 'success');
+            } catch (error) {
+                hideLoadingOverlay();
+                showToast('Gagal Hapus', 'Periksa koneksi internet.', 'error');
+                showStatusKunjungan('Gagal menghapus.', 'error');
+            }
+        }
 
         async function deleteDataMortalitas() {
             if (!confirm('Hapus data terakhir dari sheet Mortalitas? Tindakan ini tidak bisa dibatalkan.')) return;
             if (!isAuthenticated || !scriptUrl) {
-                showStatusMortalitas('Belum connect ke Sheets.', 'error');
+                showToast('Belum Tersambung', 'Klik "Connect Sheets" dulu.', 'error');
                 return;
             }
+            showLoadingOverlay('Menghapus data...');
             try {
                 await fetch(scriptUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify({ method: 'delete', sheet: 'mortalitas' })
                 });
-                showStatusMortalitas('Data terakhir berhasil dihapus! ✓', 'success');
+                hideLoadingOverlay();
+                showToast('Data Dihapus! 🗑️', 'Baris terakhir sheet Mortalitas dihapus.', 'success');
+                showStatusMortalitas('✓ Data terakhir berhasil dihapus!', 'success');
             } catch (error) {
-                showStatusMortalitas('Gagal menghapus. Periksa koneksi internet.', 'error');
+                hideLoadingOverlay();
+                showToast('Gagal Hapus', 'Periksa koneksi internet.', 'error');
+                showStatusMortalitas('Gagal menghapus.', 'error');
             }
         }
 
@@ -1038,9 +1371,14 @@
                 return db2.localeCompare(da);
             });
 
-            tbody.innerHTML = sorted.map(item => `
+            tbody.innerHTML = sorted.map(item => {
+                const synced = item._syncedToSheet;
+                const badge = synced
+                    ? '<span style="color:#2e7d32;font-size:9px;font-weight:700;">● SENT</span>'
+                    : '<span style="color:#e65100;font-size:9px;font-weight:700;">● LOCAL</span>';
+                return `
                 <tr>
-                    <td>${item.tanggal || '-'}</td>
+                    <td>${item.tanggal || '-'}<br>${badge}</td>
                     <td>${item.waktu || '-'}</td>
                     <td>${item.gh || '-'}</td>
                     <td>${item.cuaca || '-'}</td>
@@ -1049,7 +1387,7 @@
                         <button class="history-btn history-btn-delete" onclick="deleteHistoryItem('${type}','${item._localId}')">🗑️</button>
                     </td>
                 </tr>
-            `).join('');
+            `}).join('');
         }
 
         function editHistory(type, localId) {
@@ -1099,6 +1437,7 @@
                 document.getElementById('submitBtnMortalitas').textContent = 'Update Data';
             }
 
+            showToast('Mode Edit ✏️', 'Ubah data lalu klik Update.', 'info', 2500);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -1110,7 +1449,7 @@
 
             deleteLocalHistory(type, localId);
 
-            if (isAuthenticated && scriptUrl && navigator.onLine) {
+            if (isAuthenticated && scriptUrl && navigator.onLine && !localId.startsWith('sheet_')) {
                 try {
                     await fetch(scriptUrl, {
                         method: 'POST',
@@ -1126,6 +1465,7 @@
                 } catch (e) { console.error('Delete sync error:', e); }
             }
 
+            showToast('Data Dihapus 🗑️', `Data ${data.tanggal} ${data.waktu || ''} dihapus.`, 'success', 3000);
             renderHistory();
         }
 
@@ -1138,15 +1478,18 @@
             if (!isAuthenticated || !scriptUrl) {
                 syncStatus.className = 'status error';
                 syncStatus.textContent = '❌ Belum connect ke Sheets. Klik "Connect Sheets" dulu.';
+                showToast('Belum Tersambung', 'Connect Sheets dulu.', 'error');
                 return;
             }
 
             if (!navigator.onLine) {
                 syncStatus.className = 'status error';
                 syncStatus.textContent = '❌ Offline - tidak dapat sinkronisasi';
+                showToast('Offline', 'Tidak bisa sinkron sekarang.', 'error');
                 return;
             }
 
+            showLoadingOverlay('Mengambil data dari Sheet...');
             syncStatus.className = 'status info';
             syncStatus.textContent = '🔄 Mengambil data dari Google Sheet...';
 
@@ -1168,17 +1511,6 @@
                         _localId: 'sheet_' + (d.tanggal || '') + '_' + (d.waktu || '') + '_' + (d.gh || ''),
                         _syncedToSheet: true
                     }));
-                } else if (Array.isArray(result)) {
-                    sheetKunjungan = result.filter(d => d.sheet === 'kunjungan' || d.type === 'kunjungan').map(d => ({
-                        ...d,
-                        _localId: 'sheet_' + (d.tanggal || '') + '_' + (d.waktu || '') + '_' + (d.gh || ''),
-                        _syncedToSheet: true
-                    }));
-                    sheetMortalitas = result.filter(d => d.sheet === 'mortalitas' || d.type === 'mortalitas').map(d => ({
-                        ...d,
-                        _localId: 'sheet_' + (d.tanggal || '') + '_' + (d.waktu || '') + '_' + (d.gh || ''),
-                        _syncedToSheet: true
-                    }));
                 }
 
                 const mergeData = (local, sheet) => {
@@ -1191,16 +1523,25 @@
                 saveLocalHistory();
 
                 renderHistory();
+                hideLoadingOverlay();
 
                 syncStatus.className = 'status success';
                 syncStatus.textContent = `✓ Berhasil sinkron! ${sheetKunjungan.length} kunjungan, ${sheetMortalitas.length} mortalitas`;
+                showToast(
+                    'Sinkron Berhasil! 🔄',
+                    `${sheetKunjungan.length} kunjungan, ${sheetMortalitas.length} mortalitas dimuat.`,
+                    'success', 4000
+                );
+
                 setTimeout(() => {
                     syncStatus.className = 'status';
                 }, 5000);
             } catch (e) {
                 console.error('Sync error:', e);
+                hideLoadingOverlay();
                 syncStatus.className = 'status error';
                 syncStatus.textContent = '❌ Gagal sinkronisasi: ' + e.message;
+                showToast('Gagal Sinkron', e.message, 'error', 5000);
             }
         }
 
