@@ -5,13 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#2d5016">
     <title>Form Kunjungan Lebah - GH 1</title>
-    <link rel="manifest" href="manifest.json">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -37,15 +32,8 @@
             text-align: center;
         }
 
-        .header h1 {
-            font-size: 20px;
-            margin-bottom: 4px;
-        }
-
-        .header p {
-            font-size: 12px;
-            opacity: 0.9;
-        }
+        .header h1 { font-size: 20px; margin-bottom: 4px; }
+        .header p { font-size: 12px; opacity: 0.9; }
 
         .connection-status {
             margin-top: 12px;
@@ -56,23 +44,12 @@
             text-align: center;
         }
 
-        .connection-status.online {
-            background: rgba(76, 175, 80, 0.3);
-            color: #fff;
-        }
+        .connection-status.online { background: rgba(76, 175, 80, 0.3); color: #fff; }
+        .connection-status.offline { background: rgba(244, 67, 54, 0.3); color: #fff; }
 
-        .connection-status.offline {
-            background: rgba(244, 67, 54, 0.3);
-            color: #fff;
-        }
+        .content { padding: 20px; }
 
-        .content {
-            padding: 20px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
+        .form-group { margin-bottom: 20px; }
 
         .form-group label {
             display: block;
@@ -100,11 +77,7 @@
             box-shadow: 0 0 0 3px rgba(45, 80, 22, 0.1);
         }
 
-        .row-inputs {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
+        .row-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
         .bays-section {
             margin-top: 20px;
@@ -130,11 +103,7 @@
             border: 1px solid #e0e0e0;
         }
 
-        .bay-label {
-            font-weight: 600;
-            color: #2d5016;
-            min-width: 50px;
-        }
+        .bay-label { font-weight: 600; color: #2d5016; min-width: 50px; }
 
         .counter {
             display: flex;
@@ -162,14 +131,8 @@
             font-weight: bold;
         }
 
-        .counter button:active {
-            background: #1f3810;
-            transform: scale(0.95);
-        }
-
-        .counter button:hover {
-            background: #3d6b1e;
-        }
+        .counter button:active { background: #1f3810; transform: scale(0.95); }
+        .counter button:hover { background: #3d6b1e; }
 
         .counter-value {
             min-width: 40px;
@@ -188,9 +151,7 @@
             border-top: 2px solid #e0e0e0;
         }
 
-        .actions button:nth-child(3) {
-            grid-column: 1 / -1;
-        }
+        .actions button:nth-child(3) { grid-column: 1 / -1; }
 
         button.btn {
             padding: 12px;
@@ -202,41 +163,17 @@
             transition: all 0.3s;
         }
 
-        button.btn-submit {
-            background: #2d5016;
-            color: white;
-        }
+        button.btn-submit { background: #2d5016; color: white; }
+        button.btn-submit:active { transform: scale(0.98); }
+        button.btn-submit:hover { background: #1f3810; }
+        button.btn-submit:disabled { background: #999; cursor: not-allowed; }
 
-        button.btn-submit:active {
-            transform: scale(0.98);
-        }
+        button.btn-reset { background: #f0f0f0; color: #666; }
+        button.btn-reset:hover { background: #e0e0e0; }
 
-        button.btn-submit:hover {
-            background: #1f3810;
-        }
-
-        button.btn-reset {
-            background: #f0f0f0;
-            color: #666;
-        }
-
-        button.btn-reset:hover {
-            background: #e0e0e0;
-        }
-
-        button.btn-delete {
-            background: #dc3545;
-            color: white;
-            grid-column: 1 / -1;
-        }
-
-        button.btn-delete:hover {
-            background: #c82333;
-        }
-
-        button.btn-delete:active {
-            transform: scale(0.98);
-        }
+        button.btn-delete { background: #dc3545; color: white; grid-column: 1 / -1; }
+        button.btn-delete:hover { background: #c82333; }
+        button.btn-delete:active { transform: scale(0.98); }
 
         .status {
             padding: 12px;
@@ -261,10 +198,11 @@
             display: block;
         }
 
-        .info-text {
-            font-size: 12px;
-            color: #666;
-            margin-top: 4px;
+        .status.info {
+            background: #e0f2fe;
+            color: #0369a1;
+            border: 1px solid #bae6fd;
+            display: block;
         }
 
         .tabs {
@@ -275,20 +213,18 @@
 
         .tab-btn {
             flex: 1;
-            padding: 16px;
+            padding: 14px 8px;
             border: none;
             background: transparent;
             color: #666;
             font-weight: 600;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
             transition: all 0.3s;
             position: relative;
         }
 
-        .tab-btn.active {
-            color: #2d5016;
-        }
+        .tab-btn.active { color: #2d5016; }
 
         .tab-btn.active::after {
             content: '';
@@ -300,17 +236,10 @@
             background: #2d5016;
         }
 
-        .tab-btn:hover {
-            background: #f9f9f9;
-        }
+        .tab-btn:hover { background: #f9f9f9; }
 
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
 
         .kotak-item {
             display: flex;
@@ -323,17 +252,9 @@
             border: 1px solid #e0e0e0;
         }
 
-        .kotak-label {
-            font-weight: 600;
-            color: #2d5016;
-            min-width: 100px;
-        }
+        .kotak-label { font-weight: 600; color: #2d5016; min-width: 100px; }
 
-        .kotak-input-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+        .kotak-input-group { display: flex; align-items: center; gap: 8px; }
 
         .kotak-input-group input {
             width: 70px;
@@ -344,35 +265,135 @@
             font-weight: 600;
         }
 
-        .kotak-input-group .unit {
-            color: #666;
-            font-size: 14px;
+        .kotak-input-group .unit { color: #666; font-size: 14px; font-weight: 600; }
+
+        /* ===== RIWAYAT ===== */
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.75rem;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .history-table th,
+        .history-table td {
+            padding: 8px 6px;
+            border: 1px solid #e0e0e0;
+            text-align: left;
+        }
+
+        .history-table th {
+            background: #f1f5f9;
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+        }
+
+        .history-table tr:hover { background: #f9fafb; }
+
+        .history-btn {
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 700;
+            font-size: 0.7rem;
+            cursor: pointer;
+            margin-right: 2px;
+        }
+
+        .history-btn-edit { background: #e0f2fe; color: #0369a1; }
+        .history-btn-delete { background: #fee2e2; color: #dc2626; }
+
+        .history-empty {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 0.85rem;
+        }
+
+        .sync-btn {
+            background: #2d5016;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .sync-btn:active { transform: scale(0.97); }
+        .sync-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .history-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .history-toolbar select {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.8rem;
             font-weight: 600;
         }
+
+        .edit-indicator {
+            display: none;
+            background: #fff3e0;
+            color: #e65100;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            border-left: 4px solid #e65100;
+        }
+
+        .edit-indicator.show { display: block; }
+
+        .queue-badge {
+            display: inline-block;
+            background: #dc3545;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-left: 4px;
+        }
     </style>
-<base target="_blank">
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1 id="headerTitle">🐝 Kunjungan Lebah</h1>
+            <h1>🐝 Kunjungan Lebah</h1>
             <p>PT. Agri Wangi Berry - Pantau Rate Polinasi</p>
             <div id="connectionStatus" class="connection-status online">
                 <span id="statusText">🟢 Online</span>
             </div>
         </div>
 
-        <!-- Tab Navigation -->
         <div class="tabs">
             <button class="tab-btn active" data-tab="tab-kunjungan">Kunjungan</button>
             <button class="tab-btn" data-tab="tab-mortalitas">Mortalitas</button>
+            <button class="tab-btn" data-tab="tab-riwayat">Riwayat</button>
         </div>
 
         <div class="content">
-            <!-- TAB 1: Kunjungan Lebah -->
+            <!-- TAB 1: Kunjungan -->
             <div id="tab-kunjungan" class="tab-content active">
+                <div id="editIndicatorKunjungan" class="edit-indicator">✏️ Mode Edit — sedang mengedit data</div>
                 <form id="beeForm">
-                    <!-- Basic Info -->
                     <div class="form-group">
                         <label for="tanggal">Tanggal</label>
                         <input type="date" id="tanggal" required>
@@ -410,17 +431,15 @@
                         </select>
                     </div>
 
-                    <!-- Bays Counter -->
                     <div class="bays-section">
                         <h3>Jumlah Kunjungan per Bay</h3>
                         <div id="baysList"></div>
                     </div>
 
-                    <!-- Actions -->
                     <div class="actions">
                         <button type="button" class="btn btn-reset" onclick="resetFormKunjungan()">Reset</button>
-                        <button type="submit" class="btn btn-submit">Kirim ke Sheet</button>
-                        <button type="button" class="btn btn-delete" onclick="deleteDataKunjungan()">Hapus Terakhir</button>
+                        <button type="submit" class="btn btn-submit" id="submitBtnKunjungan">Kirim ke Sheet</button>
+                        <button type="button" class="btn btn-delete" onclick="deleteDataKunjungan()">Hapus Terakhir dari Sheet</button>
                     </div>
 
                     <div id="status" class="status"></div>
@@ -429,8 +448,8 @@
 
             <!-- TAB 2: Mortalitas -->
             <div id="tab-mortalitas" class="tab-content">
+                <div id="editIndicatorMortalitas" class="edit-indicator">✏️ Mode Edit — sedang mengedit data</div>
                 <form id="mortalitasForm">
-                    <!-- Basic Info -->
                     <div class="form-group">
                         <label for="tanggal2">Tanggal</label>
                         <input type="date" id="tanggal2" required>
@@ -463,45 +482,71 @@
                         </select>
                     </div>
 
-                    <!-- Kotak Lebah Counter -->
                     <div class="bays-section">
                         <h3>Persentase Lebah Hidup per Kotak</h3>
                         <div id="kotakList"></div>
                     </div>
 
-                    <!-- Actions -->
                     <div class="actions">
                         <button type="button" class="btn btn-reset" onclick="resetFormMortalitas()">Reset</button>
-                        <button type="submit" class="btn btn-submit">Kirim ke Sheet</button>
-                        <button type="button" class="btn btn-delete" onclick="deleteDataMortalitas()">Hapus Terakhir</button>
+                        <button type="submit" class="btn btn-submit" id="submitBtnMortalitas">Kirim ke Sheet</button>
+                        <button type="button" class="btn btn-delete" onclick="deleteDataMortalitas()">Hapus Terakhir dari Sheet</button>
                     </div>
 
                     <div id="statusMortalitas" class="status"></div>
                 </form>
             </div>
+
+            <!-- TAB 3: Riwayat -->
+            <div id="tab-riwayat" class="tab-content">
+                <div class="history-toolbar">
+                    <select id="historyType" onchange="renderHistory()">
+                        <option value="kunjungan">🐝 Kunjungan</option>
+                        <option value="mortalitas">💀 Mortalitas</option>
+                    </select>
+                    <button class="sync-btn" onclick="fetchAllDataFromSheet()">🔄 Sinkron ke Sheet</button>
+                </div>
+
+                <div style="overflow-x:auto;">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Tanggal</th>
+                                <th>Waktu</th>
+                                <th>GH</th>
+                                <th>Cuaca</th>
+                                <th style="text-align:center;">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyBody">
+                            <tr><td colspan="5" class="history-empty">Memuat data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="syncStatus" class="status"></div>
+            </div>
         </div>
     </div>
 
     <script>
-        // ===== KONFIGURASI: tempel URL deployment Apps Script kamu di sini =====
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby1c5bUtyIE4zXMEky_xjP3DXxeEQbYLVbQDlhvKzZRerwWJWQLIVx8z-nSyR3U1eRZqw/exec';
+        // ==================== KONFIGURASI ====================
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx17wfa7xEYZbYUWFXH7ru-PG59EHnzwK4Moo_t7n9Jjwf5Sgl-zaAEu8UCxHK99HNzWw/exec';
 
-        // ===== OFFLINE-FIRST DB =====
+        // ==================== STATE ====================
         let db;
         const dbName = 'BeeFormDB';
         const storeName = 'formQueue';
+        let localHistory = { kunjungan: [], mortalitas: [] };
+        let currentEditId = null;
+        let currentEditType = null;
 
-        // Initialize IndexedDB
+        // ==================== INDEXEDDB ====================
         function initDB() {
             return new Promise((resolve, reject) => {
                 const request = indexedDB.open(dbName, 1);
-                
                 request.onerror = () => reject(request.error);
-                request.onsuccess = () => {
-                    db = request.result;
-                    resolve(db);
-                };
-                
+                request.onsuccess = () => { db = request.result; resolve(db); };
                 request.onupgradeneeded = (e) => {
                     const database = e.target.result;
                     if (!database.objectStoreNames.contains(storeName)) {
@@ -511,100 +556,121 @@
             });
         }
 
-        // Save data to queue
         async function saveToQueue(data, type) {
             try {
                 const tx = db.transaction(storeName, 'readwrite');
-                const store = tx.objectStore(storeName);
-                store.add({
-                    data: data,
-                    type: type,
-                    timestamp: new Date().toISOString(),
-                    synced: false
+                tx.objectStore(storeName).add({
+                    data, type, timestamp: new Date().toISOString(), synced: false
                 });
-            } catch (error) {
-                console.error('Error saving to queue:', error);
-            }
+            } catch (e) { console.error('Queue error:', e); }
         }
 
-        // Get all queued data
         async function getQueuedData() {
             return new Promise((resolve, reject) => {
                 const tx = db.transaction(storeName, 'readonly');
-                const store = tx.objectStore(storeName);
-                const request = store.getAll();
-                
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => resolve(request.result);
+                const req = tx.objectStore(storeName).getAll();
+                req.onerror = () => reject(req.error);
+                req.onsuccess = () => resolve(req.result);
             });
         }
 
-        // Delete from queue
         async function deleteFromQueue(id) {
             return new Promise((resolve, reject) => {
                 const tx = db.transaction(storeName, 'readwrite');
-                const store = tx.objectStore(storeName);
-                const request = store.delete(id);
-                
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => resolve();
+                const req = tx.objectStore(storeName).delete(id);
+                req.onerror = () => reject(req.error);
+                req.onsuccess = () => resolve();
             });
         }
 
-        // Sync all queued data
         async function syncQueuedData() {
             const queued = await getQueuedData();
-            
             for (const item of queued) {
                 try {
-                    const response = await fetch(APPS_SCRIPT_URL, {
+                    await fetch(APPS_SCRIPT_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify(item.data)
                     });
-                    
                     await deleteFromQueue(item.id);
                     console.log('Synced:', item.data);
-                } catch (error) {
-                    console.error('Sync error:', error);
-                    break; // Stop if one fails
-                }
+                } catch (e) { break; }
             }
         }
 
-        // ===== CONNECTION STATUS =====
+        // ==================== RIWAYAT LOKAL ====================
+        function loadLocalHistory() {
+            const saved = localStorage.getItem('bee_local_history');
+            if (saved) {
+                try { localHistory = JSON.parse(saved); } catch(e) {}
+            }
+            if (!localHistory.kunjungan) localHistory.kunjungan = [];
+            if (!localHistory.mortalitas) localHistory.mortalitas = [];
+        }
+
+        function saveLocalHistory() {
+            localStorage.setItem('bee_local_history', JSON.stringify(localHistory));
+        }
+
+        function generateLocalId() {
+            return Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        }
+
+        function addLocalHistory(type, data) {
+            if (!localHistory[type]) localHistory[type] = [];
+            data._localId = generateLocalId();
+            data._syncedToSheet = navigator.onLine;
+            localHistory[type].push(data);
+            saveLocalHistory();
+        }
+
+        function updateLocalHistory(type, localId, newData) {
+            if (!localHistory[type]) return;
+            const idx = localHistory[type].findIndex(d => d._localId === localId);
+            if (idx !== -1) {
+                localHistory[type][idx] = { ...newData, _localId: localId, _syncedToSheet: navigator.onLine };
+                saveLocalHistory();
+            }
+        }
+
+        function deleteLocalHistory(type, localId) {
+            if (!localHistory[type]) return;
+            localHistory[type] = localHistory[type].filter(d => d._localId !== localId);
+            saveLocalHistory();
+        }
+
+        // ==================== CONNECTION ====================
         function updateConnectionStatus() {
-            const status = navigator.onLine;
-            const statusEl = document.getElementById('connectionStatus');
-            const statusText = document.getElementById('statusText');
-            
-            if (status) {
-                statusEl.classList.remove('offline');
-                statusEl.classList.add('online');
-                statusText.textContent = '🟢 Online';
-                syncQueuedData(); // Try to sync when online
+            const online = navigator.onLine;
+            const el = document.getElementById('connectionStatus');
+            const txt = document.getElementById('statusText');
+            if (online) {
+                el.classList.remove('offline');
+                el.classList.add('online');
+                txt.textContent = '🟢 Online';
+                syncQueuedData();
             } else {
-                statusEl.classList.remove('online');
-                statusEl.classList.add('offline');
-                statusText.textContent = '🔴 Offline - Data tersimpan lokal';
+                el.classList.remove('online');
+                el.classList.add('offline');
+                txt.textContent = '🔴 Offline - Data tersimpan lokal';
             }
         }
 
         window.addEventListener('online', updateConnectionStatus);
         window.addEventListener('offline', updateConnectionStatus);
 
-        // Set today's date as default
         const today = new Date().toISOString().split('T')[0];
-        document.getElementById('tanggal').value = today;
-        document.getElementById('tanggal2').value = today;
 
-        // Init DB and check connection
+        // ==================== INIT ====================
         initDB().then(() => {
+            loadLocalHistory();
             updateConnectionStatus();
+            document.getElementById('tanggal').value = today;
+            document.getElementById('tanggal2').value = today;
             console.log('Database initialized');
         }).catch(err => console.error('DB init failed:', err));
 
-        // ===== TAB NAVIGATION =====
+        // ==================== TAB NAVIGATION ====================
         document.querySelector('.tabs').addEventListener('click', (e) => {
             const btn = e.target.closest('.tab-btn');
             if (!btn) return;
@@ -617,15 +683,16 @@
             btn.classList.add('active');
             const content = document.getElementById(tabName);
             if (content) content.classList.add('active');
+
+            if (tabName === 'tab-riwayat') renderHistory();
         });
 
-        // ===== TAB 1: KUNJUNGAN LEBAH =====
+        // ==================== TAB 1: KUNJUNGAN ====================
         const baysList = document.getElementById('baysList');
         const bays = {};
 
         for (let i = 1; i <= 10; i++) {
             bays[`bay${i}`] = 0;
-
             const bayItem = document.createElement('div');
             bayItem.className = 'bay-item';
             bayItem.innerHTML = `
@@ -639,28 +706,19 @@
             baysList.appendChild(bayItem);
         }
 
-        function incrementBay(bayId) {
-            bays[bayId]++;
-            updateBayDisplay(bayId);
-        }
-
-        function decrementBay(bayId) {
-            if (bays[bayId] > 0) {
-                bays[bayId]--;
-            }
-            updateBayDisplay(bayId);
-        }
-
+        function incrementBay(bayId) { bays[bayId]++; updateBayDisplay(bayId); }
+        function decrementBay(bayId) { if (bays[bayId] > 0) bays[bayId]--; updateBayDisplay(bayId); }
         function updateBayDisplay(bayId) {
             document.getElementById(`value-${bayId}`).textContent = bays[bayId];
         }
 
-        // Form submission - Kunjungan
         document.getElementById('beeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
+            const isEdit = currentEditType === 'kunjungan' && currentEditId;
             const formData = {
                 sheet: 'kunjungan',
+                action: isEdit ? 'update' : 'submit',
                 tanggal: document.getElementById('tanggal').value,
                 waktu: document.getElementById('waktu').value,
                 gh: document.getElementById('gh').value,
@@ -669,78 +727,92 @@
                 ...bays
             };
 
+            if (isEdit) formData._localId = currentEditId;
+
             try {
                 if (navigator.onLine) {
-                    // Online - send directly
-                    const response = await fetch(APPS_SCRIPT_URL, {
+                    await fetch(APPS_SCRIPT_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify(formData)
                     });
-
                     showStatus('Data berhasil dikirim! ✓', 'success');
                 } else {
-                    // Offline - save to queue
                     await saveToQueue(formData, 'kunjungan');
-                    showStatus('Offline - Data tersimpan lokal, akan dikirim otomatis saat online', 'success');
+                    showStatus('Offline - Data tersimpan lokal', 'success');
                 }
-                
+
+                if (isEdit) {
+                    updateLocalHistory('kunjungan', currentEditId, formData);
+                    currentEditId = null;
+                    currentEditType = null;
+                    document.getElementById('editIndicatorKunjungan').classList.remove('show');
+                } else {
+                    addLocalHistory('kunjungan', formData);
+                }
+
                 resetFormKunjungan();
+                renderHistory();
             } catch (error) {
                 console.error('Error:', error);
-                // Still save to queue on error
                 await saveToQueue(formData, 'kunjungan');
-                showStatus('Koneksi gagal - Data tersimpan lokal, akan dikirim saat online', 'success');
+                showStatus('Koneksi gagal - Data tersimpan lokal', 'success');
+
+                if (isEdit) {
+                    updateLocalHistory('kunjungan', currentEditId, formData);
+                    currentEditId = null;
+                    currentEditType = null;
+                    document.getElementById('editIndicatorKunjungan').classList.remove('show');
+                } else {
+                    addLocalHistory('kunjungan', formData);
+                }
                 resetFormKunjungan();
+                renderHistory();
             }
         });
 
         function resetFormKunjungan() {
             document.getElementById('beeForm').reset();
-            Object.keys(bays).forEach(bay => {
-                bays[bay] = 0;
-                updateBayDisplay(bay);
-            });
+            Object.keys(bays).forEach(bay => { bays[bay] = 0; updateBayDisplay(bay); });
             document.getElementById('tanggal').value = today;
             hideStatus();
+            currentEditId = null;
+            currentEditType = null;
+            document.getElementById('editIndicatorKunjungan').classList.remove('show');
+            document.getElementById('submitBtnKunjungan').textContent = 'Kirim ke Sheet';
         }
 
         function showStatus(message, type) {
             const status = document.getElementById('status');
             status.textContent = message;
             status.className = `status ${type}`;
+            setTimeout(() => {
+                status.className = 'status';
+            }, 4000);
         }
 
-        function hideStatus() {
-            document.getElementById('status').className = 'status';
-        }
+        function hideStatus() { document.getElementById('status').className = 'status'; }
 
         async function deleteDataKunjungan() {
-            if (!confirm('Hapus data terakhir dari sheet Kunjungan? Tindakan ini tidak bisa dibatalkan.')) {
-                return;
-            }
-
+            if (!confirm('Hapus data terakhir dari sheet Kunjungan? Tindakan ini tidak bisa dibatalkan.')) return;
             try {
                 await fetch(APPS_SCRIPT_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify({ method: 'delete', sheet: 'kunjungan' })
                 });
-
                 showStatus('Data terakhir berhasil dihapus! ✓', 'success');
             } catch (error) {
-                console.error('Error:', error);
-                showStatus('Gagal menghapus data. Periksa koneksi internet.', 'error');
+                showStatus('Gagal menghapus. Periksa koneksi internet.', 'error');
             }
         }
 
-        // ===== TAB 2: MORTALITAS =====
+        // ==================== TAB 2: MORTALITAS ====================
         const kotakList = document.getElementById('kotakList');
         const kotaks = {};
 
         for (let i = 1; i <= 6; i++) {
             kotaks[`kotak${i}`] = 100;
-
             const kotakItem = document.createElement('div');
             kotakItem.className = 'kotak-item';
             kotakItem.innerHTML = `
@@ -756,21 +828,19 @@
         function updateKotakValue(kotakId) {
             const input = document.getElementById(kotakId);
             let val = parseInt(input.value) || 0;
-            
-            // Clamp between 0 dan 100
             if (val < 0) val = 0;
             if (val > 100) val = 100;
-            
             input.value = val;
             kotaks[kotakId] = val;
         }
 
-        // Form submission - Mortalitas
         document.getElementById('mortalitasForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
+            const isEdit = currentEditType === 'mortalitas' && currentEditId;
             const formData = {
                 sheet: 'mortalitas',
+                action: isEdit ? 'update' : 'submit',
                 tanggal: document.getElementById('tanggal2').value,
                 waktu: document.getElementById('waktu2').value,
                 gh: document.getElementById('gh2').value,
@@ -778,29 +848,46 @@
                 ...kotaks
             };
 
+            if (isEdit) formData._localId = currentEditId;
+
             try {
                 if (navigator.onLine) {
-                    // Online - send directly
-                    const response = await fetch(APPS_SCRIPT_URL, {
+                    await fetch(APPS_SCRIPT_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify(formData)
                     });
-
                     showStatusMortalitas('Data berhasil dikirim! ✓', 'success');
                 } else {
-                    // Offline - save to queue
                     await saveToQueue(formData, 'mortalitas');
-                    showStatusMortalitas('Offline - Data tersimpan lokal, akan dikirim otomatis saat online', 'success');
+                    showStatusMortalitas('Offline - Data tersimpan lokal', 'success');
                 }
-                
+
+                if (isEdit) {
+                    updateLocalHistory('mortalitas', currentEditId, formData);
+                    currentEditId = null;
+                    currentEditType = null;
+                    document.getElementById('editIndicatorMortalitas').classList.remove('show');
+                } else {
+                    addLocalHistory('mortalitas', formData);
+                }
+
                 resetFormMortalitas();
+                renderHistory();
             } catch (error) {
-                console.error('Error:', error);
-                // Still save to queue on error
                 await saveToQueue(formData, 'mortalitas');
-                showStatusMortalitas('Koneksi gagal - Data tersimpan lokal, akan dikirim saat online', 'success');
+                showStatusMortalitas('Koneksi gagal - Data tersimpan lokal', 'success');
+
+                if (isEdit) {
+                    updateLocalHistory('mortalitas', currentEditId, formData);
+                    currentEditId = null;
+                    currentEditType = null;
+                    document.getElementById('editIndicatorMortalitas').classList.remove('show');
+                } else {
+                    addLocalHistory('mortalitas', formData);
+                }
                 resetFormMortalitas();
+                renderHistory();
             }
         });
 
@@ -812,38 +899,215 @@
             });
             document.getElementById('tanggal2').value = today;
             hideStatusMortalitas();
+            currentEditId = null;
+            currentEditType = null;
+            document.getElementById('editIndicatorMortalitas').classList.remove('show');
+            document.getElementById('submitBtnMortalitas').textContent = 'Kirim ke Sheet';
         }
 
         function showStatusMortalitas(message, type) {
             const status = document.getElementById('statusMortalitas');
             status.textContent = message;
             status.className = `status ${type}`;
+            setTimeout(() => {
+                status.className = 'status';
+            }, 4000);
         }
 
-        function hideStatusMortalitas() {
-            document.getElementById('statusMortalitas').className = 'status';
-        }
+        function hideStatusMortalitas() { document.getElementById('statusMortalitas').className = 'status'; }
 
         async function deleteDataMortalitas() {
-            if (!confirm('Hapus data terakhir dari sheet Mortalitas? Tindakan ini tidak bisa dibatalkan.')) {
-                return;
-            }
-
+            if (!confirm('Hapus data terakhir dari sheet Mortalitas? Tindakan ini tidak bisa dibatalkan.')) return;
             try {
                 await fetch(APPS_SCRIPT_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify({ method: 'delete', sheet: 'mortalitas' })
                 });
-
                 showStatusMortalitas('Data terakhir berhasil dihapus! ✓', 'success');
             } catch (error) {
-                console.error('Error:', error);
-                showStatusMortalitas('Gagal menghapus data. Periksa koneksi internet.', 'error');
+                showStatusMortalitas('Gagal menghapus. Periksa koneksi internet.', 'error');
             }
         }
 
-        // Service Worker registration for PWA
+        // ==================== TAB 3: RIWAYAT ====================
+        function renderHistory() {
+            const type = document.getElementById('historyType').value;
+            const data = localHistory[type] || [];
+            const tbody = document.getElementById('historyBody');
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="history-empty">Belum ada data riwayat</td></tr>';
+                return;
+            }
+
+            const sorted = [...data].sort((a, b) => {
+                const da = (a.tanggal || '') + (a.waktu || '');
+                const db2 = (b.tanggal || '') + (b.waktu || '');
+                return db2.localeCompare(da);
+            });
+
+            tbody.innerHTML = sorted.map(item => `
+                <tr>
+                    <td>${item.tanggal || '-'}</td>
+                    <td>${item.waktu || '-'}</td>
+                    <td>${item.gh || '-'}</td>
+                    <td>${item.cuaca || '-'}</td>
+                    <td style="text-align:center; white-space:nowrap;">
+                        <button class="history-btn history-btn-edit" onclick="editHistory('${type}','${item._localId}')">✏️</button>
+                        <button class="history-btn history-btn-delete" onclick="deleteHistoryItem('${type}','${item._localId}')">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function editHistory(type, localId) {
+            const data = (localHistory[type] || []).find(d => d._localId === localId);
+            if (!data) return;
+
+            currentEditId = localId;
+            currentEditType = type;
+
+            if (type === 'kunjungan') {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.querySelector('[data-tab="tab-kunjungan"]').classList.add('active');
+                document.getElementById('tab-kunjungan').classList.add('active');
+
+                document.getElementById('tanggal').value = data.tanggal || today;
+                document.getElementById('waktu').value = data.waktu || '';
+                document.getElementById('gh').value = data.gh || '';
+                document.getElementById('rowKe').value = data.rowKe || '';
+                document.getElementById('cuaca').value = data.cuaca || '';
+
+                for (let i = 1; i <= 10; i++) {
+                    bays[`bay${i}`] = parseInt(data[`bay${i}`]) || 0;
+                    updateBayDisplay(`bay${i}`);
+                }
+
+                document.getElementById('editIndicatorKunjungan').classList.add('show');
+                document.getElementById('submitBtnKunjungan').textContent = 'Update Data';
+            } else {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.querySelector('[data-tab="tab-mortalitas"]').classList.add('active');
+                document.getElementById('tab-mortalitas').classList.add('active');
+
+                document.getElementById('tanggal2').value = data.tanggal || today;
+                document.getElementById('waktu2').value = data.waktu || '';
+                document.getElementById('gh2').value = data.gh || '';
+                document.getElementById('cuaca2').value = data.cuaca || '';
+
+                for (let i = 1; i <= 6; i++) {
+                    const val = data[`kotak${i}`] !== undefined ? data[`kotak${i}`] : 100;
+                    kotaks[`kotak${i}`] = parseInt(val) || 0;
+                    document.getElementById(`kotak${i}`).value = kotaks[`kotak${i}`];
+                }
+
+                document.getElementById('editIndicatorMortalitas').classList.add('show');
+                document.getElementById('submitBtnMortalitas').textContent = 'Update Data';
+            }
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function deleteHistoryItem(type, localId) {
+            const data = (localHistory[type] || []).find(d => d._localId === localId);
+            if (!data) return;
+
+            if (!confirm(`Hapus data tanggal ${data.tanggal} ${data.waktu || ''} (${data.gh})?`)) return;
+
+            deleteLocalHistory(type, localId);
+
+            if (navigator.onLine) {
+                try {
+                    await fetch(APPS_SCRIPT_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify({
+                            action: 'delete-row',
+                            sheet: type,
+                            tanggal: data.tanggal,
+                            waktu: data.waktu,
+                            gh: data.gh
+                        })
+                    });
+                } catch (e) { console.error('Delete sync error:', e); }
+            }
+
+            renderHistory();
+        }
+
+        // ==================== SINKRONISASI ====================
+        async function fetchAllDataFromSheet() {
+            const syncStatus = document.getElementById('syncStatus');
+            syncStatus.className = 'status';
+            syncStatus.textContent = '';
+
+            if (!navigator.onLine) {
+                syncStatus.className = 'status error';
+                syncStatus.textContent = '❌ Offline - tidak dapat sinkronisasi';
+                return;
+            }
+
+            syncStatus.className = 'status info';
+            syncStatus.textContent = '🔄 Mengambil data dari Google Sheet...';
+
+            try {
+                const res = await fetch(APPS_SCRIPT_URL + '?action=list');
+                const result = await res.json();
+
+                let sheetKunjungan = [];
+                let sheetMortalitas = [];
+
+                if (result && result.kunjungan) {
+                    sheetKunjungan = (result.kunjungan || []).map(d => ({
+                        ...d,
+                        _localId: 'sheet_' + (d.tanggal || '') + '_' + (d.waktu || '') + '_' + (d.gh || ''),
+                        _syncedToSheet: true
+                    }));
+                    sheetMortalitas = (result.mortalitas || []).map(d => ({
+                        ...d,
+                        _localId: 'sheet_' + (d.tanggal || '') + '_' + (d.waktu || '') + '_' + (d.gh || ''),
+                        _syncedToSheet: true
+                    }));
+                } else if (Array.isArray(result)) {
+                    sheetKunjungan = result.filter(d => d.sheet === 'kunjungan' || d.type === 'kunjungan').map(d => ({
+                        ...d,
+                        _localId: 'sheet_' + (d.tanggal || '') + '_' + (d.waktu || '') + '_' + (d.gh || ''),
+                        _syncedToSheet: true
+                    }));
+                    sheetMortalitas = result.filter(d => d.sheet === 'mortalitas' || d.type === 'mortalitas').map(d => ({
+                        ...d,
+                        _localId: 'sheet_' + (d.tanggal || '') + '_' + (d.waktu || '') + '_' + (d.gh || ''),
+                        _syncedToSheet: true
+                    }));
+                }
+
+                const mergeData = (local, sheet) => {
+                    const localOnly = (local || []).filter(l => !l._localId.startsWith('sheet_'));
+                    return [...sheet, ...localOnly];
+                };
+
+                localHistory.kunjungan = mergeData(localHistory.kunjungan, sheetKunjungan);
+                localHistory.mortalitas = mergeData(localHistory.mortalitas, sheetMortalitas);
+                saveLocalHistory();
+
+                renderHistory();
+
+                syncStatus.className = 'status success';
+                syncStatus.textContent = `✓ Berhasil sinkron! ${sheetKunjungan.length} kunjungan, ${sheetMortalitas.length} mortalitas`;
+                setTimeout(() => {
+                    syncStatus.className = 'status';
+                }, 5000);
+            } catch (e) {
+                console.error('Sync error:', e);
+                syncStatus.className = 'status error';
+                syncStatus.textContent = '❌ Gagal sinkronisasi: ' + e.message;
+            }
+        }
+
+        // ==================== SERVICE WORKER ====================
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed'));
         }
