@@ -1,9 +1,9 @@
 // ============================================
 // SERVICE WORKER - BEE FORM PWA
-// VERSION 7 - Cache Chart.js untuk offline
+// VERSION 8 - skip version.json + cache Chart.js
 // ============================================
 
-const CACHE_NAME = 'bee-form-v7';
+const CACHE_NAME = 'bee-form-v8';
 
 const urlsToCache = [
   './',
@@ -11,11 +11,9 @@ const urlsToCache = [
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
-  // Chart.js - WAJIB di-cache agar trend bisa tampil offline
   'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js'
 ];
 
-// ==================== INSTALL ====================
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache =>
@@ -29,54 +27,64 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// ==================== ACTIVATE ====================
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames =>
       Promise.all(
-        cacheNames
-          .filter(name => name !== CACHE_NAME)
-          .map(name => caches.delete(name))
+        cacheNames.filter(name => name !== CACHE_NAME).map(name => caches.delete(name))
       )
     ).then(() => self.clients.claim())
   );
 });
 
-// ==================== FETCH ====================
 self.addEventListener('fetch', event => {
-  const url = event.request.url;
+  const req = event.request;
+  const url = new URL(req.url);
 
-  // Jangan intercept request ke Apps Script / Google API (harus selalu real-time)
-  if (url.includes('script.google') ||
-      url.includes('googleapis.com') ||
-      url.includes('gstatic.com')) {
+  // ============ SKIP: Apps Script (harus real-time) ============
+  if (url.href.includes('script.google') ||
+      url.href.includes('googleapis.com') ||
+      url.href.includes('gstatic.com')) {
     return;
   }
 
-  // Hanya handle GET
-  if (event.request.method !== 'GET') return;
+  // ============ SKIP: version.json — JANGAN DI-CACHE ============
+  if (url.pathname.endsWith('version.json')) {
+    return;
+  }
+
+  // ============ Hanya handle GET ============
+  if (req.method !== 'GET') return;
+
+  // ============ Skip request dengan cache-bust (?v=, ?t=) ============
+  if (url.searchParams.has('v') || url.searchParams.has('t')) {
+    // Biarkan fetch langsung ke network (jangan intercept) 
+    return;
+  }
 
   event.respondWith(
-    fetch(event.request)
+    fetch(req)
       .then(response => {
-        // Cache semua response sukses (basic = same-origin, cors = CDN)
         if (response.status === 200 &&
             (response.type === 'basic' || response.type === 'cors')) {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
         }
         return response;
       })
       .catch(() =>
-        caches.match(event.request).then(cached => {
+        caches.match(req).then(cached => {
           if (cached) return cached;
-
-          // Fallback untuk navigasi ke index.html
-          if (event.request.mode === 'navigate') {
-            return caches.match('./index.html');
-          }
+          if (req.mode === 'navigate') return caches.match('./index.html');
           return new Response('Offline', { status: 503 });
         })
       )
   );
+});
+
+// ============ LISTEN: pesan dari app untuk skip waiting ============
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
