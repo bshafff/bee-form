@@ -110,10 +110,7 @@ body {
   font-weight: 800 !important;
   animation: pulseUpdate 1.5s infinite;
 }
-.btn-update:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
+.btn-update:disabled { opacity: 0.6; cursor: wait; }
 @keyframes pulseUpdate {
   0%, 100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.7); }
   50% { box-shadow: 0 0 0 10px rgba(250, 204, 21, 0); }
@@ -408,7 +405,6 @@ button.btn-delete:hover { background: #c82333; }
 .summary-card .sub {
   font-size: 10px; color: #888; margin-top: 4px;
 }
-/* Weather-specific border colors */
 .summary-card.weather-cerah { border-left-color: #f59e0b; }
 .summary-card.weather-berawan { border-left-color: #64748b; }
 .summary-card.weather-mendung { border-left-color: #475569; }
@@ -433,7 +429,6 @@ button.btn-delete:hover { background: #c82333; }
   background: rgba(76,175,80,0.35);
 }
 
-/* ===== Weather Table (untuk detail breakdown) ===== */
 .weather-table {
   width: 100%; border-collapse: collapse;
   font-size: 0.75rem; background: #fff;
@@ -498,7 +493,7 @@ button.btn-delete:hover { background: #c82333; }
       </button>
 
       <button class="hdr-btn hdr-btn-connect" id="authBtn" onclick="handleAuthClick()">
-        ☁️ Connect Sheets
+        ☁️ Menyambung...
       </button>
 
       <button class="btn-update" id="updateBtn" onclick="manualUpdate()" title="Periksa update">
@@ -552,7 +547,6 @@ button.btn-delete:hover { background: #c82333; }
           </div>
         </div>
 
-        <!-- SUHU (sebelumnya Row Ke) -->
         <div class="form-group">
           <label for="suhu">Suhu (°C)</label>
           <input type="number" id="suhu" step="0.1" min="-10" max="60" placeholder="Contoh: 28.5" required>
@@ -687,20 +681,16 @@ button.btn-delete:hover { background: #c82333; }
         </div>
       </div>
 
-      <!-- Summary utama -->
       <div class="summary-grid" id="trendSummary"></div>
 
-      <!-- 🌤️ TREND BY CUACA -->
       <div class="chart-card">
         <div class="chart-container">
           <canvas id="weatherChart"></canvas>
         </div>
       </div>
 
-      <!-- Summary per cuaca -->
       <div class="summary-grid" id="weatherSummary"></div>
 
-      <!-- Tabel detail per cuaca -->
       <div class="chart-card">
         <div style="font-size: 12px; font-weight: 700; color: #2d5016; margin-bottom: 8px; text-transform: uppercase;">
           📋 Detail Kunjungan per Cuaca
@@ -723,14 +713,12 @@ button.btn-delete:hover { background: #c82333; }
         </div>
       </div>
 
-      <!-- Line trend harian -->
       <div class="chart-card">
         <div class="chart-container">
           <canvas id="trendChart"></canvas>
         </div>
       </div>
 
-      <!-- Bar per Bay -->
       <div class="chart-card">
         <div class="chart-container">
           <canvas id="barChart"></canvas>
@@ -784,6 +772,18 @@ button.btn-delete:hover { background: #c82333; }
 <script>
 
 // ============================================
+// 🔧 KONFIGURASI AUTO-CONNECT
+// ============================================
+//
+// ⚠️ DEVELOPER: GANTI URL DI BAWAH INI dengan
+// URL Web App Apps Script Anda (yang berakhiran /exec).
+//
+// Setelah itu, user awam TIDAK PERLU isi URL lagi.
+// Cukup buka aplikasi → otomatis tersambung.
+//
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwyCi2ohiGuXYtpzfeXerY6YPh9kikwFeZOzBuKFMs4L3lV_CjLL7ht54WuYneYcbYdkA/exec';
+
+// ============================================
 // STATE
 // ============================================
 
@@ -800,11 +800,14 @@ let currentEditId = null;
 let currentEditType = null;
 
 // ============================================
-// AUTH
+// AUTH (Auto-Connect)
 // ============================================
 
-let scriptUrl = localStorage.getItem('bee_script_url') || '';
-let isAuthenticated = JSON.parse(localStorage.getItem('bee_auth') || 'false');
+// Prioritas URL: localStorage (jika admin override) → DEFAULT_SCRIPT_URL
+let scriptUrl = localStorage.getItem('bee_script_url') || DEFAULT_SCRIPT_URL;
+
+// Auto-connect: kecuali user pernah sengaja memutuskan koneksi
+let isAuthenticated = (localStorage.getItem('bee_auth') === 'false') ? false : true;
 
 // ============================================
 // AUTO SYNC CONFIG
@@ -881,7 +884,7 @@ function hideLoadingOverlay() {
 }
 
 // ============================================
-// ===== AUTO UPDATE VERSION LOGIC =====
+// AUTO UPDATE VERSION LOGIC
 // ============================================
 
 async function checkVersion(silent) {
@@ -906,7 +909,6 @@ async function checkVersion(silent) {
       return 'latest';
     }
 
-    // Versi baru tersedia → tampilkan tombol kuning
     const btn = document.getElementById('updateBtn');
     if (btn) {
       btn.classList.add('available');
@@ -932,7 +934,6 @@ async function performHardReset(newVersion) {
     localStorage.setItem(APP_VERSION_KEY, newVersion);
   }
 
-  // Unregister service worker
   if ('serviceWorker' in navigator) {
     try {
       const regs = await navigator.serviceWorker.getRegistrations();
@@ -941,7 +942,6 @@ async function performHardReset(newVersion) {
     } catch (e) { console.warn('[UPDATE] SW fail:', e); }
   }
 
-  // Hapus semua cache
   if ('caches' in window) {
     try {
       const keys = await caches.keys();
@@ -950,7 +950,6 @@ async function performHardReset(newVersion) {
     } catch (e) { console.warn('[UPDATE] Cache fail:', e); }
   }
 
-  // Reload dengan cache-bust
   setTimeout(() => {
     window.location.replace(window.location.pathname + '?v=' + Date.now());
   }, 800);
@@ -992,7 +991,6 @@ async function manualUpdate() {
       return;
     }
 
-    // Ada versi baru → update + reload
     showToast('🆕 Update ke v' + remote.version, 'Memperbarui aplikasi...', 'update', 4000);
     await performHardReset(remote.version);
 
@@ -1009,11 +1007,10 @@ async function manualUpdate() {
 function startVersionCheckInterval() {
   if (window.__versionCheckInterval) return;
   window.__versionCheckInterval = setInterval(() => {
-    checkVersion(true); // silent, hanya tampilkan tombol kalau ada update
-  }, 30 * 60 * 1000); // 30 menit
+    checkVersion(true);
+  }, 30 * 60 * 1000);
 }
 
-// Cek ulang setiap halaman kembali aktif (user buka app dari background)
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     checkVersion(true);
@@ -1021,7 +1018,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ============================================
-// AUTH STATUS
+// AUTH STATUS (Auto-Connect)
 // ============================================
 
 function updateAuthStatus() {
@@ -1031,20 +1028,27 @@ function updateAuthStatus() {
   const pullBtn = document.getElementById('pullBtn');
 
   if (isAuthenticated && scriptUrl) {
-    status.innerHTML = '✓ Terhubung — Sheet sync & auto-sync aktif';
+    status.innerHTML = '✓ Tersambung otomatis ke Google Sheets';
     status.className = 'auth-status-text ok';
-    authBtn.textContent = 'Putuskan';
+
+    // Tombol jadi "Putuskan" (kalau user mau disconnect)
+    authBtn.textContent = '✓ Tersambung';
     authBtn.className = 'hdr-btn hdr-btn-logout';
+    authBtn.title = 'Klik untuk memutuskan koneksi';
+
     pushBtn.style.display = 'inline-flex';
     pullBtn.style.display = 'inline-flex';
     updateQueueBadge();
     updateAutoSyncIndicator('aktif');
     startAutoSync();
   } else {
-    status.innerHTML = '';
+    status.innerHTML = '⚠️ Koneksi terputus — klik tombol di atas untuk menyambungkan';
     status.className = 'auth-status-text';
-    authBtn.textContent = '☁️ Connect Sheets';
+
+    authBtn.textContent = '☁️ Sambungkan';
     authBtn.className = 'hdr-btn hdr-btn-connect';
+    authBtn.title = 'Klik untuk menyambungkan kembali';
+
     pushBtn.style.display = 'none';
     pullBtn.style.display = 'none';
     updateAutoSyncIndicator('nonaktif');
@@ -1053,8 +1057,12 @@ function updateAuthStatus() {
 }
 
 function handleAuthClick() {
+  // Kalau sudah tersambung → tawaran putuskan
   if (isAuthenticated) {
-    if (!confirm('Putuskan koneksi ke Google Sheets?')) return;
+    if (!confirm('Putuskan koneksi ke Google Sheets?\n\nData baru akan disimpan lokal sampai Anda menyambung kembali.')) {
+      return;
+    }
+
     isAuthenticated = false;
     localStorage.setItem('bee_auth', 'false');
     updateAuthStatus();
@@ -1062,17 +1070,20 @@ function handleAuthClick() {
     return;
   }
 
-  const url = prompt('Masukkan URL Apps Script Web App (/exec):', scriptUrl || '');
-  if (!url || !url.trim()) return;
+  // Kalau belum tersambung → langsung sambungkan (TANPA prompt URL)
+  if (!scriptUrl) {
+    showToast('URL Belum Disetel', 'Hubungi admin untuk setup aplikasi.', 'error', 5000);
+    return;
+  }
 
-  scriptUrl = url.trim();
-  localStorage.setItem('bee_script_url', scriptUrl);
-  localStorage.setItem('bee_auth', 'true');
   isAuthenticated = true;
+  localStorage.setItem('bee_auth', 'true');
 
   updateAuthStatus();
   showToast('Tersambung! ✓', 'Berhasil connect. Auto-sync aktif.', 'success');
-  fetchAllDataFromSheet();
+
+  // Langsung sync
+  setTimeout(() => autoSync(), 500);
 }
 
 // ============================================
@@ -1143,7 +1154,7 @@ async function updateQueueBadge() {
 
 async function syncQueuedData() {
   if (!isAuthenticated || !scriptUrl) {
-    showToast('Belum Tersambung', 'Klik "Connect Sheets" dulu ya.', 'error');
+    showToast('Belum Tersambung', 'Klik tombol "Sambungkan" dulu ya.', 'error');
     return;
   }
 
@@ -1278,7 +1289,7 @@ function updateAutoSyncIndicator(status) {
     el.innerHTML = '⏱️ Auto-sync: <b>nonaktif</b>';
   } else {
     el.classList.remove('active');
-    el.innerHTML = '⏱️ Auto-sync: menunggu connect';
+    el.innerHTML = '⏱️ Auto-sync: menunggu';
   }
 }
 
@@ -1401,13 +1412,28 @@ initDB()
 
     console.log('Database initialized');
 
-    // === AUTO UPDATE: cek versi saat app dibuka ===
+    // === AUTO-CONNECT: pastikan scriptUrl tersimpan ===
+    if (scriptUrl) {
+      // Simpan ke localStorage agar persist
+      localStorage.setItem('bee_script_url', scriptUrl);
+      console.log('✅ Auto-connect URL:', scriptUrl);
+
+      // Kalau authenticated → langsung sync
+      if (isAuthenticated && navigator.onLine) {
+        // Toast kecil konfirmasi auto-connect (hanya sekali per session)
+        if (!sessionStorage.getItem('bee_auto_connect_toast_shown')) {
+          sessionStorage.setItem('bee_auto_connect_toast_shown', 'true');
+          showToast('Tersambung Otomatis ✓', 'Google Sheets siap digunakan.', 'success', 3000);
+        }
+
+        // Delay sedikit agar tidak blocking init
+        setTimeout(() => autoSync(), 2000);
+      }
+    }
+
+    // === AUTO UPDATE: cek versi ===
     checkVersion(true);
     startVersionCheckInterval();
-
-    if (isAuthenticated && scriptUrl && navigator.onLine) {
-      setTimeout(() => autoSync(), 2000);
-    }
   })
   .catch(err => console.error('DB init failed:', err));
 
@@ -1470,7 +1496,7 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
     tanggal: document.getElementById('tanggal').value,
     waktu: document.getElementById('waktu').value,
     gh: document.getElementById('gh').value,
-    suhu: document.getElementById('suhu').value,  // ← SUHU
+    suhu: document.getElementById('suhu').value,
     cuaca: document.getElementById('cuaca').value,
     ...bays
   };
@@ -1695,7 +1721,7 @@ function hideStatusMortalitas() {
 async function deleteDataKunjungan() {
   if (!confirm('Hapus data terakhir dari sheet Kunjungan? Tidak bisa dibatalkan.')) return;
   if (!isAuthenticated || !scriptUrl) {
-    showToast('Belum Tersambung', 'Klik "Connect Sheets" dulu.', 'error');
+    showToast('Belum Tersambung', 'Klik tombol "Sambungkan" dulu.', 'error');
     return;
   }
   showLoadingOverlay('Menghapus data...');
@@ -1720,7 +1746,7 @@ async function deleteDataKunjungan() {
 async function deleteDataMortalitas() {
   if (!confirm('Hapus data terakhir dari sheet Mortalitas? Tidak bisa dibatalkan.')) return;
   if (!isAuthenticated || !scriptUrl) {
-    showToast('Belum Tersambung', 'Klik "Connect Sheets" dulu.', 'error');
+    showToast('Belum Tersambung', 'Klik tombol "Sambungkan" dulu.', 'error');
     return;
   }
   showLoadingOverlay('Menghapus data...');
@@ -1806,7 +1832,6 @@ function editHistory(type, localId) {
     document.getElementById('tanggal').value = data.tanggal || getLocalDate();
     document.getElementById('waktu').value = data.waktu || '';
     document.getElementById('gh').value = data.gh || '';
-    // SUHU
     document.getElementById('suhu').value = data.suhu !== undefined ? data.suhu : '';
     document.getElementById('cuaca').value = data.cuaca || '';
 
@@ -1917,8 +1942,8 @@ async function fetchAllDataFromSheet() {
 
   if (!isAuthenticated || !scriptUrl) {
     syncStatus.className = 'status error';
-    syncStatus.textContent = '❌ Belum connect ke Sheets.';
-    showToast('Belum Tersambung', 'Connect Sheets dulu.', 'error');
+    syncStatus.textContent = '❌ Belum tersambung ke Sheets.';
+    showToast('Belum Tersambung', 'Klik tombol "Sambungkan" dulu.', 'error');
     return;
   }
 
@@ -2031,7 +2056,6 @@ function renderTrendDashboard() {
   const ghFilter = document.getElementById('trendGhFilter').value;
   const filteredData = getFilteredKunjungan();
 
-  // === Kelompokkan per tanggal ===
   const groupedByDate = {};
   filteredData.forEach(item => {
     if (!groupedByDate[item.tanggal]) groupedByDate[item.tanggal] = [];
@@ -2087,7 +2111,6 @@ function renderTrendDashboard() {
 
   const metricLabel = metric === 'total' ? 'Total Kunjungan' : `Kunjungan ${metric.toUpperCase()}`;
 
-  // === Line Chart harian ===
   const ctx = document.getElementById('trendChart').getContext('2d');
   if (trendChartInstance) trendChartInstance.destroy();
 
@@ -2133,27 +2156,18 @@ function renderTrendDashboard() {
     }
   });
 
-  // === Bar Chart per Bay ===
   renderBarChart(filteredData, ghFilter);
-
-  // === 🌤️ WEATHER TREND ===
   renderWeatherDashboard(filteredData, ghFilter);
 }
 
 // ============================================
-// 🌤️ TREND BY CUACA
+// TREND BY CUACA
 // ============================================
 
 function renderWeatherDashboard(filteredData, ghFilter) {
-  // Group by cuaca
   const byWeather = {};
   WEATHER_ORDER.forEach(w => {
-    byWeather[w] = {
-      sessions: 0,
-      totalKunjungan: 0,
-      totalSuhu: 0,
-      suhuCount: 0
-    };
+    byWeather[w] = { sessions: 0, totalKunjungan: 0, totalSuhu: 0, suhuCount: 0 };
   });
 
   filteredData.forEach(item => {
@@ -2165,7 +2179,6 @@ function renderWeatherDashboard(filteredData, ghFilter) {
     byWeather[w].sessions += 1;
     byWeather[w].totalKunjungan += total;
 
-    // Suhu bisa berupa angka/string
     const suhu = parseFloat(item.suhu);
     if (!isNaN(suhu)) {
       byWeather[w].totalSuhu += suhu;
@@ -2173,10 +2186,8 @@ function renderWeatherDashboard(filteredData, ghFilter) {
     }
   });
 
-  // Kumpulkan cuaca yang punya data
   const activeWeather = Object.keys(byWeather).filter(w => byWeather[w].sessions > 0);
 
-  // === Weather Bar Chart (average per sesi untuk setiap cuaca) ===
   const labels = activeWeather.map(w => WEATHER_LABEL[w] || w);
   const avgPerSession = activeWeather.map(w => {
     const d = byWeather[w];
@@ -2235,7 +2246,6 @@ function renderWeatherDashboard(filteredData, ghFilter) {
     }
   });
 
-  // === Summary cards per cuaca ===
   if (activeWeather.length === 0) {
     document.getElementById('weatherSummary').innerHTML =
       `<div class="summary-card"><div class="header">🌤️ Belum ada data cuaca</div><div class="value">-</div></div>`;
@@ -2244,7 +2254,6 @@ function renderWeatherDashboard(filteredData, ghFilter) {
     return;
   }
 
-  // Cari cuaca terbaik & terendah
   let bestWeather = activeWeather[0];
   let worstWeather = activeWeather[0];
   activeWeather.forEach(w => {
@@ -2278,7 +2287,6 @@ function renderWeatherDashboard(filteredData, ghFilter) {
     </div>
   `;
 
-  // === Tabel detail ===
   let tableHtml = '';
   WEATHER_ORDER.forEach(w => {
     const d = byWeather[w];
