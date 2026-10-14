@@ -19,7 +19,6 @@
 <meta name="apple-mobile-web-app-title" content="Kunjungan Lebah">
 <meta name="mobile-web-app-capable" content="yes">
 
-<!-- Chart.js untuk Trend Dashboard -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 
 <style>
@@ -88,6 +87,42 @@ body {
   background: #dc3545; color: white; font-size: 10px; font-weight: 800;
   padding: 2px 6px; border-radius: 10px; min-width: 18px;
   text-align: center; display: inline-block;
+}
+
+/* ===== Tombol Update di header ===== */
+.btn-update {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.35);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.btn-update.available {
+  background: #facc15 !important;
+  color: #422006 !important;
+  border-color: #eab308 !important;
+  font-weight: 800 !important;
+  animation: pulseUpdate 1.5s infinite;
+}
+.btn-update:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+@keyframes pulseUpdate {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.7); }
+  50% { box-shadow: 0 0 0 10px rgba(250, 204, 21, 0); }
+}
+.app-version {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-top: 6px;
+  color: #fff;
 }
 
 .content { padding: 20px; }
@@ -184,9 +219,9 @@ button.btn-delete:hover { background: #c82333; }
   background: white; overflow-x: auto;
 }
 .tab-btn {
-  flex: 1; min-width: 80px; padding: 14px 8px; border: none;
+  flex: 1; min-width: 70px; padding: 14px 6px; border: none;
   background: transparent; color: #666; font-weight: 600;
-  cursor: pointer; font-size: 12px; position: relative;
+  cursor: pointer; font-size: 11px; position: relative;
   white-space: nowrap;
 }
 .tab-btn.active { color: #2d5016; }
@@ -294,6 +329,8 @@ button.btn-delete:hover { background: #c82333; }
 .toast.info .toast-icon { background: #e0f2fe; color: #0284c7; }
 .toast.loading { border-left-color: #e65100; }
 .toast.loading .toast-icon { background: #fff3e0; color: #e65100; }
+.toast.update { border-left-color: #eab308; }
+.toast.update .toast-icon { background: #fef9c3; color: #a16207; }
 
 .loading-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.5);
@@ -371,6 +408,12 @@ button.btn-delete:hover { background: #c82333; }
 .summary-card .sub {
   font-size: 10px; color: #888; margin-top: 4px;
 }
+/* Weather-specific border colors */
+.summary-card.weather-cerah { border-left-color: #f59e0b; }
+.summary-card.weather-berawan { border-left-color: #64748b; }
+.summary-card.weather-mendung { border-left-color: #475569; }
+.summary-card.weather-hujan { border-left-color: #0284c7; }
+.summary-card.weather-gerimis { border-left-color: #0891b2; }
 
 .chart-card {
   background: white; border: 1px solid #e0e0e0;
@@ -389,6 +432,29 @@ button.btn-delete:hover { background: #c82333; }
 .auto-sync-indicator.active {
   background: rgba(76,175,80,0.35);
 }
+
+/* ===== Weather Table (untuk detail breakdown) ===== */
+.weather-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 0.75rem; background: #fff;
+  border-radius: 8px; overflow: hidden;
+  margin-top: 8px;
+}
+.weather-table th,
+.weather-table td {
+  padding: 8px 10px; border: 1px solid #e0e0e0;
+  text-align: left;
+}
+.weather-table th {
+  background: #f1f5f9; font-weight: 700;
+  font-size: 0.7rem; text-transform: uppercase;
+}
+.weather-table tr:hover { background: #f9fafb; }
+.weather-table .w-cerah { color: #f59e0b; font-weight: 700; }
+.weather-table .w-berawan { color: #64748b; font-weight: 700; }
+.weather-table .w-mendung { color: #475569; font-weight: 700; }
+.weather-table .w-hujan { color: #0284c7; font-weight: 700; }
+.weather-table .w-gerimis { color: #0891b2; font-weight: 700; }
 
 </style>
 
@@ -435,9 +501,14 @@ button.btn-delete:hover { background: #c82333; }
         ☁️ Connect Sheets
       </button>
 
+      <button class="btn-update" id="updateBtn" onclick="manualUpdate()" title="Periksa update">
+        🔄 Update
+      </button>
+
     </div>
 
     <div class="auth-status-text" id="authStatus"></div>
+    <div class="app-version" id="app-version-label"></div>
 
   </div>
 
@@ -481,9 +552,10 @@ button.btn-delete:hover { background: #c82333; }
           </div>
         </div>
 
+        <!-- SUHU (sebelumnya Row Ke) -->
         <div class="form-group">
-          <label for="rowKe">Row Ke</label>
-          <input type="number" id="rowKe" min="1" required>
+          <label for="suhu">Suhu (°C)</label>
+          <input type="number" id="suhu" step="0.1" min="-10" max="60" placeholder="Contoh: 28.5" required>
         </div>
 
         <div class="form-group">
@@ -615,16 +687,50 @@ button.btn-delete:hover { background: #c82333; }
         </div>
       </div>
 
-      <div class="summary-grid" id="trendSummary">
-        <!-- Summary cards di-inject via JS -->
+      <!-- Summary utama -->
+      <div class="summary-grid" id="trendSummary"></div>
+
+      <!-- 🌤️ TREND BY CUACA -->
+      <div class="chart-card">
+        <div class="chart-container">
+          <canvas id="weatherChart"></canvas>
+        </div>
       </div>
 
+      <!-- Summary per cuaca -->
+      <div class="summary-grid" id="weatherSummary"></div>
+
+      <!-- Tabel detail per cuaca -->
+      <div class="chart-card">
+        <div style="font-size: 12px; font-weight: 700; color: #2d5016; margin-bottom: 8px; text-transform: uppercase;">
+          📋 Detail Kunjungan per Cuaca
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="weather-table">
+            <thead>
+              <tr>
+                <th>Cuaca</th>
+                <th>Sesi</th>
+                <th>Total</th>
+                <th>Rata²/Sesi</th>
+                <th>Suhu Rata²</th>
+              </tr>
+            </thead>
+            <tbody id="weatherTableBody">
+              <tr><td colspan="5" style="text-align:center;color:#999;">Belum ada data</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Line trend harian -->
       <div class="chart-card">
         <div class="chart-container">
           <canvas id="trendChart"></canvas>
         </div>
       </div>
 
+      <!-- Bar per Bay -->
       <div class="chart-card">
         <div class="chart-container">
           <canvas id="barChart"></canvas>
@@ -656,12 +762,13 @@ button.btn-delete:hover { background: #c82333; }
               <th>Tanggal</th>
               <th>Waktu</th>
               <th>GH</th>
+              <th>Suhu</th>
               <th>Cuaca</th>
               <th style="text-align:center;">Aksi</th>
             </tr>
           </thead>
           <tbody id="historyBody">
-            <tr><td colspan="5" class="history-empty">Memuat data...</td></tr>
+            <tr><td colspan="6" class="history-empty">Memuat data...</td></tr>
           </tbody>
         </table>
       </div>
@@ -708,6 +815,13 @@ let autoSyncTimer = null;
 let isSyncing = false;
 
 // ============================================
+// AUTO UPDATE VERSION
+// ============================================
+
+const APP_VERSION_KEY = 'pwa_app_version_v1';
+let currentRemoteVersion = null;
+
+// ============================================
 // LOCAL DATE
 // ============================================
 
@@ -734,6 +848,7 @@ function showToast(title, message, type = 'success', duration = 3500) {
   if (type === 'error') icon = '✕';
   if (type === 'info') icon = 'ℹ';
   if (type === 'loading') icon = '⏳';
+  if (type === 'update') icon = '🆕';
 
   toast.innerHTML = `
     <div class="toast-icon">${icon}</div>
@@ -764,6 +879,146 @@ function showLoadingOverlay(text = 'Memproses...') {
 function hideLoadingOverlay() {
   document.getElementById('loadingOverlay').classList.remove('show');
 }
+
+// ============================================
+// ===== AUTO UPDATE VERSION LOGIC =====
+// ============================================
+
+async function checkVersion(silent) {
+  try {
+    const res = await fetch('./version.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return 'error';
+    const remote = await res.json();
+    currentRemoteVersion = remote;
+    const localVer = localStorage.getItem(APP_VERSION_KEY);
+
+    const labelEl = document.getElementById('app-version-label');
+    if (labelEl) {
+      labelEl.textContent = 'v' + (localVer || remote.version || '?') + ' · ' + (remote.released || '');
+    }
+
+    if (!localVer) {
+      localStorage.setItem(APP_VERSION_KEY, remote.version);
+      return 'first';
+    }
+
+    if (localVer === remote.version) {
+      return 'latest';
+    }
+
+    // Versi baru tersedia → tampilkan tombol kuning
+    const btn = document.getElementById('updateBtn');
+    if (btn) {
+      btn.classList.add('available');
+      btn.textContent = '🆕 v' + remote.version;
+      btn.title = remote.notes || 'Versi baru tersedia';
+    }
+
+    if (!silent) {
+      showToast('Update Tersedia! 🆕',
+        'Versi ' + remote.version + ' siap dipasang. Klik tombol kuning di atas.',
+        'update', 6000);
+    }
+
+    return remote.version;
+  } catch (err) {
+    console.warn('[VERSION] Gagal cek version:', err);
+    return 'error';
+  }
+}
+
+async function performHardReset(newVersion) {
+  if (newVersion) {
+    localStorage.setItem(APP_VERSION_KEY, newVersion);
+  }
+
+  // Unregister service worker
+  if ('serviceWorker' in navigator) {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+      console.log('[UPDATE] Unregistered', regs.length, 'SW');
+    } catch (e) { console.warn('[UPDATE] SW fail:', e); }
+  }
+
+  // Hapus semua cache
+  if ('caches' in window) {
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+      console.log('[UPDATE] Deleted', keys.length, 'cache');
+    } catch (e) { console.warn('[UPDATE] Cache fail:', e); }
+  }
+
+  // Reload dengan cache-bust
+  setTimeout(() => {
+    window.location.replace(window.location.pathname + '?v=' + Date.now());
+  }, 800);
+}
+
+async function manualUpdate() {
+  const btn = document.getElementById('updateBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Cek...';
+  }
+
+  showToast('🔄 Memeriksa update...', '', 'loading', 2000);
+
+  try {
+    const res = await fetch('./version.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('version.json tidak ditemukan');
+    const remote = await res.json();
+    const localVer = localStorage.getItem(APP_VERSION_KEY);
+
+    if (!localVer) {
+      localStorage.setItem(APP_VERSION_KEY, remote.version);
+      showToast('✓ Versi v' + remote.version + ' tersimpan', '', 'success', 3000);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '🔄 Update';
+        btn.classList.remove('available');
+      }
+      return;
+    }
+
+    if (localVer === remote.version) {
+      showToast('✓ Sudah versi terbaru', 'v' + localVer, 'success', 3000);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '🔄 Update';
+        btn.classList.remove('available');
+      }
+      return;
+    }
+
+    // Ada versi baru → update + reload
+    showToast('🆕 Update ke v' + remote.version, 'Memperbarui aplikasi...', 'update', 4000);
+    await performHardReset(remote.version);
+
+  } catch (err) {
+    console.error(err);
+    showToast('Gagal cek update', err.message, 'error', 4000);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🔄 Update';
+    }
+  }
+}
+
+function startVersionCheckInterval() {
+  if (window.__versionCheckInterval) return;
+  window.__versionCheckInterval = setInterval(() => {
+    checkVersion(true); // silent, hanya tampilkan tombol kalau ada update
+  }, 30 * 60 * 1000); // 30 menit
+}
+
+// Cek ulang setiap halaman kembali aktif (user buka app dari background)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    checkVersion(true);
+  }
+});
 
 // ============================================
 // AUTH STATUS
@@ -797,14 +1052,9 @@ function updateAuthStatus() {
   }
 }
 
-// ============================================
-// AUTH CLICK
-// ============================================
-
 function handleAuthClick() {
   if (isAuthenticated) {
     if (!confirm('Putuskan koneksi ke Google Sheets?')) return;
-
     isAuthenticated = false;
     localStorage.setItem('bee_auth', 'false');
     updateAuthStatus();
@@ -832,28 +1082,16 @@ function handleAuthClick() {
 function initDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(dbName, 1);
-
     request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      db = request.result;
-      resolve(db);
-    };
-
+    request.onsuccess = () => { db = request.result; resolve(db); };
     request.onupgradeneeded = (e) => {
       const database = e.target.result;
       if (!database.objectStoreNames.contains(storeName)) {
-        database.createObjectStore(storeName, {
-          keyPath: 'id',
-          autoIncrement: true
-        });
+        database.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
       }
     };
   });
 }
-
-// ============================================
-// QUEUE
-// ============================================
 
 async function saveToQueue(data, type) {
   try {
@@ -864,9 +1102,7 @@ async function saveToQueue(data, type) {
       synced: false
     });
     updateQueueBadge();
-  } catch (e) {
-    console.error('Queue error:', e);
-  }
+  } catch (e) { console.error('Queue error:', e); }
 }
 
 async function getQueuedData() {
@@ -883,10 +1119,7 @@ async function deleteFromQueue(id) {
     const tx = db.transaction(storeName, 'readwrite');
     const req = tx.objectStore(storeName).delete(id);
     req.onerror = () => reject(req.error);
-    req.onsuccess = () => {
-      resolve();
-      updateQueueBadge();
-    };
+    req.onsuccess = () => { resolve(); updateQueueBadge(); };
   });
 }
 
@@ -905,7 +1138,7 @@ async function updateQueueBadge() {
 }
 
 // ============================================
-// SYNC QUEUE (Manual — dengan konfirmasi)
+// SYNC QUEUE (Manual)
 // ============================================
 
 async function syncQueuedData() {
@@ -934,9 +1167,7 @@ async function syncQueuedData() {
         body: JSON.stringify(item.data)
       });
       const result = await res.json();
-
       if (result.status === 'error') throw new Error(result.message || 'Gagal');
-
       await deleteFromQueue(item.id);
       synced++;
     } catch (e) {
@@ -988,11 +1219,7 @@ function updateLocalHistory(type, localId, newData) {
   if (!localHistory[type]) return;
   const idx = localHistory[type].findIndex(d => d._localId === localId);
   if (idx !== -1) {
-    localHistory[type][idx] = {
-      ...newData,
-      _localId: localId,
-      _syncedToSheet: false
-    };
+    localHistory[type][idx] = { ...newData, _localId: localId, _syncedToSheet: false };
     saveLocalHistory();
   }
 }
@@ -1011,7 +1238,6 @@ function updateConnectionStatus() {
   const online = navigator.onLine;
   const el = document.getElementById('connectionStatus');
   const txt = document.getElementById('statusText');
-
   if (online) {
     el.classList.remove('offline');
     el.classList.add('online');
@@ -1026,7 +1252,6 @@ function updateConnectionStatus() {
 window.addEventListener('online', () => {
   updateConnectionStatus();
   showToast('Kembali Online', 'Auto-sync berjalan...', 'success', 2500);
-  // Trigger auto-sync langsung saat kembali online
   setTimeout(() => autoSync(), 1000);
 });
 
@@ -1042,7 +1267,6 @@ window.addEventListener('offline', () => {
 function updateAutoSyncIndicator(status) {
   const el = document.getElementById('autoSyncStatus');
   if (!el) return;
-
   if (status === 'aktif') {
     el.classList.add('active');
     el.innerHTML = '⏱️ Auto-sync: <b>AKTIF</b> (3 menit)';
@@ -1061,7 +1285,7 @@ function updateAutoSyncIndicator(status) {
 function startAutoSync() {
   if (autoSyncTimer) clearInterval(autoSyncTimer);
   autoSyncTimer = setInterval(autoSync, AUTO_SYNC_INTERVAL_MS);
-  console.log('✅ Auto-sync started (interval ' + AUTO_SYNC_INTERVAL_MS + 'ms)');
+  console.log('✅ Auto-sync started');
 }
 
 function stopAutoSync() {
@@ -1081,7 +1305,6 @@ async function autoSync() {
   updateAutoSyncIndicator('syncing');
 
   try {
-    // 1) PUSH — kirim data yang masih di queue
     const queued = await getQueuedData();
     let pushedCount = 0;
 
@@ -1097,13 +1320,9 @@ async function autoSync() {
           await deleteFromQueue(item.id);
           pushedCount++;
         }
-      } catch (e) {
-        console.warn('Auto-push gagal 1 item:', e);
-      }
+      } catch (e) { console.warn('Auto-push gagal 1 item:', e); }
     }
 
-    // 2) PULL — ambil data terbaru dari Sheet
-    let pulledCount = 0;
     try {
       const res = await fetch(scriptUrl + '?action=list');
       const result = await res.json();
@@ -1132,24 +1351,17 @@ async function autoSync() {
         localHistory.mortalitas = mergeData(localHistory.mortalitas, sheetMortalitas);
         saveLocalHistory();
 
-        pulledCount = sheetKunjungan.length + sheetMortalitas.length;
-
-        // Re-render if user is on trend/history tab
         const activeTab = document.querySelector('.tab-content.active');
         if (activeTab && activeTab.id === 'tab-trend') renderTrendDashboard();
         if (activeTab && activeTab.id === 'tab-riwayat') renderHistory();
       }
-    } catch (e) {
-      console.warn('Auto-pull gagal:', e);
-    }
+    } catch (e) { console.warn('Auto-pull gagal:', e); }
 
-    // Notifikasi ringan (hanya jika ada aksi)
     if (pushedCount > 0) {
       showToast('Auto-Sync ✓', `${pushedCount} data terkirim otomatis.`, 'success', 2500);
     }
 
     updateAutoSyncIndicator('aktif');
-
   } catch (e) {
     console.warn('AutoSync error:', e);
     updateAutoSyncIndicator('aktif');
@@ -1170,11 +1382,9 @@ initDB()
     updateQueueBadge();
     updateAutoSyncIndicator('menunggu');
 
-    // Set tanggal default untuk form
     document.getElementById('tanggal').value = today;
     document.getElementById('tanggal2').value = today;
 
-    // Set default range tanggal untuk trend (30 hari terakhir)
     const todayDate = new Date();
     const lastMonth = new Date();
     lastMonth.setDate(todayDate.getDate() - 30);
@@ -1191,7 +1401,10 @@ initDB()
 
     console.log('Database initialized');
 
-    // Kalau sudah login, langsung sync sekali di awal
+    // === AUTO UPDATE: cek versi saat app dibuka ===
+    checkVersion(true);
+    startVersionCheckInterval();
+
     if (isAuthenticated && scriptUrl && navigator.onLine) {
       setTimeout(() => autoSync(), 2000);
     }
@@ -1229,7 +1442,6 @@ const bays = {};
 
 for (let i = 1; i <= 10; i++) {
   bays[`bay${i}`] = 0;
-
   const bayItem = document.createElement('div');
   bayItem.className = 'bay-item';
   bayItem.innerHTML = `
@@ -1243,23 +1455,9 @@ for (let i = 1; i <= 10; i++) {
   baysList.appendChild(bayItem);
 }
 
-function incrementBay(bayId) {
-  bays[bayId]++;
-  updateBayDisplay(bayId);
-}
-
-function decrementBay(bayId) {
-  if (bays[bayId] > 0) bays[bayId]--;
-  updateBayDisplay(bayId);
-}
-
-function updateBayDisplay(bayId) {
-  document.getElementById(`value-${bayId}`).textContent = bays[bayId];
-}
-
-// ============================================
-// SUBMIT KUNJUNGAN
-// ============================================
+function incrementBay(bayId) { bays[bayId]++; updateBayDisplay(bayId); }
+function decrementBay(bayId) { if (bays[bayId] > 0) bays[bayId]--; updateBayDisplay(bayId); }
+function updateBayDisplay(bayId) { document.getElementById(`value-${bayId}`).textContent = bays[bayId]; }
 
 document.getElementById('beeForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -1272,7 +1470,7 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
     tanggal: document.getElementById('tanggal').value,
     waktu: document.getElementById('waktu').value,
     gh: document.getElementById('gh').value,
-    rowKe: document.getElementById('rowKe').value,
+    suhu: document.getElementById('suhu').value,  // ← SUHU
     cuaca: document.getElementById('cuaca').value,
     ...bays
   };
@@ -1282,7 +1480,6 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
   const submitBtn = document.getElementById('submitBtnKunjungan');
   submitBtn.disabled = true;
   submitBtn.textContent = isEdit ? 'Mengupdate...' : 'Mengirim...';
-
   showStatusKunjungan(isEdit ? 'Mengupdate data...' : 'Mengirim data...', 'loading');
 
   try {
@@ -1295,7 +1492,6 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
       const result = await res.json();
 
       if (result.status === 'error') throw new Error(result.message || 'Gagal');
-
       if (isEdit && result.status !== 'success') {
         throw new Error('Data tidak ditemukan di Google Sheet.');
       }
@@ -1304,7 +1500,6 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
       showToast(isEdit ? 'Update Berhasil! ✏️' : 'Data Terkirim! ✓',
         isEdit ? 'Perubahan tersimpan di Sheet.' : 'Kunjungan tersimpan di Sheet.',
         'success', 4000);
-
     } else {
       await saveToQueue(formData, 'kunjungan');
       showStatusKunjungan('📥 Data tersimpan lokal. Auto-sync akan kirim otomatis.', 'info');
@@ -1323,7 +1518,6 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
 
   } catch (error) {
     console.error('Error:', error);
-
     await saveToQueue(formData, 'kunjungan');
     showStatusKunjungan('⚠️ Koneksi gagal - Data tersimpan lokal', 'error');
     showToast('Gagal Kirim ⚠️', 'Tersimpan lokal. Auto-sync akan coba lagi.', 'error', 5000);
@@ -1340,26 +1534,14 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
   }
 });
 
-// ============================================
-// RESET KUNJUNGAN
-// ============================================
-
 function resetFormKunjungan() {
   document.getElementById('beeForm').reset();
-
-  Object.keys(bays).forEach(bay => {
-    bays[bay] = 0;
-    updateBayDisplay(bay);
-  });
-
+  Object.keys(bays).forEach(bay => { bays[bay] = 0; updateBayDisplay(bay); });
   document.getElementById('tanggal').value = getLocalDate();
   hideStatusKunjungan();
-
   currentEditId = null;
   currentEditType = null;
-
   document.getElementById('editIndicatorKunjungan').classList.remove('show');
-
   const btn = document.getElementById('submitBtnKunjungan');
   btn.textContent = 'Kirim';
   btn.disabled = false;
@@ -1384,7 +1566,6 @@ const kotaks = {};
 
 for (let i = 1; i <= 6; i++) {
   kotaks[`kotak${i}`] = 100;
-
   const kotakItem = document.createElement('div');
   kotakItem.className = 'kotak-item';
   kotakItem.innerHTML = `
@@ -1407,10 +1588,6 @@ function updateKotakValue(kotakId) {
   kotaks[kotakId] = val;
 }
 
-// ============================================
-// SUBMIT MORTALITAS
-// ============================================
-
 document.getElementById('mortalitasForm').addEventListener('submit', async e => {
   e.preventDefault();
 
@@ -1431,7 +1608,6 @@ document.getElementById('mortalitasForm').addEventListener('submit', async e => 
   const submitBtn = document.getElementById('submitBtnMortalitas');
   submitBtn.disabled = true;
   submitBtn.textContent = isEdit ? 'Mengupdate...' : 'Mengirim...';
-
   showStatusMortalitas(isEdit ? 'Mengupdate data...' : 'Mengirim data...', 'loading');
 
   try {
@@ -1444,7 +1620,6 @@ document.getElementById('mortalitasForm').addEventListener('submit', async e => 
       const result = await res.json();
 
       if (result.status === 'error') throw new Error(result.message || 'Gagal');
-
       if (isEdit && result.status !== 'success') {
         throw new Error('Data tidak ditemukan di Google Sheet.');
       }
@@ -1453,7 +1628,6 @@ document.getElementById('mortalitasForm').addEventListener('submit', async e => 
       showToast(isEdit ? 'Update Berhasil! ✏️' : 'Data Terkirim! ✓',
         isEdit ? 'Perubahan tersimpan di Sheet.' : 'Mortalitas tersimpan di Sheet.',
         'success', 4000);
-
     } else {
       await saveToQueue(formData, 'mortalitas');
       showStatusMortalitas('📥 Data tersimpan lokal. Auto-sync akan kirim otomatis.', 'info');
@@ -1472,7 +1646,6 @@ document.getElementById('mortalitasForm').addEventListener('submit', async e => 
 
   } catch (error) {
     console.error('Error:', error);
-
     await saveToQueue(formData, 'mortalitas');
     showStatusMortalitas('⚠️ Koneksi gagal - Data tersimpan lokal', 'error');
     showToast('Gagal Kirim ⚠️', 'Tersimpan lokal. Auto-sync akan coba lagi.', 'error', 5000);
@@ -1489,26 +1662,17 @@ document.getElementById('mortalitasForm').addEventListener('submit', async e => 
   }
 });
 
-// ============================================
-// RESET MORTALITAS
-// ============================================
-
 function resetFormMortalitas() {
   document.getElementById('mortalitasForm').reset();
-
   Object.keys(kotaks).forEach(kotak => {
     kotaks[kotak] = 100;
     document.getElementById(kotak).value = 100;
   });
-
   document.getElementById('tanggal2').value = getLocalDate();
   hideStatusMortalitas();
-
   currentEditId = null;
   currentEditType = null;
-
   document.getElementById('editIndicatorMortalitas').classList.remove('show');
-
   const btn = document.getElementById('submitBtnMortalitas');
   btn.textContent = 'Kirim';
   btn.disabled = false;
@@ -1530,14 +1694,11 @@ function hideStatusMortalitas() {
 
 async function deleteDataKunjungan() {
   if (!confirm('Hapus data terakhir dari sheet Kunjungan? Tidak bisa dibatalkan.')) return;
-
   if (!isAuthenticated || !scriptUrl) {
     showToast('Belum Tersambung', 'Klik "Connect Sheets" dulu.', 'error');
     return;
   }
-
   showLoadingOverlay('Menghapus data...');
-
   try {
     const res = await fetch(scriptUrl, {
       method: 'POST',
@@ -1546,12 +1707,9 @@ async function deleteDataKunjungan() {
     });
     const result = await res.json();
     hideLoadingOverlay();
-
     if (result.status !== 'success') throw new Error(result.message || 'Data tidak ditemukan.');
-
     showToast('Data Dihapus! 🗑️', 'Baris terakhir sheet Kunjungan dihapus.', 'success');
     await fetchAllDataFromSheet();
-
   } catch (error) {
     hideLoadingOverlay();
     console.error(error);
@@ -1561,14 +1719,11 @@ async function deleteDataKunjungan() {
 
 async function deleteDataMortalitas() {
   if (!confirm('Hapus data terakhir dari sheet Mortalitas? Tidak bisa dibatalkan.')) return;
-
   if (!isAuthenticated || !scriptUrl) {
     showToast('Belum Tersambung', 'Klik "Connect Sheets" dulu.', 'error');
     return;
   }
-
   showLoadingOverlay('Menghapus data...');
-
   try {
     const res = await fetch(scriptUrl, {
       method: 'POST',
@@ -1577,12 +1732,9 @@ async function deleteDataMortalitas() {
     });
     const result = await res.json();
     hideLoadingOverlay();
-
     if (result.status !== 'success') throw new Error(result.message || 'Data tidak ditemukan.');
-
     showToast('Data Dihapus! 🗑️', 'Baris terakhir sheet Mortalitas dihapus.', 'success');
     await fetchAllDataFromSheet();
-
   } catch (error) {
     hideLoadingOverlay();
     console.error(error);
@@ -1600,7 +1752,7 @@ function renderHistory() {
   const tbody = document.getElementById('historyBody');
 
   if (data.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="history-empty">Belum ada data riwayat</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="history-empty">Belum ada data riwayat</td></tr>`;
     return;
   }
 
@@ -1616,11 +1768,16 @@ function renderHistory() {
       ? `<span style="color:#2e7d32;font-size:9px;font-weight:700;">● SHEET</span>`
       : `<span style="color:#e65100;font-size:9px;font-weight:700;">● LOCAL</span>`;
 
+    const suhuVal = (type === 'kunjungan')
+      ? (item.suhu !== undefined && item.suhu !== '' ? item.suhu + '°C' : '-')
+      : '-';
+
     return `
       <tr>
         <td>${item.tanggal || '-'}<br>${badge}</td>
         <td>${item.waktu || '-'}</td>
         <td>${item.gh || '-'}</td>
+        <td>${suhuVal}</td>
         <td>${item.cuaca || '-'}</td>
         <td style="text-align:center;white-space:nowrap;">
           <button class="history-btn history-btn-edit"
@@ -1649,7 +1806,8 @@ function editHistory(type, localId) {
     document.getElementById('tanggal').value = data.tanggal || getLocalDate();
     document.getElementById('waktu').value = data.waktu || '';
     document.getElementById('gh').value = data.gh || '';
-    document.getElementById('rowKe').value = data.rowKe || '';
+    // SUHU
+    document.getElementById('suhu').value = data.suhu !== undefined ? data.suhu : '';
     document.getElementById('cuaca').value = data.cuaca || '';
 
     for (let i = 1; i <= 10; i++) {
@@ -1659,7 +1817,6 @@ function editHistory(type, localId) {
 
     document.getElementById('editIndicatorKunjungan').classList.add('show');
     document.getElementById('submitBtnKunjungan').textContent = 'Update Data';
-
   } else {
     activateTab('tab-mortalitas');
     document.getElementById('tanggal2').value = data.tanggal || getLocalDate();
@@ -1681,20 +1838,13 @@ function editHistory(type, localId) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ============================================
-// ACTIVATE TAB
-// ============================================
-
 function activateTab(tabName) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-
   const btn = document.querySelector(`[data-tab="${tabName}"]`);
   const content = document.getElementById(tabName);
-
   if (btn) btn.classList.add('active');
   if (content) content.classList.add('active');
-
   if (tabName === 'tab-trend') renderTrendDashboard();
 }
 
@@ -1736,9 +1886,7 @@ async function deleteHistoryItem(type, localId) {
       deleteLocalHistory(type, localId);
       renderHistory();
       hideLoadingOverlay();
-      showToast('Data Dihapus 🗑️',
-        `Data ${data.tanggal} berhasil dihapus dari Sheet.`,
-        'success', 4000);
+      showToast('Data Dihapus 🗑️', `Data ${data.tanggal} berhasil dihapus.`, 'success', 4000);
       return;
     }
 
@@ -1751,18 +1899,15 @@ async function deleteHistoryItem(type, localId) {
     }
 
     throw new Error(result.message || 'Google Sheet gagal menghapus data.');
-
   } catch (error) {
     hideLoadingOverlay();
     console.error('Delete sync error:', error);
-    showToast('Gagal Hapus dari Sheet',
-      'Data tidak dihapus dari Sheet. Coba lagi.',
-      'error', 5000);
+    showToast('Gagal Hapus dari Sheet', 'Coba lagi.', 'error', 5000);
   }
 }
 
 // ============================================
-// FETCH / SYNC SHEET (Manual, dengan UI feedback)
+// FETCH / SYNC SHEET (Manual)
 // ============================================
 
 async function fetchAllDataFromSheet() {
@@ -1789,7 +1934,6 @@ async function fetchAllDataFromSheet() {
   try {
     const res = await fetch(scriptUrl + '?action=list');
     const result = await res.json();
-
     if (result.status === 'error') throw new Error(result.message || 'Gagal mengambil data.');
 
     const sheetKunjungan = (result.kunjungan || []).map(d => ({
@@ -1825,7 +1969,6 @@ async function fetchAllDataFromSheet() {
       `${sheetKunjungan.length} kunjungan, ${sheetMortalitas.length} mortalitas dimuat.`,
       'success', 4000);
 
-    // Re-render trend if on trend tab
     const activeTab = document.querySelector('.tab-content.active');
     if (activeTab && activeTab.id === 'tab-trend') renderTrendDashboard();
 
@@ -1846,22 +1989,49 @@ async function fetchAllDataFromSheet() {
 
 let trendChartInstance = null;
 let barChartInstance = null;
+let weatherChartInstance = null;
 
-function renderTrendDashboard() {
+const WEATHER_ORDER = ['cerah', 'berawan', 'mendung', 'hujan', 'gerimis'];
+const WEATHER_LABEL = {
+  cerah: 'Cerah',
+  berawan: 'Berawan',
+  mendung: 'Mendung',
+  hujan: 'Hujan',
+  gerimis: 'Gerimis'
+};
+const WEATHER_COLOR = {
+  cerah: '#f59e0b',
+  berawan: '#64748b',
+  mendung: '#475569',
+  hujan: '#0284c7',
+  gerimis: '#0891b2'
+};
+
+function getFilteredKunjungan() {
   const fromDate = document.getElementById('trendFromDate').value;
   const toDate = document.getElementById('trendToDate').value;
   const ghFilter = document.getElementById('trendGhFilter').value;
-  const metric = document.getElementById('trendMetric').value;
 
-  // Filter data kunjungan
-  const filteredData = (localHistory.kunjungan || []).filter(item => {
+  return (localHistory.kunjungan || []).filter(item => {
     const matchDate = (!fromDate || item.tanggal >= fromDate) &&
                       (!toDate || item.tanggal <= toDate);
     const matchGh = !ghFilter || item.gh === ghFilter;
     return matchDate && matchGh;
   });
+}
 
-  // Kelompokkan berdasarkan tanggal
+function getTotalPerItem(item) {
+  let total = 0;
+  for (let i = 1; i <= 10; i++) total += parseInt(item['bay' + i]) || 0;
+  return total;
+}
+
+function renderTrendDashboard() {
+  const metric = document.getElementById('trendMetric').value;
+  const ghFilter = document.getElementById('trendGhFilter').value;
+  const filteredData = getFilteredKunjungan();
+
+  // === Kelompokkan per tanggal ===
   const groupedByDate = {};
   filteredData.forEach(item => {
     if (!groupedByDate[item.tanggal]) groupedByDate[item.tanggal] = [];
@@ -1877,20 +2047,12 @@ function renderTrendDashboard() {
   sortedDates.forEach(date => {
     const dayItems = groupedByDate[date];
     let dailyTotal = 0;
-
     dayItems.forEach(item => {
-      if (metric === 'total') {
-        for (let i = 1; i <= 10; i++) {
-          dailyTotal += parseInt(item['bay' + i]) || 0;
-        }
-      } else {
-        dailyTotal += parseInt(item[metric]) || 0;
-      }
+      if (metric === 'total') dailyTotal += getTotalPerItem(item);
+      else dailyTotal += parseInt(item[metric]) || 0;
     });
-
     chartData.push(dailyTotal);
     grandTotal += dailyTotal;
-
     if (dailyTotal > maxVal) {
       maxVal = dailyTotal;
       maxDate = date;
@@ -1900,7 +2062,6 @@ function renderTrendDashboard() {
   const avgPerDay = sortedDates.length > 0 ? (grandTotal / sortedDates.length).toFixed(1) : 0;
   const totalSessions = filteredData.length;
 
-  // Summary
   document.getElementById('trendSummary').innerHTML = `
     <div class="summary-card">
       <div class="header">📊 Total Kunjungan</div>
@@ -1924,11 +2085,9 @@ function renderTrendDashboard() {
     </div>
   `;
 
-  const metricLabel = metric === 'total'
-    ? 'Total Kunjungan'
-    : `Kunjungan ${metric.toUpperCase()}`;
+  const metricLabel = metric === 'total' ? 'Total Kunjungan' : `Kunjungan ${metric.toUpperCase()}`;
 
-  // Line Chart
+  // === Line Chart harian ===
   const ctx = document.getElementById('trendChart').getContext('2d');
   if (trendChartInstance) trendChartInstance.destroy();
 
@@ -1950,8 +2109,7 @@ function renderTrendDashboard() {
       }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: {
         title: {
           display: true,
@@ -1975,8 +2133,170 @@ function renderTrendDashboard() {
     }
   });
 
-  // Bar Chart — Distribusi per Bay
+  // === Bar Chart per Bay ===
   renderBarChart(filteredData, ghFilter);
+
+  // === 🌤️ WEATHER TREND ===
+  renderWeatherDashboard(filteredData, ghFilter);
+}
+
+// ============================================
+// 🌤️ TREND BY CUACA
+// ============================================
+
+function renderWeatherDashboard(filteredData, ghFilter) {
+  // Group by cuaca
+  const byWeather = {};
+  WEATHER_ORDER.forEach(w => {
+    byWeather[w] = {
+      sessions: 0,
+      totalKunjungan: 0,
+      totalSuhu: 0,
+      suhuCount: 0
+    };
+  });
+
+  filteredData.forEach(item => {
+    const w = (item.cuaca || '').toLowerCase().trim();
+    if (!byWeather[w]) {
+      byWeather[w] = { sessions: 0, totalKunjungan: 0, totalSuhu: 0, suhuCount: 0 };
+    }
+    const total = getTotalPerItem(item);
+    byWeather[w].sessions += 1;
+    byWeather[w].totalKunjungan += total;
+
+    // Suhu bisa berupa angka/string
+    const suhu = parseFloat(item.suhu);
+    if (!isNaN(suhu)) {
+      byWeather[w].totalSuhu += suhu;
+      byWeather[w].suhuCount += 1;
+    }
+  });
+
+  // Kumpulkan cuaca yang punya data
+  const activeWeather = Object.keys(byWeather).filter(w => byWeather[w].sessions > 0);
+
+  // === Weather Bar Chart (average per sesi untuk setiap cuaca) ===
+  const labels = activeWeather.map(w => WEATHER_LABEL[w] || w);
+  const avgPerSession = activeWeather.map(w => {
+    const d = byWeather[w];
+    return d.sessions > 0 ? +(d.totalKunjungan / d.sessions).toFixed(2) : 0;
+  });
+  const colors = activeWeather.map(w => WEATHER_COLOR[w] || '#2d5016');
+
+  const wctx = document.getElementById('weatherChart').getContext('2d');
+  if (weatherChartInstance) weatherChartInstance.destroy();
+
+  weatherChartInstance = new Chart(wctx, {
+    type: 'bar',
+    data: {
+      labels: labels.length ? labels : ['Belum ada data'],
+      datasets: [{
+        label: 'Rata-rata Kunjungan / Sesi',
+        data: avgPerSession.length ? avgPerSession : [0],
+        backgroundColor: colors.length ? colors : ['#e0e0e0'],
+        borderColor: '#2d5016',
+        borderWidth: 1,
+        borderRadius: 8
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        title: {
+          display: true,
+          text: `🌤️ Rata-rata Kunjungan per Sesi berdasarkan Cuaca - ${ghFilter || 'Semua GH'}`,
+          font: { weight: 'bold', size: 13, family: 'sans-serif' },
+          color: '#2d5016'
+        },
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            afterLabel: function(context) {
+              const w = activeWeather[context.dataIndex];
+              if (!w) return '';
+              const d = byWeather[w];
+              return [
+                'Total: ' + d.totalKunjungan + ' kunjungan',
+                'Sesi: ' + d.sessions
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Kunjungan / Sesi', font: { weight: 'bold' } },
+          grid: { color: '#f0f0f0' }
+        },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // === Summary cards per cuaca ===
+  if (activeWeather.length === 0) {
+    document.getElementById('weatherSummary').innerHTML =
+      `<div class="summary-card"><div class="header">🌤️ Belum ada data cuaca</div><div class="value">-</div></div>`;
+    document.getElementById('weatherTableBody').innerHTML =
+      `<tr><td colspan="5" style="text-align:center;color:#999;">Belum ada data</td></tr>`;
+    return;
+  }
+
+  // Cari cuaca terbaik & terendah
+  let bestWeather = activeWeather[0];
+  let worstWeather = activeWeather[0];
+  activeWeather.forEach(w => {
+    const avg = byWeather[w].sessions > 0 ? byWeather[w].totalKunjungan / byWeather[w].sessions : 0;
+    const bestAvg = byWeather[bestWeather].sessions > 0 ? byWeather[bestWeather].totalKunjungan / byWeather[bestWeather].sessions : 0;
+    const worstAvg = byWeather[worstWeather].sessions > 0 ? byWeather[worstWeather].totalKunjungan / byWeather[worstWeather].sessions : 0;
+    if (avg > bestAvg) bestWeather = w;
+    if (avg < worstAvg) worstWeather = w;
+  });
+
+  const bestAvg = byWeather[bestWeather].sessions > 0
+    ? (byWeather[bestWeather].totalKunjungan / byWeather[bestWeather].sessions).toFixed(1) : 0;
+  const worstAvg = byWeather[worstWeather].sessions > 0
+    ? (byWeather[worstWeather].totalKunjungan / byWeather[worstWeather].sessions).toFixed(1) : 0;
+
+  document.getElementById('weatherSummary').innerHTML = `
+    <div class="summary-card weather-${bestWeather}">
+      <div class="header">🌞 Cuaca Terbaik</div>
+      <div class="value">${WEATHER_LABEL[bestWeather] || bestWeather}</div>
+      <div class="sub">Rata² ${bestAvg} kunjungan/sesi</div>
+    </div>
+    <div class="summary-card weather-${worstWeather}">
+      <div class="header">🌧️ Cuaca Terendah</div>
+      <div class="value">${WEATHER_LABEL[worstWeather] || worstWeather}</div>
+      <div class="sub">Rata² ${worstAvg} kunjungan/sesi</div>
+    </div>
+    <div class="summary-card">
+      <div class="header">📅 Jenis Cuaca</div>
+      <div class="value">${activeWeather.length}</div>
+      <div class="sub">Jenis cuaca tercatat</div>
+    </div>
+  `;
+
+  // === Tabel detail ===
+  let tableHtml = '';
+  WEATHER_ORDER.forEach(w => {
+    const d = byWeather[w];
+    if (!d || d.sessions === 0) return;
+    const avgPerSesi = d.sessions > 0 ? (d.totalKunjungan / d.sessions).toFixed(1) : 0;
+    const avgSuhu = d.suhuCount > 0 ? (d.totalSuhu / d.suhuCount).toFixed(1) + '°C' : '-';
+    tableHtml += `
+      <tr>
+        <td class="w-${w}">${WEATHER_LABEL[w] || w}</td>
+        <td>${d.sessions}</td>
+        <td>${d.totalKunjungan}</td>
+        <td><b>${avgPerSesi}</b></td>
+        <td>${avgSuhu}</td>
+      </tr>
+    `;
+  });
+  document.getElementById('weatherTableBody').innerHTML =
+    tableHtml || `<tr><td colspan="5" style="text-align:center;color:#999;">Belum ada data</td></tr>`;
 }
 
 function renderBarChart(filteredData, ghFilter) {
@@ -2005,8 +2325,7 @@ function renderBarChart(filteredData, ghFilter) {
       }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: {
         title: {
           display: true,
@@ -2022,9 +2341,7 @@ function renderBarChart(filteredData, ghFilter) {
           title: { display: true, text: 'Total Kunjungan', font: { weight: 'bold' } },
           grid: { color: '#f0f0f0' }
         },
-        x: {
-          grid: { display: false }
-        }
+        x: { grid: { display: false } }
       }
     }
   });
