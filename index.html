@@ -781,7 +781,7 @@ button.btn-delete:hover { background: #c82333; }
 // Setelah itu, user awam TIDAK PERLU isi URL lagi.
 // Cukup buka aplikasi → otomatis tersambung.
 //
-const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxhdORSYpSfu-qtt6SWuqEBdbkim1KSSooZbYOsjbDICu16jBEriFlDLC1LsX01Mne2-Q/exec';
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxv51hcseHd076_AYSQusUdCkuWFYsBM_YMfIqDHIUENSBGwDRqK-PFdOfAYIxB5cXa/exec';
 
 // ============================================
 // STATE
@@ -798,6 +798,24 @@ let localHistory = {
 
 let currentEditId = null;
 let currentEditType = null;
+let editOriginalKey = null; // kunci asli baris (tanggal+waktu+gh) saat mode edit
+
+// Suhu dari sheet bisa 'rusak' jadi tanggal ISO (mis. 27.8 -> 2026-08-27T...)
+// Kembalikan ke format angka supaya tampil benar.
+function normalizeSuhu(val) {
+  if (val === undefined || val === null || val === '') return '';
+  if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(val)) {
+    const d = new Date(val);
+    if (!isNaN(d)) {
+      // sheet di zona WIB: tanggal-bulan = angka-desimal (27 Agu -> 27.8)
+      const wib = new Date(d.getTime() + 7 * 3600 * 1000);
+      return parseFloat(wib.getUTCDate() + '.' + (wib.getUTCMonth() + 1));
+    }
+    return '';
+  }
+  const n = parseFloat(String(val).replace(',', '.'));
+  return isNaN(n) ? '' : n;
+}
 
 // ============================================
 // AUTH (Auto-Connect)
@@ -1501,7 +1519,14 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
     ...bays
   };
 
-  if (isEdit) formData._localId = currentEditId;
+  if (isEdit) {
+    formData._localId = currentEditId;
+    if (editOriginalKey) {
+      formData.oldTanggal = editOriginalKey.tanggal;
+      formData.oldWaktu = editOriginalKey.waktu;
+      formData.oldGh = editOriginalKey.gh;
+    }
+  }
 
   const submitBtn = document.getElementById('submitBtnKunjungan');
   submitBtn.disabled = true;
@@ -1629,7 +1654,14 @@ document.getElementById('mortalitasForm').addEventListener('submit', async e => 
     ...kotaks
   };
 
-  if (isEdit) formData._localId = currentEditId;
+  if (isEdit) {
+    formData._localId = currentEditId;
+    if (editOriginalKey) {
+      formData.oldTanggal = editOriginalKey.tanggal;
+      formData.oldWaktu = editOriginalKey.waktu;
+      formData.oldGh = editOriginalKey.gh;
+    }
+  }
 
   const submitBtn = document.getElementById('submitBtnMortalitas');
   submitBtn.disabled = true;
@@ -1794,9 +1826,8 @@ function renderHistory() {
       ? `<span style="color:#2e7d32;font-size:9px;font-weight:700;">● SHEET</span>`
       : `<span style="color:#e65100;font-size:9px;font-weight:700;">● LOCAL</span>`;
 
-    const suhuVal = (type === 'kunjungan')
-      ? (item.suhu !== undefined && item.suhu !== '' ? item.suhu + '°C' : '-')
-      : '-';
+    const suhuNorm = (type === 'kunjungan') ? normalizeSuhu(item.suhu) : '';
+    const suhuVal = suhuNorm !== '' ? suhuNorm + '°C' : '-';
 
     return `
       <tr>
@@ -1826,13 +1857,14 @@ function editHistory(type, localId) {
 
   currentEditId = localId;
   currentEditType = type;
+  editOriginalKey = { tanggal: data.tanggal || '', waktu: data.waktu || '', gh: data.gh || '' };
 
   if (type === 'kunjungan') {
     activateTab('tab-kunjungan');
     document.getElementById('tanggal').value = data.tanggal || getLocalDate();
     document.getElementById('waktu').value = data.waktu || '';
     document.getElementById('gh').value = data.gh || '';
-    document.getElementById('suhu').value = data.suhu !== undefined ? data.suhu : '';
+    document.getElementById('suhu').value = normalizeSuhu(data.suhu);
     document.getElementById('cuaca').value = data.cuaca || '';
 
     for (let i = 1; i <= 10; i++) {
@@ -2179,7 +2211,7 @@ function renderWeatherDashboard(filteredData, ghFilter) {
     byWeather[w].sessions += 1;
     byWeather[w].totalKunjungan += total;
 
-    const suhu = parseFloat(item.suhu);
+    const suhu = parseFloat(normalizeSuhu(item.suhu));
     if (!isNaN(suhu)) {
       byWeather[w].totalSuhu += suhu;
       byWeather[w].suhuCount += 1;
