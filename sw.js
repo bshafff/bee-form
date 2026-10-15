@@ -1,9 +1,9 @@
 // ============================================
 // SERVICE WORKER - BEE FORM PWA
-// VERSION 8 - skip version.json + cache Chart.js
+// VERSION 9 - skip version.json + cache Chart.js
 // ============================================
 
-const CACHE_NAME = 'bee-form-v8';
+const CACHE_NAME = 'bee-form-v9';
 
 const urlsToCache = [
   './',
