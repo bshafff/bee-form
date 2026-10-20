@@ -1,5 +1,5 @@
 {
-  "version": "1.0.1",
-  "released": "2026-10-15",
-  "notes": "Fix tampilan suhu & edit baris di sheet"
+  "version": "1.0.2",
+  "released": "2026-10-20",
+  "notes": "Fix jam riwayat bergeser +7:07 (kompatibel server lama & baru)"
 }

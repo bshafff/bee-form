@@ -817,6 +817,56 @@ function normalizeSuhu(val) {
   return isNaN(n) ? '' : n;
 }
 
+
+// ============================================
+// FIX JAM DARI SHEET
+// Sel jam di Sheets disimpan sebagai tanggal 30 Des 1899. Saat dibaca server
+// (zona Asia/Jakarta) jam jadi bergeser +7 jam 07 menit (offset LMT Batavia),
+// mis. 11:05 di sheet -> 18:12 di riwayat. Di sini kita kembalikan ke jam asli.
+// Otomatis: kalau respons server memuat timeFix, tidak ada koreksi.
+// ============================================
+const WAKTU_SHIFT_LEGACY_MIN = 7 * 60 + 7;
+// Server lama (belum di-deploy ulang) -> geser 7:07. Server baru mengirim timeFix:2 -> 0.
+let serverWaktuShiftMin = WAKTU_SHIFT_LEGACY_MIN;
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function fixSheetWaktu(val) {
+  if (val === undefined || val === null || val === '') return '';
+  const str = String(val).trim();
+
+  // Format ISO (mis. 1899-12-30T04:00:48.000Z) -> jam WIB asli
+  if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
+    const d = new Date(str);
+    if (isNaN(d)) return '';
+    const yr = d.getUTCFullYear();
+    const shiftMs = yr < 1901
+      ? (7 * 3600 + 7 * 60 + 12) * 1000   // LMT Batavia
+      : 7 * 3600 * 1000;                  // WIB biasa
+    const w = new Date(d.getTime() + shiftMs);
+    return pad2(w.getUTCHours()) + ':' + pad2(w.getUTCMinutes());
+  }
+
+  // Format "HH:mm" / "HH:mm:ss" -> kurangi pergeseran server
+  const m = str.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return str;
+  let total = parseInt(m[1], 10) * 60 + parseInt(m[2], 10) - serverWaktuShiftMin;
+  total = ((total % 1440) + 1440) % 1440;
+  return pad2(Math.floor(total / 60)) + ':' + pad2(total % 60);
+}
+
+// Ubah 1 baris dari sheet jadi item riwayat (jam dikoreksi, nilai asli disimpan untuk kunci edit/hapus)
+function mapSheetRow(d) {
+  const rawWaktu = d.waktu;
+  return {
+    ...d,
+    waktu: fixSheetWaktu(rawWaktu),
+    _waktuRaw: rawWaktu,
+    _localId: 'sheet_' + (d._sheetRow || ((d.tanggal || '') + '_' + (rawWaktu || '') + '_' + (d.gh || ''))),
+    _syncedToSheet: true
+  };
+}
+
 // ============================================
 // AUTH (Auto-Connect)
 // ============================================
@@ -1226,6 +1276,18 @@ function loadLocalHistory() {
   }
   if (!localHistory.kunjungan) localHistory.kunjungan = [];
   if (!localHistory.mortalitas) localHistory.mortalitas = [];
+
+  // Migrasi sekali: item dari sheet yang tersimpan sebelum fix jam dibuang,
+  // nanti diambil ulang dari sheet dengan jam yang benar.
+  if (!localStorage.getItem('bee_waktu_fix_v1')) {
+    ['kunjungan', 'mortalitas'].forEach(t => {
+      localHistory[t] = localHistory[t].filter(
+        x => !String(x._localId || '').startsWith('sheet_')
+      );
+    });
+    saveLocalHistory();
+    localStorage.setItem('bee_waktu_fix_v1', '1');
+  }
 }
 
 function saveLocalHistory() {
@@ -1357,17 +1419,10 @@ async function autoSync() {
       const result = await res.json();
 
       if (result.status !== 'error') {
-        const sheetKunjungan = (result.kunjungan || []).map(d => ({
-          ...d,
-          _localId: 'sheet_' + (d._sheetRow || ((d.tanggal || '') + '_' + (d.waktu || '') + '_' + (d.gh || ''))),
-          _syncedToSheet: true
-        }));
+        serverWaktuShiftMin = result.timeFix ? 0 : WAKTU_SHIFT_LEGACY_MIN;
+        const sheetKunjungan = (result.kunjungan || []).map(mapSheetRow);
 
-        const sheetMortalitas = (result.mortalitas || []).map(d => ({
-          ...d,
-          _localId: 'sheet_' + (d._sheetRow || ((d.tanggal || '') + '_' + (d.waktu || '') + '_' + (d.gh || ''))),
-          _syncedToSheet: true
-        }));
+        const sheetMortalitas = (result.mortalitas || []).map(mapSheetRow);
 
         const mergeData = (local, sheet) => {
           const localOnly = (local || []).filter(
@@ -1857,7 +1912,7 @@ function editHistory(type, localId) {
 
   currentEditId = localId;
   currentEditType = type;
-  editOriginalKey = { tanggal: data.tanggal || '', waktu: data.waktu || '', gh: data.gh || '' };
+  editOriginalKey = { tanggal: data.tanggal || '', waktu: (data._waktuRaw !== undefined ? data._waktuRaw : data.waktu) || '', gh: data.gh || '' };
 
   if (type === 'kunjungan') {
     activateTab('tab-kunjungan');
@@ -1932,7 +1987,7 @@ async function deleteHistoryItem(type, localId) {
         action: 'delete-row',
         sheet: type,
         tanggal: data.tanggal,
-        waktu: data.waktu,
+        waktu: (data._waktuRaw !== undefined ? data._waktuRaw : data.waktu),
         gh: data.gh
       })
     });
@@ -1993,17 +2048,11 @@ async function fetchAllDataFromSheet() {
     const result = await res.json();
     if (result.status === 'error') throw new Error(result.message || 'Gagal mengambil data.');
 
-    const sheetKunjungan = (result.kunjungan || []).map(d => ({
-      ...d,
-      _localId: 'sheet_' + (d._sheetRow || ((d.tanggal || '') + '_' + (d.waktu || '') + '_' + (d.gh || ''))),
-      _syncedToSheet: true
-    }));
+    serverWaktuShiftMin = result.timeFix ? 0 : WAKTU_SHIFT_LEGACY_MIN;
 
-    const sheetMortalitas = (result.mortalitas || []).map(d => ({
-      ...d,
-      _localId: 'sheet_' + (d._sheetRow || ((d.tanggal || '') + '_' + (d.waktu || '') + '_' + (d.gh || ''))),
-      _syncedToSheet: true
-    }));
+    const sheetKunjungan = (result.kunjungan || []).map(mapSheetRow);
+
+    const sheetMortalitas = (result.mortalitas || []).map(mapSheetRow);
 
     const mergeData = (local, sheet) => {
       const localOnly = (local || []).filter(
