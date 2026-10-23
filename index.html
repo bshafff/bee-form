@@ -1260,8 +1260,10 @@ async function syncQueuedData() {
 
   if (failed === 0) {
     showToast('Sinkron Berhasil! 🎉', `${synced} data terkirim.`, 'success', 4000);
+    fetchAllDataFromSheet(); // Refresh data lokal agar duplikat hilang
   } else {
     showToast('Sinkron Sebagian', `${synced} berhasil, ${failed} gagal.`, 'error', 5000);
+    if (synced > 0) fetchAllDataFromSheet(); // Tetap refresh jika ada yang berhasil
   }
 }
 
@@ -1298,19 +1300,19 @@ function generateLocalId() {
   return Date.now() + '_' + Math.random().toString(36).slice(2, 8);
 }
 
-function addLocalHistory(type, data) {
+function addLocalHistory(type, data, synced = false) {
   if (!localHistory[type]) localHistory[type] = [];
   data._localId = generateLocalId();
-  data._syncedToSheet = false;
+  data._syncedToSheet = synced;
   localHistory[type].push(data);
   saveLocalHistory();
 }
 
-function updateLocalHistory(type, localId, newData) {
+function updateLocalHistory(type, localId, newData, synced = false) {
   if (!localHistory[type]) return;
   const idx = localHistory[type].findIndex(d => d._localId === localId);
   if (idx !== -1) {
-    localHistory[type][idx] = { ...newData, _localId: localId, _syncedToSheet: false };
+    localHistory[type][idx] = { ...newData, _localId: localId, _syncedToSheet: synced };
     saveLocalHistory();
   }
 }
@@ -1421,14 +1423,24 @@ async function autoSync() {
       if (result.status !== 'error') {
         serverWaktuShiftMin = result.timeFix ? 0 : WAKTU_SHIFT_LEGACY_MIN;
         const sheetKunjungan = (result.kunjungan || []).map(mapSheetRow);
-
         const sheetMortalitas = (result.mortalitas || []).map(mapSheetRow);
 
+        // --- PERBAIKAN: Hapus data lokal yang sudah ada di Sheet ---
         const mergeData = (local, sheet) => {
           const localOnly = (local || []).filter(
             l => !String(l._localId || '').startsWith('sheet_')
           );
-          return [...sheet, ...localOnly];
+          
+          const unsyncedLocal = localOnly.filter(loc => {
+            const isAlreadyInSheet = sheet.some(sh => 
+              sh.tanggal === loc.tanggal && 
+              sh.waktu === loc.waktu && 
+              sh.gh === loc.gh
+            );
+            return !isAlreadyInSheet;
+          });
+
+          return [...sheet, ...unsyncedLocal];
         };
 
         localHistory.kunjungan = mergeData(localHistory.kunjungan, sheetKunjungan);
@@ -1589,6 +1601,8 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
   showStatusKunjungan(isEdit ? 'Mengupdate data...' : 'Mengirim data...', 'loading');
 
   try {
+    let isSuccessSync = false; // <-- TAMBAHAN
+
     if (isAuthenticated && scriptUrl && navigator.onLine) {
       const res = await fetch(scriptUrl, {
         method: 'POST',
@@ -1602,6 +1616,8 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
         throw new Error('Data tidak ditemukan di Google Sheet.');
       }
 
+      isSuccessSync = true; // <-- TAMBAHAN
+
       showStatusKunjungan(isEdit ? '✓ Data berhasil diupdate!' : '✓ Data berhasil dikirim!', 'success');
       showToast(isEdit ? 'Update Berhasil! ✏️' : 'Data Terkirim! ✓',
         isEdit ? 'Perubahan tersimpan di Sheet.' : 'Kunjungan tersimpan di Sheet.',
@@ -1612,8 +1628,8 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
       showToast('Tersimpan Lokal 📥', 'Auto-sync akan kirim otomatis.', 'info', 4500);
     }
 
-    if (isEdit) updateLocalHistory('kunjungan', currentEditId, formData);
-    else addLocalHistory('kunjungan', formData);
+    if (isEdit) updateLocalHistory('kunjungan', currentEditId, formData, isSuccessSync);
+    else addLocalHistory('kunjungan', formData, isSuccessSync);
 
     currentEditId = null;
     currentEditType = null;
@@ -1628,8 +1644,8 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
     showStatusKunjungan('⚠️ Koneksi gagal - Data tersimpan lokal', 'error');
     showToast('Gagal Kirim ⚠️', 'Tersimpan lokal. Auto-sync akan coba lagi.', 'error', 5000);
 
-    if (isEdit) updateLocalHistory('kunjungan', currentEditId, formData);
-    else addLocalHistory('kunjungan', formData);
+    if (isEdit) updateLocalHistory('kunjungan', currentEditId, formData, false);
+    else addLocalHistory('kunjungan', formData, false);
 
     currentEditId = null;
     currentEditType = null;
@@ -1724,6 +1740,8 @@ document.getElementById('mortalitasForm').addEventListener('submit', async e => 
   showStatusMortalitas(isEdit ? 'Mengupdate data...' : 'Mengirim data...', 'loading');
 
   try {
+    let isSuccessSync = false; // <-- TAMBAHAN
+
     if (isAuthenticated && scriptUrl && navigator.onLine) {
       const res = await fetch(scriptUrl, {
         method: 'POST',
@@ -1737,6 +1755,8 @@ document.getElementById('mortalitasForm').addEventListener('submit', async e => 
         throw new Error('Data tidak ditemukan di Google Sheet.');
       }
 
+      isSuccessSync = true; // <-- TAMBAHAN
+
       showStatusMortalitas(isEdit ? '✓ Data berhasil diupdate!' : '✓ Data berhasil dikirim!', 'success');
       showToast(isEdit ? 'Update Berhasil! ✏️' : 'Data Terkirim! ✓',
         isEdit ? 'Perubahan tersimpan di Sheet.' : 'Mortalitas tersimpan di Sheet.',
@@ -1747,8 +1767,8 @@ document.getElementById('mortalitasForm').addEventListener('submit', async e => 
       showToast('Tersimpan Lokal 📥', 'Auto-sync akan kirim otomatis.', 'info', 4500);
     }
 
-    if (isEdit) updateLocalHistory('mortalitas', currentEditId, formData);
-    else addLocalHistory('mortalitas', formData);
+    if (isEdit) updateLocalHistory('mortalitas', currentEditId, formData, isSuccessSync);
+    else addLocalHistory('mortalitas', formData, isSuccessSync);
 
     currentEditId = null;
     currentEditType = null;
@@ -1763,8 +1783,8 @@ document.getElementById('mortalitasForm').addEventListener('submit', async e => 
     showStatusMortalitas('⚠️ Koneksi gagal - Data tersimpan lokal', 'error');
     showToast('Gagal Kirim ⚠️', 'Tersimpan lokal. Auto-sync akan coba lagi.', 'error', 5000);
 
-    if (isEdit) updateLocalHistory('mortalitas', currentEditId, formData);
-    else addLocalHistory('mortalitas', formData);
+    if (isEdit) updateLocalHistory('mortalitas', currentEditId, formData, false);
+    else addLocalHistory('mortalitas', formData, false);
 
     currentEditId = null;
     currentEditType = null;
@@ -2054,11 +2074,22 @@ async function fetchAllDataFromSheet() {
 
     const sheetMortalitas = (result.mortalitas || []).map(mapSheetRow);
 
+    // --- PERBAIKAN: Hapus data lokal yang sudah ada di Sheet ---
     const mergeData = (local, sheet) => {
       const localOnly = (local || []).filter(
         l => !String(l._localId || '').startsWith('sheet_')
       );
-      return [...sheet, ...localOnly];
+      
+      const unsyncedLocal = localOnly.filter(loc => {
+        const isAlreadyInSheet = sheet.some(sh => 
+          sh.tanggal === loc.tanggal && 
+          sh.waktu === loc.waktu && 
+          sh.gh === loc.gh
+        );
+        return !isAlreadyInSheet;
+      });
+
+      return [...sheet, ...unsyncedLocal];
     };
 
     localHistory.kunjungan = mergeData(localHistory.kunjungan, sheetKunjungan);
@@ -2495,4 +2526,5 @@ window.addEventListener('appinstalled', () => {
 </script>
 
 </body>
+
 </html>
