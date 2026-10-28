@@ -835,7 +835,7 @@ function fixSheetWaktu(val) {
   if (val === undefined || val === null || val === '') return '';
   const str = String(val).trim();
 
-  // Format ISO (mis. 1899-12-30T04:00:48.000Z) -> jam WIB asli
+  // Format ISO (jaga-jaga jika ada sisa data dari server versi lama)
   if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
     const d = new Date(str);
     if (isNaN(d)) return '';
@@ -847,12 +847,15 @@ function fixSheetWaktu(val) {
     return pad2(w.getUTCHours()) + ':' + pad2(w.getUTCMinutes());
   }
 
-  // Format "HH:mm" / "HH:mm:ss" -> kurangi pergeseran server
+  // Format "HH:mm" / "HH:mm:ss" 
+  // ⚠️ PERBAIKAN: Server (Apps Script) sudah mengirim jam yang benar (misal "13:07").
+  // Jadi jangan dikurangi 7:07 lagi, cukup rapikan formatnya saja.
   const m = str.match(/^(\d{1,2}):(\d{2})/);
-  if (!m) return str;
-  let total = parseInt(m[1], 10) * 60 + parseInt(m[2], 10) - serverWaktuShiftMin;
-  total = ((total % 1440) + 1440) % 1440;
-  return pad2(Math.floor(total / 60)) + ':' + pad2(total % 60);
+  if (m) {
+    return pad2(parseInt(m[1], 10)) + ':' + m[2];
+  }
+  
+  return str;
 }
 
 // Ubah 1 baris dari sheet jadi item riwayat (jam dikoreksi, nilai asli disimpan untuk kunci edit/hapus)
