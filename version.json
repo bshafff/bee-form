@@ -1,5 +1,5 @@
 {
-  "version": "1.0.3",
-  "released": "2026-10-23",
-  "notes": "Fix jam riwayat bergeser +7:07 (kompatibel server lama & baru)"
+  "version": "1.0.4",
+  "released": "2026-10-28",
+  "notes": "Fix jam riwayat"
 }
