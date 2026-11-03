@@ -230,6 +230,24 @@ button.btn-delete:hover { background: #c82333; }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
+.qc-item {
+  padding: 12px; background: #f9f9f9; border-radius: 8px;
+  margin-bottom: 10px; border: 1px solid #e0e0e0;
+}
+.qc-item .qc-title { font-weight: 600; color: #2d5016; margin-bottom: 8px; }
+.qc-item .qc-row { display: flex; gap: 8px; align-items: center; }
+.qc-item select { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+.qc-item .qc-sisiran { display: flex; align-items: center; gap: 6px; }
+.qc-item .qc-sisiran input {
+  width: 64px; padding: 8px; border: 1px solid #ddd;
+  border-radius: 6px; text-align: center; font-weight: 600;
+}
+.qc-item .qc-sisiran span { color: #666; font-size: 13px; font-weight: 600; }
+.qc-item.k-bagus { border-left: 5px solid #2e7d32; }
+.qc-item.k-cukup { border-left: 5px solid #f9a825; }
+.qc-item.k-jelek { border-left: 5px solid #c62828; }
+.qc-hint { color: #888; font-size: 13px; padding: 8px 0; }
+.qc-summary { font-size: 13px; font-weight: 600; color: #2d5016; padding: 4px 2px; }
 .kotak-item {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px; background: #f9f9f9; border-radius: 8px;
@@ -509,7 +527,7 @@ button.btn-delete:hover { background: #c82333; }
 
   <div class="tabs">
     <button class="tab-btn active" data-tab="tab-kunjungan">Kunjungan</button>
-    <button class="tab-btn" data-tab="tab-mortalitas">Mortalitas</button>
+    <button class="tab-btn" data-tab="tab-qc">QC Koloni</button>
     <button class="tab-btn" data-tab="tab-trend">📈 Trend</button>
     <button class="tab-btn" data-tab="tab-riwayat">Riwayat</button>
   </div>
@@ -582,60 +600,59 @@ button.btn-delete:hover { background: #c82333; }
     </div>
 
     <!-- =====================================
-         MORTALITAS
+         QC KOLONI BARU DATANG
     ===================================== -->
-    <div id="tab-mortalitas" class="tab-content">
+    <div id="tab-qc" class="tab-content">
 
-      <div id="editIndicatorMortalitas" class="edit-indicator">
+      <div id="editIndicatorQc" class="edit-indicator">
         ✏️ Mode Edit — sedang mengedit data
       </div>
 
-      <form id="mortalitasForm">
+      <form id="qcForm">
 
         <div class="form-group">
-          <label for="tanggal2">Tanggal</label>
-          <input type="date" id="tanggal2" required>
+          <label for="tanggalQc">Tanggal Datang</label>
+          <input type="date" id="tanggalQc" required>
         </div>
 
         <div class="row-inputs">
           <div class="form-group">
-            <label for="waktu2">Waktu</label>
-            <input type="time" id="waktu2" required>
+            <label for="waktuQc">Waktu</label>
+            <input type="time" id="waktuQc" required>
           </div>
           <div class="form-group">
-            <label for="gh2">Greenhouse</label>
-            <select id="gh2" required>
+            <label for="ghQc">Greenhouse</label>
+            <select id="ghQc" required>
               <option value="">-- Pilih GH --</option>
-              <option value="GH 1">GH 1</option>
-              <option value="GH 2">GH 2</option>
+              <option value="GH 1">GH 1 (6 kotak)</option>
+              <option value="GH 2">GH 2 (5 kotak)</option>
             </select>
           </div>
         </div>
 
         <div class="form-group">
-          <label for="cuaca2">Cuaca</label>
-          <select id="cuaca2" required>
-            <option value="">-- Pilih Cuaca --</option>
-            <option value="cerah">Cerah</option>
-            <option value="berawan">Berawan</option>
-            <option value="mendung">Mendung</option>
-            <option value="hujan">Hujan</option>
-            <option value="gerimis">Gerimis</option>
-          </select>
+          <label for="asalQc">Asal Koloni (opsional)</label>
+          <input type="text" id="asalQc" placeholder="mis. nama pemasok / lokasi">
         </div>
 
         <div class="bays-section">
-          <h3>Persentase Lebah Hidup per Kotak</h3>
-          <div id="kotakList"></div>
+          <h3>QC per Kotak</h3>
+          <div id="qcKotakList"><div class="qc-hint">Pilih GH dulu untuk menampilkan kotak.</div></div>
+          <div id="qcSummary" class="qc-summary"></div>
+        </div>
+
+        <div class="form-group">
+          <label for="catatanQc">Catatan (opsional)</label>
+          <input type="text" id="catatanQc" placeholder="mis. 1 kotak ratu tidak terlihat">
         </div>
 
         <div class="actions">
-          <button type="button" class="btn btn-reset" onclick="resetFormMortalitas()">Reset</button>
-          <button type="submit" class="btn btn-submit" id="submitBtnMortalitas">Kirim</button>
-          <button type="button" class="btn btn-delete" onclick="deleteDataMortalitas()">Hapus Terakhir</button>
+          <button type="button" class="btn btn-reset" onclick="resetFormQc()">Reset</button>
+          <button type="submit" class="btn btn-submit" id="submitBtnQc">Kirim</button>
+          <button type="button" class="btn btn-delete" onclick="deleteDataQc()">Hapus Terakhir</button>
         </div>
 
-        <div id="statusMortalitas" class="status"></div>
+        <div id="statusQc" class="status"></div>
 
       </form>
 
@@ -735,7 +752,7 @@ button.btn-delete:hover { background: #c82333; }
       <div class="history-toolbar">
         <select id="historyType" onchange="renderHistory()">
           <option value="kunjungan">🐝 Kunjungan</option>
-          <option value="mortalitas">💀 Mortalitas</option>
+          <option value="qc">✅ QC Koloni</option>
         </select>
 
         <button class="sync-btn" onclick="fetchAllDataFromSheet()">
@@ -750,8 +767,8 @@ button.btn-delete:hover { background: #c82333; }
               <th>Tanggal</th>
               <th>Waktu</th>
               <th>GH</th>
-              <th>Suhu</th>
-              <th>Cuaca</th>
+              <th id="histCol4">Suhu</th>
+              <th id="histCol5">Cuaca</th>
               <th style="text-align:center;">Aksi</th>
             </tr>
           </thead>
@@ -793,7 +810,7 @@ const storeName = 'formQueue';
 
 let localHistory = {
   kunjungan: [],
-  mortalitas: []
+  qc: []
 };
 
 let currentEditId = null;
@@ -1280,12 +1297,13 @@ function loadLocalHistory() {
     try { localHistory = JSON.parse(saved); } catch (e) { console.error(e); }
   }
   if (!localHistory.kunjungan) localHistory.kunjungan = [];
-  if (!localHistory.mortalitas) localHistory.mortalitas = [];
+  if (!localHistory.qc) localHistory.qc = [];
+  delete localHistory.mortalitas;
 
   // Migrasi sekali: item dari sheet yang tersimpan sebelum fix jam dibuang,
   // nanti diambil ulang dari sheet dengan jam yang benar.
   if (!localStorage.getItem('bee_waktu_fix_v1')) {
-    ['kunjungan', 'mortalitas'].forEach(t => {
+    ['kunjungan', 'qc'].forEach(t => {
       localHistory[t] = localHistory[t].filter(
         x => !String(x._localId || '').startsWith('sheet_')
       );
@@ -1426,7 +1444,7 @@ async function autoSync() {
       if (result.status !== 'error') {
         serverWaktuShiftMin = result.timeFix ? 0 : WAKTU_SHIFT_LEGACY_MIN;
         const sheetKunjungan = (result.kunjungan || []).map(mapSheetRow);
-        const sheetMortalitas = (result.mortalitas || []).map(mapSheetRow);
+        const sheetQc = (result.qc || []).map(mapSheetRow);
 
         // --- PERBAIKAN: Hapus data lokal yang sudah ada di Sheet ---
         const mergeData = (local, sheet) => {
@@ -1447,7 +1465,7 @@ async function autoSync() {
         };
 
         localHistory.kunjungan = mergeData(localHistory.kunjungan, sheetKunjungan);
-        localHistory.mortalitas = mergeData(localHistory.mortalitas, sheetMortalitas);
+        localHistory.qc = mergeData(localHistory.qc, sheetQc);
         saveLocalHistory();
 
         const activeTab = document.querySelector('.tab-content.active');
@@ -1482,7 +1500,7 @@ initDB()
     updateAutoSyncIndicator('menunggu');
 
     document.getElementById('tanggal').value = today;
-    document.getElementById('tanggal2').value = today;
+    document.getElementById('tanggalQc').value = today;
 
     const todayDate = new Date();
     const lastMonth = new Date();
@@ -1683,50 +1701,114 @@ function hideStatusKunjungan() {
 }
 
 // ============================================
-// MORTALITAS
+// QC KOLONI BARU DATANG
 // ============================================
 
-const kotakList = document.getElementById('kotakList');
-const kotaks = {};
+const QC_KOTAK_PER_GH = { 'GH 1': 6, 'GH 2': 5 };
+const QC_MAX_KOTAK = 6;
+const QC_KONDISI = ['Bagus', 'Cukup', 'Jelek'];
 
-for (let i = 1; i <= 6; i++) {
-  kotaks[`kotak${i}`] = 100;
-  const kotakItem = document.createElement('div');
-  kotakItem.className = 'kotak-item';
-  kotakItem.innerHTML = `
-    <span class="kotak-label">Kotak Lebah ${i}</span>
-    <div class="kotak-input-group">
-      <input type="number" id="kotak${i}" min="0" max="100" value="100"
-             onchange="updateKotakValue('kotak${i}')">
-      <span class="unit">%</span>
-    </div>
-  `;
-  kotakList.appendChild(kotakItem);
+function qcEsc(v) {
+  return String(v === undefined || v === null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-function updateKotakValue(kotakId) {
-  const input = document.getElementById(kotakId);
-  let val = parseInt(input.value) || 0;
-  if (val < 0) val = 0;
-  if (val > 100) val = 100;
-  input.value = val;
-  kotaks[kotakId] = val;
+function renderQcKotak(gh, values) {
+  const list = document.getElementById('qcKotakList');
+  const n = QC_KOTAK_PER_GH[gh] || 0;
+  values = values || {};
+  if (n === 0) {
+    list.innerHTML = '<div class="qc-hint">Pilih GH dulu untuk menampilkan kotak.</div>';
+    updateQcSummary();
+    return;
+  }
+  let html = '';
+  for (let i = 1; i <= n; i++) {
+    const kond = values[`kotak${i}_kondisi`] || '';
+    const sis = values[`kotak${i}_sisiran`];
+    html += `
+      <div class="qc-item ${kond ? 'k-' + kond.toLowerCase() : ''}" id="qcItem${i}">
+        <div class="qc-title">Kotak ${i}</div>
+        <div class="qc-row">
+          <select id="kotak${i}_kondisi" required onchange="updateQcSummary()">
+            <option value="">-- Kondisi --</option>
+            ${QC_KONDISI.map(k => `<option value="${k}" ${k === kond ? 'selected' : ''}>${k}</option>`).join('')}
+          </select>
+          <div class="qc-sisiran">
+            <input type="number" id="kotak${i}_sisiran" min="0" max="20" inputmode="numeric"
+                   placeholder="0" value="${qcEsc(sis)}">
+            <span>sisiran</span>
+          </div>
+        </div>
+      </div>`;
+  }
+  list.innerHTML = html;
+  updateQcSummary();
 }
 
-document.getElementById('mortalitasForm').addEventListener('submit', async e => {
+function updateQcSummary() {
+  const n = QC_KOTAK_PER_GH[document.getElementById('ghQc').value] || 0;
+  const c = { Bagus: 0, Cukup: 0, Jelek: 0 };
+  let sisiran = 0;
+  for (let i = 1; i <= n; i++) {
+    const k = document.getElementById(`kotak${i}_kondisi`);
+    const item = document.getElementById(`qcItem${i}`);
+    if (!k) continue;
+    if (k.value) c[k.value]++;
+    sisiran += parseInt(document.getElementById(`kotak${i}_sisiran`).value) || 0;
+    if (item) item.className = 'qc-item' + (k.value ? ' k-' + k.value.toLowerCase() : '');
+  }
+  const el = document.getElementById('qcSummary');
+  el.textContent = n ? `Bagus ${c.Bagus} · Cukup ${c.Cukup} · Jelek ${c.Jelek} · Total ${sisiran} sisiran` : '';
+}
+
+document.getElementById('ghQc').addEventListener('change', e => renderQcKotak(e.target.value));
+document.getElementById('qcKotakList').addEventListener('input', updateQcSummary);
+
+function qcSummaryText(item) {
+  const c = { Bagus: 0, Cukup: 0, Jelek: 0 };
+  let total = 0, any = false;
+  for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+    const k = item[`kotak${i}_kondisi`];
+    if (k && c[k] !== undefined) { c[k]++; any = true; }
+    total += parseInt(item[`kotak${i}_sisiran`]) || 0;
+  }
+  return any ? `B${c.Bagus} C${c.Cukup} J${c.Jelek}<br>${total} sisiran` : '-';
+}
+
+document.getElementById('qcForm').addEventListener('submit', async e => {
   e.preventDefault();
 
-  const isEdit = currentEditType === 'mortalitas' && currentEditId;
+  const isEdit = currentEditType === 'qc' && currentEditId;
+  const gh = document.getElementById('ghQc').value;
+  const n = QC_KOTAK_PER_GH[gh] || 0;
 
   const formData = {
-    sheet: 'mortalitas',
+    sheet: 'qc',
     action: isEdit ? 'update' : 'submit',
-    tanggal: document.getElementById('tanggal2').value,
-    waktu: document.getElementById('waktu2').value,
-    gh: document.getElementById('gh2').value,
-    cuaca: document.getElementById('cuaca2').value,
-    ...kotaks
+    tanggal: document.getElementById('tanggalQc').value,
+    waktu: document.getElementById('waktuQc').value,
+    gh,
+    asal: document.getElementById('asalQc').value.trim(),
+    catatan: document.getElementById('catatanQc').value.trim()
   };
+
+  const jml = { Bagus: 0, Cukup: 0, Jelek: 0 };
+  let totalSisiran = 0;
+  for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+    const kEl = document.getElementById(`kotak${i}_kondisi`);
+    const sEl = document.getElementById(`kotak${i}_sisiran`);
+    const kond = (i <= n && kEl) ? kEl.value : '';
+    const sis = (i <= n && sEl && sEl.value !== '') ? (parseInt(sEl.value) || 0) : '';
+    formData[`kotak${i}_kondisi`] = kond;
+    formData[`kotak${i}_sisiran`] = sis;
+    if (kond) jml[kond]++;
+    if (sis !== '') totalSisiran += sis;
+  }
+  formData.jml_bagus = jml.Bagus;
+  formData.jml_cukup = jml.Cukup;
+  formData.jml_jelek = jml.Jelek;
+  formData.total_sisiran = totalSisiran;
 
   if (isEdit) {
     formData._localId = currentEditId;
@@ -1737,13 +1819,13 @@ document.getElementById('mortalitasForm').addEventListener('submit', async e => 
     }
   }
 
-  const submitBtn = document.getElementById('submitBtnMortalitas');
+  const submitBtn = document.getElementById('submitBtnQc');
   submitBtn.disabled = true;
   submitBtn.textContent = isEdit ? 'Mengupdate...' : 'Mengirim...';
-  showStatusMortalitas(isEdit ? 'Mengupdate data...' : 'Mengirim data...', 'loading');
+  showStatusQc(isEdit ? 'Mengupdate data...' : 'Mengirim data...', 'loading');
 
   try {
-    let isSuccessSync = false; // <-- TAMBAHAN
+    let isSuccessSync = false;
 
     if (isAuthenticated && scriptUrl && navigator.onLine) {
       const res = await fetch(scriptUrl, {
@@ -1758,70 +1840,67 @@ document.getElementById('mortalitasForm').addEventListener('submit', async e => 
         throw new Error('Data tidak ditemukan di Google Sheet.');
       }
 
-      isSuccessSync = true; // <-- TAMBAHAN
+      isSuccessSync = true;
 
-      showStatusMortalitas(isEdit ? '✓ Data berhasil diupdate!' : '✓ Data berhasil dikirim!', 'success');
+      showStatusQc(isEdit ? '✓ Data berhasil diupdate!' : '✓ Data berhasil dikirim!', 'success');
       showToast(isEdit ? 'Update Berhasil! ✏️' : 'Data Terkirim! ✓',
-        isEdit ? 'Perubahan tersimpan di Sheet.' : 'Mortalitas tersimpan di Sheet.',
+        isEdit ? 'Perubahan tersimpan di Sheet.' : 'QC koloni tersimpan di Sheet.',
         'success', 4000);
     } else {
-      await saveToQueue(formData, 'mortalitas');
-      showStatusMortalitas('📥 Data tersimpan lokal. Auto-sync akan kirim otomatis.', 'info');
+      await saveToQueue(formData, 'qc');
+      showStatusQc('📥 Data tersimpan lokal. Auto-sync akan kirim otomatis.', 'info');
       showToast('Tersimpan Lokal 📥', 'Auto-sync akan kirim otomatis.', 'info', 4500);
     }
 
-    if (isEdit) updateLocalHistory('mortalitas', currentEditId, formData, isSuccessSync);
-    else addLocalHistory('mortalitas', formData, isSuccessSync);
+    if (isEdit) updateLocalHistory('qc', currentEditId, formData, isSuccessSync);
+    else addLocalHistory('qc', formData, isSuccessSync);
 
     currentEditId = null;
     currentEditType = null;
 
-    resetFormMortalitas();
+    resetFormQc();
     renderHistory();
     updateQueueBadge();
 
   } catch (error) {
     console.error('Error:', error);
-    await saveToQueue(formData, 'mortalitas');
-    showStatusMortalitas('⚠️ Koneksi gagal - Data tersimpan lokal', 'error');
+    await saveToQueue(formData, 'qc');
+    showStatusQc('⚠️ Koneksi gagal - Data tersimpan lokal', 'error');
     showToast('Gagal Kirim ⚠️', 'Tersimpan lokal. Auto-sync akan coba lagi.', 'error', 5000);
 
-    if (isEdit) updateLocalHistory('mortalitas', currentEditId, formData, false);
-    else addLocalHistory('mortalitas', formData, false);
+    if (isEdit) updateLocalHistory('qc', currentEditId, formData, false);
+    else addLocalHistory('qc', formData, false);
 
     currentEditId = null;
     currentEditType = null;
 
-    resetFormMortalitas();
+    resetFormQc();
     renderHistory();
     updateQueueBadge();
   }
 });
 
-function resetFormMortalitas() {
-  document.getElementById('mortalitasForm').reset();
-  Object.keys(kotaks).forEach(kotak => {
-    kotaks[kotak] = 100;
-    document.getElementById(kotak).value = 100;
-  });
-  document.getElementById('tanggal2').value = getLocalDate();
-  hideStatusMortalitas();
+function resetFormQc() {
+  document.getElementById('qcForm').reset();
+  renderQcKotak('');
+  document.getElementById('tanggalQc').value = getLocalDate();
+  hideStatusQc();
   currentEditId = null;
   currentEditType = null;
-  document.getElementById('editIndicatorMortalitas').classList.remove('show');
-  const btn = document.getElementById('submitBtnMortalitas');
+  document.getElementById('editIndicatorQc').classList.remove('show');
+  const btn = document.getElementById('submitBtnQc');
   btn.textContent = 'Kirim';
   btn.disabled = false;
 }
 
-function showStatusMortalitas(message, type) {
-  const status = document.getElementById('statusMortalitas');
+function showStatusQc(message, type) {
+  const status = document.getElementById('statusQc');
   status.textContent = message;
   status.className = `status ${type}`;
 }
 
-function hideStatusMortalitas() {
-  document.getElementById('statusMortalitas').className = 'status';
+function hideStatusQc() {
+  document.getElementById('statusQc').className = 'status';
 }
 
 // ============================================
@@ -1853,8 +1932,8 @@ async function deleteDataKunjungan() {
   }
 }
 
-async function deleteDataMortalitas() {
-  if (!confirm('Hapus data terakhir dari sheet Mortalitas? Tidak bisa dibatalkan.')) return;
+async function deleteDataQc() {
+  if (!confirm('Hapus data terakhir dari sheet QC? Tidak bisa dibatalkan.')) return;
   if (!isAuthenticated || !scriptUrl) {
     showToast('Belum Tersambung', 'Klik tombol "Sambungkan" dulu.', 'error');
     return;
@@ -1864,12 +1943,12 @@ async function deleteDataMortalitas() {
     const res = await fetch(scriptUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ method: 'delete', sheet: 'mortalitas' })
+      body: JSON.stringify({ method: 'delete', sheet: 'qc' })
     });
     const result = await res.json();
     hideLoadingOverlay();
     if (result.status !== 'success') throw new Error(result.message || 'Data tidak ditemukan.');
-    showToast('Data Dihapus! 🗑️', 'Baris terakhir sheet Mortalitas dihapus.', 'success');
+    showToast('Data Dihapus! 🗑️', 'Baris terakhir sheet QC dihapus.', 'success');
     await fetchAllDataFromSheet();
   } catch (error) {
     hideLoadingOverlay();
@@ -1886,6 +1965,8 @@ function renderHistory() {
   const type = document.getElementById('historyType').value;
   const data = localHistory[type] || [];
   const tbody = document.getElementById('historyBody');
+  document.getElementById('histCol4').textContent = (type === 'qc') ? 'Kondisi' : 'Suhu';
+  document.getElementById('histCol5').textContent = (type === 'qc') ? 'Asal' : 'Cuaca';
 
   if (data.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" class="history-empty">Belum ada data riwayat</td></tr>`;
@@ -1912,8 +1993,8 @@ function renderHistory() {
         <td>${item.tanggal || '-'}<br>${badge}</td>
         <td>${item.waktu || '-'}</td>
         <td>${item.gh || '-'}</td>
-        <td>${suhuVal}</td>
-        <td>${item.cuaca || '-'}</td>
+        <td>${type === 'qc' ? qcSummaryText(item) : suhuVal}</td>
+        <td>${type === 'qc' ? qcEsc(item.asal || '-') : (item.cuaca || '-')}</td>
         <td style="text-align:center;white-space:nowrap;">
           <button class="history-btn history-btn-edit"
             onclick="editHistory('${type}','${item._localId}')">✏️</button>
@@ -1953,20 +2034,16 @@ function editHistory(type, localId) {
     document.getElementById('editIndicatorKunjungan').classList.add('show');
     document.getElementById('submitBtnKunjungan').textContent = 'Update Data';
   } else {
-    activateTab('tab-mortalitas');
-    document.getElementById('tanggal2').value = data.tanggal || getLocalDate();
-    document.getElementById('waktu2').value = data.waktu || '';
-    document.getElementById('gh2').value = data.gh || '';
-    document.getElementById('cuaca2').value = data.cuaca || '';
+    activateTab('tab-qc');
+    document.getElementById('tanggalQc').value = data.tanggal || getLocalDate();
+    document.getElementById('waktuQc').value = data.waktu || '';
+    document.getElementById('ghQc').value = data.gh || '';
+    document.getElementById('asalQc').value = data.asal || '';
+    document.getElementById('catatanQc').value = data.catatan || '';
+    renderQcKotak(data.gh || '', data);
 
-    for (let i = 1; i <= 6; i++) {
-      const val = data[`kotak${i}`] !== undefined ? data[`kotak${i}`] : 100;
-      kotaks[`kotak${i}`] = parseInt(val) || 0;
-      document.getElementById(`kotak${i}`).value = kotaks[`kotak${i}`];
-    }
-
-    document.getElementById('editIndicatorMortalitas').classList.add('show');
-    document.getElementById('submitBtnMortalitas').textContent = 'Update Data';
+    document.getElementById('editIndicatorQc').classList.add('show');
+    document.getElementById('submitBtnQc').textContent = 'Update Data';
   }
 
   showToast('Mode Edit ✏️', 'Ubah data lalu klik Update.', 'info', 2500);
@@ -2075,7 +2152,7 @@ async function fetchAllDataFromSheet() {
 
     const sheetKunjungan = (result.kunjungan || []).map(mapSheetRow);
 
-    const sheetMortalitas = (result.mortalitas || []).map(mapSheetRow);
+    const sheetQc = (result.qc || []).map(mapSheetRow);
 
     // --- PERBAIKAN: Hapus data lokal yang sudah ada di Sheet ---
     const mergeData = (local, sheet) => {
@@ -2096,17 +2173,17 @@ async function fetchAllDataFromSheet() {
     };
 
     localHistory.kunjungan = mergeData(localHistory.kunjungan, sheetKunjungan);
-    localHistory.mortalitas = mergeData(localHistory.mortalitas, sheetMortalitas);
+    localHistory.qc = mergeData(localHistory.qc, sheetQc);
     saveLocalHistory();
 
     renderHistory();
     hideLoadingOverlay();
 
     syncStatus.className = 'status success';
-    syncStatus.textContent = `✓ Berhasil sinkron! ${sheetKunjungan.length} kunjungan, ${sheetMortalitas.length} mortalitas`;
+    syncStatus.textContent = `✓ Berhasil sinkron! ${sheetKunjungan.length} kunjungan, ${sheetQc.length} QC`;
 
     showToast('Sinkron Berhasil! 🔄',
-      `${sheetKunjungan.length} kunjungan, ${sheetMortalitas.length} mortalitas dimuat.`,
+      `${sheetKunjungan.length} kunjungan, ${sheetQc.length} QC dimuat.`,
       'success', 4000);
 
     const activeTab = document.querySelector('.tab-content.active');
