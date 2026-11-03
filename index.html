@@ -246,6 +246,18 @@ button.btn-delete:hover { background: #c82333; }
 .qc-item.k-bagus { border-left: 5px solid #2e7d32; }
 .qc-item.k-cukup { border-left: 5px solid #f9a825; }
 .qc-item.k-jelek { border-left: 5px solid #c62828; }
+.qc-item .qc-no {
+  width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;
+}
+.qc-item .qc-row + .qc-row { margin-top: 8px; }
+.qc-foto-btn {
+  display: inline-block; padding: 8px 12px; background: #fff; border: 1px dashed #2d5016;
+  color: #2d5016; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.qc-prev { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; display: none; }
+.qc-prev.show { display: block; }
+.qc-foto-x { display: none; border: none; background: #eee; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; }
+.qc-foto-x.show { display: inline-block; }
 .qc-hint { color: #888; font-size: 13px; padding: 8px 0; }
 .qc-summary { font-size: 13px; font-weight: 600; color: #2d5016; padding: 4px 2px; }
 .kotak-item {
@@ -798,7 +810,7 @@ button.btn-delete:hover { background: #c82333; }
 // Setelah itu, user awam TIDAK PERLU isi URL lagi.
 // Cukup buka aplikasi → otomatis tersambung.
 //
-const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxSRgWt1uZaE1JUhKjYcqbqyuFobnGctNP5zyHmNGBV2evhy832Bd8otIKFJHrSDuXk/exec';
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxj3x8864k8g64u6o6oqItYouKDie2N2mddZUniqHgBYQM2WnoqAyV2U507mTLLerPT7g/exec';
 
 // ============================================
 // STATE
@@ -1713,10 +1725,79 @@ function qcEsc(v) {
     .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
+const qcFotoState = {}; // i -> dataURL baru, URL Drive lama, atau ''
+
+function qcFotoThumb(val) {
+  if (!val) return '';
+  if (val.startsWith('data:')) return val;
+  const m = val.match(/\/d\/([\w-]+)/) || val.match(/[?&]id=([\w-]+)/);
+  return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w200` : '';
+}
+
+function qcShowFoto(i) {
+  const val = qcFotoState[i] || '';
+  const img = document.getElementById(`kotak${i}_prev`);
+  const x = document.getElementById(`kotak${i}_fotox`);
+  const lbl = document.getElementById(`kotak${i}_fotolbl`);
+  if (!img) return;
+  const src = qcFotoThumb(val);
+  if (src) { img.src = src; img.classList.add('show'); x.classList.add('show'); lbl.firstChild.nodeValue = '📷 Ganti foto'; }
+  else { img.removeAttribute('src'); img.classList.remove('show'); x.classList.remove('show'); lbl.firstChild.nodeValue = '📷 Foto'; }
+}
+
+function qcCompressImage(file, maxDim = 1000, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const sc = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.round(img.width * sc), h = Math.round(img.height * sc);
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Gagal membaca foto')); };
+    img.src = url;
+  });
+}
+
+async function qcPickFoto(i, input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  try {
+    qcFotoState[i] = await qcCompressImage(file);
+    qcShowFoto(i);
+  } catch (err) {
+    showToast('Foto Gagal', err.message, 'error', 3000);
+  }
+  input.value = '';
+}
+
+function qcClearFoto(i) {
+  qcFotoState[i] = '';
+  qcShowFoto(i);
+}
+
+// Salinan data untuk riwayat lokal: buang base64 (localStorage terbatas)
+function qcStripFoto(fd) {
+  const c = { ...fd };
+  for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+    const k = `kotak${i}_foto`;
+    if (typeof c[k] === 'string' && c[k].startsWith('data:')) c[k] = 'local';
+  }
+  return c;
+}
+
 function renderQcKotak(gh, values) {
   const list = document.getElementById('qcKotakList');
   const n = QC_KOTAK_PER_GH[gh] || 0;
   values = values || {};
+  for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+    const f = values[`kotak${i}_foto`];
+    qcFotoState[i] = (typeof f === 'string' && f.startsWith('http')) ? f : '';
+  }
   if (n === 0) {
     list.innerHTML = '<div class="qc-hint">Pilih GH dulu untuk menampilkan kotak.</div>';
     updateQcSummary();
@@ -1730,6 +1811,10 @@ function renderQcKotak(gh, values) {
       <div class="qc-item ${kond ? 'k-' + kond.toLowerCase() : ''}" id="qcItem${i}">
         <div class="qc-title">Kotak ${i}</div>
         <div class="qc-row">
+          <input type="text" class="qc-no" id="kotak${i}_no" placeholder="No koloni"
+                 value="${qcEsc(values[`kotak${i}_no`])}">
+        </div>
+        <div class="qc-row">
           <select id="kotak${i}_kondisi" required onchange="updateQcSummary()">
             <option value="">-- Kondisi --</option>
             ${QC_KONDISI.map(k => `<option value="${k}" ${k === kond ? 'selected' : ''}>${k}</option>`).join('')}
@@ -1740,9 +1825,16 @@ function renderQcKotak(gh, values) {
             <span>sisiran</span>
           </div>
         </div>
+        <div class="qc-row">
+          <label class="qc-foto-btn" id="kotak${i}_fotolbl">📷 Foto<input type="file" accept="image/*" hidden
+                 onchange="qcPickFoto(${i}, this)"></label>
+          <img class="qc-prev" id="kotak${i}_prev" alt="">
+          <button type="button" class="qc-foto-x" id="kotak${i}_fotox" onclick="qcClearFoto(${i})">✕</button>
+        </div>
       </div>`;
   }
   list.innerHTML = html;
+  for (let i = 1; i <= n; i++) qcShowFoto(i);
   updateQcSummary();
 }
 
@@ -1767,13 +1859,14 @@ document.getElementById('qcKotakList').addEventListener('input', updateQcSummary
 
 function qcSummaryText(item) {
   const c = { Bagus: 0, Cukup: 0, Jelek: 0 };
-  let total = 0, any = false;
+  let total = 0, any = false, foto = 0;
   for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+    if (item[`kotak${i}_foto`]) foto++;
     const k = item[`kotak${i}_kondisi`];
     if (k && c[k] !== undefined) { c[k]++; any = true; }
     total += parseInt(item[`kotak${i}_sisiran`]) || 0;
   }
-  return any ? `B${c.Bagus} C${c.Cukup} J${c.Jelek}<br>${total} sisiran` : '-';
+  return any ? `B${c.Bagus} C${c.Cukup} J${c.Jelek}<br>${total} sisiran${foto ? ' · 📷' + foto : ''}` : '-';
 }
 
 document.getElementById('qcForm').addEventListener('submit', async e => {
@@ -1800,8 +1893,10 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     const sEl = document.getElementById(`kotak${i}_sisiran`);
     const kond = (i <= n && kEl) ? kEl.value : '';
     const sis = (i <= n && sEl && sEl.value !== '') ? (parseInt(sEl.value) || 0) : '';
+    formData[`kotak${i}_no`] = (i <= n && document.getElementById(`kotak${i}_no`)) ? document.getElementById(`kotak${i}_no`).value.trim() : '';
     formData[`kotak${i}_kondisi`] = kond;
     formData[`kotak${i}_sisiran`] = sis;
+    formData[`kotak${i}_foto`] = (i <= n) ? (qcFotoState[i] || '') : '';
     if (kond) jml[kond]++;
     if (sis !== '') totalSisiran += sis;
   }
@@ -1822,7 +1917,8 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
   const submitBtn = document.getElementById('submitBtnQc');
   submitBtn.disabled = true;
   submitBtn.textContent = isEdit ? 'Mengupdate...' : 'Mengirim...';
-  showStatusQc(isEdit ? 'Mengupdate data...' : 'Mengirim data...', 'loading');
+  const adaFoto = Object.keys(formData).some(k => /^kotak\d_foto$/.test(k) && String(formData[k]).startsWith('data:'));
+  showStatusQc(adaFoto ? 'Mengunggah foto & data...' : (isEdit ? 'Mengupdate data...' : 'Mengirim data...'), 'loading');
 
   try {
     let isSuccessSync = false;
@@ -1852,8 +1948,8 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
       showToast('Tersimpan Lokal 📥', 'Auto-sync akan kirim otomatis.', 'info', 4500);
     }
 
-    if (isEdit) updateLocalHistory('qc', currentEditId, formData, isSuccessSync);
-    else addLocalHistory('qc', formData, isSuccessSync);
+    if (isEdit) updateLocalHistory('qc', currentEditId, qcStripFoto(formData), isSuccessSync);
+    else addLocalHistory('qc', qcStripFoto(formData), isSuccessSync);
 
     currentEditId = null;
     currentEditType = null;
@@ -1868,8 +1964,8 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     showStatusQc('⚠️ Koneksi gagal - Data tersimpan lokal', 'error');
     showToast('Gagal Kirim ⚠️', 'Tersimpan lokal. Auto-sync akan coba lagi.', 'error', 5000);
 
-    if (isEdit) updateLocalHistory('qc', currentEditId, formData, false);
-    else addLocalHistory('qc', formData, false);
+    if (isEdit) updateLocalHistory('qc', currentEditId, qcStripFoto(formData), false);
+    else addLocalHistory('qc', qcStripFoto(formData), false);
 
     currentEditId = null;
     currentEditType = null;
