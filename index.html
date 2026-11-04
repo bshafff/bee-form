@@ -503,6 +503,33 @@ button.btn-delete:hover { background: #c82333; }
 .weather-table .w-hujan { color: #0284c7; font-weight: 700; }
 .weather-table .w-gerimis { color: #0891b2; font-weight: 700; }
 
+/* ===== QUICK FLAGS QC ===== */
+.qc-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 6px;
+}
+.qc-flags label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+  cursor: pointer;
+}
+.qc-flags input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #dc3545;
+  cursor: pointer;
+}
+
 </style>
 
 </head>
@@ -730,10 +757,10 @@ button.btn-delete:hover { background: #c82333; }
             </div>
           </div>
           <div class="form-group">
-  <label for="batchAk">No Batch</label>
-  <input type="text" id="batchAk" list="batchAkList" placeholder="otomatis terisi dari kotak yang dipilih" required>
-  <datalist id="batchAkList"></datalist>
-</div>
+            <label for="batchAk">No Batch</label>
+            <input type="text" id="batchAk" list="batchAkList" placeholder="otomatis terisi dari kotak yang dipilih" required>
+            <datalist id="batchAkList"></datalist>
+          </div>
           <div class="form-group">
             <label for="penyebabAk">Penyebab</label>
             <select id="penyebabAk" required></select>
@@ -1915,10 +1942,28 @@ function renderQcKotak(gh, values) {
     updateQcSummary();
     return;
   }
+  
   let html = '';
   for (let i = 1; i <= n; i++) {
     const kond = values[`kotak${i}_kondisi`] || '';
     const sis = values[`kotak${i}_sisiran`];
+    
+    // Ekstrak flags dari catatan lama
+    let catVal = values[`kotak${i}_catatan`] || '';
+    let cleanCat = catVal;
+    let f1 = false, f2 = false, f3 = false, f4 = false;
+    if (catVal.startsWith('[⚠️ ')) {
+       const match = catVal.match(/^\[⚠️ (.*?)\]\s*(.*)$/);
+       if (match) {
+          const flags = match[1].split(', ');
+          f1 = flags.includes('Ratu Hilang');
+          f2 = flags.includes('Hama/Penyakit');
+          f3 = flags.includes('Stres/Panas');
+          f4 = flags.includes('Kurang Aktif');
+          cleanCat = match[2];
+       }
+    }
+
     html += `
       <div class="qc-item ${kond ? 'k-' + kond.toLowerCase() : ''}" id="qcItem${i}">
         <div class="qc-title">Kotak ${i}</div>
@@ -1937,6 +1982,15 @@ function renderQcKotak(gh, values) {
             <span>sisiran</span>
           </div>
         </div>
+        
+        <!-- QUICK FLAGS -->
+        <div class="qc-flags">
+          <label><input type="checkbox" id="kotak${i}_f1" ${f1 ? 'checked' : ''}> 🐝 Ratu Hilang</label>
+          <label><input type="checkbox" id="kotak${i}_f2" ${f2 ? 'checked' : ''}> 🕷️ Hama</label>
+          <label><input type="checkbox" id="kotak${i}_f3" ${f3 ? 'checked' : ''}> 🌡️ Stres</label>
+          <label><input type="checkbox" id="kotak${i}_f4" ${f4 ? 'checked' : ''}> 💤 Kurang Aktif</label>
+        </div>
+
         <div class="qc-row">
           <label class="qc-foto-btn" id="kotak${i}_fotolbl">📷 Foto<input type="file" accept="image/*" hidden
                  onchange="qcPickFoto(${i}, this)"></label>
@@ -1945,7 +1999,7 @@ function renderQcKotak(gh, values) {
         </div>
         <div class="qc-row">
           <input type="text" class="qc-cat" id="kotak${i}_catatan" placeholder="Catatan kotak (opsional)"
-                 value="${qcEsc(values[`kotak${i}_catatan`])}">
+                 value="${qcEsc(cleanCat)}">
         </div>
       </div>`;
   }
@@ -1975,14 +2029,17 @@ document.getElementById('qcKotakList').addEventListener('input', updateQcSummary
 
 function qcSummaryText(item) {
   const c = { Bagus: 0, Cukup: 0, Jelek: 0 };
-  let total = 0, any = false, foto = 0;
+  let total = 0, any = false, foto = 0, hasWarn = false;
   for (let i = 1; i <= QC_MAX_KOTAK; i++) {
     if (item[`kotak${i}_foto`]) foto++;
+    if (String(item[`kotak${i}_catatan`] || '').includes('[⚠️')) hasWarn = true;
+    
     const k = item[`kotak${i}_kondisi`];
     if (k && c[k] !== undefined) { c[k]++; any = true; }
     total += parseInt(item[`kotak${i}_sisiran`]) || 0;
   }
-  return any ? `B${c.Bagus} C${c.Cukup} J${c.Jelek}<br>${total} sisiran${foto ? ' · 📷' + foto : ''}` : '-';
+  const warnIcon = hasWarn ? ' <span style="color:#dc3545;font-size:14px;" title="Ada peringatan masalah">⚠️</span>' : '';
+  return any ? `B${c.Bagus} C${c.Cukup} J${c.Jelek}<br>${total} sisiran${foto ? ' · 📷' + foto : ''}${warnIcon}` : '-';
 }
 
 document.getElementById('qcForm').addEventListener('submit', async e => {
@@ -2015,20 +2072,37 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     const kond = aktif ? kEl.value : '';
     const sis = (aktif && sEl && sEl.value !== '') ? (parseInt(sEl.value) || 0) : '';
     const no = aktif && nEl ? nEl.value.trim() : '';
-    const cat = aktif && cEl ? cEl.value.trim() : '';
-    const foto = aktif ? (qcFotoState[i] || '') : '';
+    
+    // --- MULAI GANTI DARI SINI ---
+    let cat = aktif && cEl ? cEl.value.trim() : '';
+    
+    // Gabungkan Quick Flags ke dalam Catatan
+    if (aktif) {
+      const flags = [];
+      if (document.getElementById(`kotak${i}_f1`)?.checked) flags.push('Ratu Hilang');
+      if (document.getElementById(`kotak${i}_f2`)?.checked) flags.push('Hama/Penyakit');
+      if (document.getElementById(`kotak${i}_f3`)?.checked) flags.push('Stres/Panas');
+      if (document.getElementById(`kotak${i}_f4`)?.checked) flags.push('Kurang Aktif');
+      if (flags.length > 0) {
+        cat = `[⚠️ ${flags.join(', ')}] ${cat}`.trim();
+      }
+    }
 
     if (aktif && (no || kond || sis !== '' || cat || foto)) {
       terisi++;
       if (!no) { showStatusQc(`Kotak ${i}: isi No Koloni dulu.`, 'error'); nEl.focus(); return; }
       if (!kond) { showStatusQc(`Kotak ${i}: pilih Kondisi dulu.`, 'error'); kEl.focus(); return; }
     }
+    
+    const foto = aktif ? (qcFotoState[i] || '') : '';
 
     formData[`kotak${i}_no`] = no;
     formData[`kotak${i}_kondisi`] = kond;
     formData[`kotak${i}_sisiran`] = sis;
     formData[`kotak${i}_foto`] = foto;
-    formData[`kotak${i}_catatan`] = cat;
+    formData[`kotak${i}_catatan`] = cat; // Simpan catatan yang sudah digabung
+    // --- SAMPAI SINI ---
+    
     if (kond) jml[kond]++;
     if (sis !== '') totalSisiran += sis;
   }
