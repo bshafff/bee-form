@@ -258,6 +258,28 @@ button.btn-delete:hover { background: #c82333; }
 .qc-prev.show { display: block; }
 .qc-foto-x { display: none; border: none; background: #eee; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; }
 .qc-foto-x.show { display: inline-block; }
+.qc-item .qc-cat { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; }
+.bt-summary { padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+.bt-summary.ok { background: #e8f5e9; color: #1b5e20; }
+.bt-summary.warn { background: #fff3e0; color: #bf360c; border: 1px solid #ffcc80; }
+.bt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+@media (max-width: 380px) { .bt-grid { grid-template-columns: 1fr; } }
+.bt-gh-title { font-weight: 700; color: #2d5016; margin: 6px 0 8px; font-size: 15px; }
+.bt-card { padding: 10px; border-radius: 8px; background: #f9f9f9; border: 1px solid #e0e0e0; border-left: 5px solid #999; font-size: 13px; }
+.bt-card.bt-green { border-left-color: #2e7d32; }
+.bt-card.bt-yellow { border-left-color: #f9a825; background: #fffde7; }
+.bt-card.bt-orange { border-left-color: #ef6c00; background: #fff3e0; }
+.bt-card.bt-red { border-left-color: #c62828; background: #ffebee; }
+.bt-card.bt-empty { border-left-color: #c62828; background: #fafafa; border-style: dashed; border-left-style: solid; }
+.bt-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.bt-top b { color: #2d5016; }
+.bt-days { font-weight: 700; font-size: 12px; }
+.bt-note { margin-top: 4px; font-weight: 600; }
+.bt-btn { margin-top: 8px; padding: 6px 10px; border: 1px solid #2d5016; background: #fff; color: #2d5016; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.bt-box { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+.bt-box summary { font-weight: 700; color: #2d5016; cursor: pointer; }
+.bt-box .form-group { margin-top: 12px; margin-bottom: 12px; }
+.bt-stats { font-size: 13px; color: #444; margin: 8px 0 10px; line-height: 1.5; }
 .qc-hint { color: #888; font-size: 13px; padding: 8px 0; }
 .qc-summary { font-size: 13px; font-weight: 600; color: #2d5016; padding: 4px 2px; }
 .kotak-item {
@@ -540,6 +562,7 @@ button.btn-delete:hover { background: #c82333; }
   <div class="tabs">
     <button class="tab-btn active" data-tab="tab-kunjungan">Kunjungan</button>
     <button class="tab-btn" data-tab="tab-qc">QC Koloni</button>
+    <button class="tab-btn" data-tab="tab-batch">🐝 Batch</button>
     <button class="tab-btn" data-tab="tab-trend">📈 Trend</button>
     <button class="tab-btn" data-tab="tab-riwayat">Riwayat</button>
   </div>
@@ -647,8 +670,14 @@ button.btn-delete:hover { background: #c82333; }
           <input type="text" id="asalQc" placeholder="mis. nama pemasok / lokasi">
         </div>
 
+        <div class="form-group">
+          <label for="batchQc">No Batch (per kedatangan)</label>
+          <input type="text" id="batchQc" placeholder="mis. B-12" required>
+        </div>
+
         <div class="bays-section">
           <h3>QC per Kotak</h3>
+          <div class="qc-hint">Isi hanya kotak yang diganti/datang baru. Kotak yang dikosongkan tetap memakai batch lamanya.</div>
           <div id="qcKotakList"><div class="qc-hint">Pilih GH dulu untuk menampilkan kotak.</div></div>
           <div id="qcSummary" class="qc-summary"></div>
         </div>
@@ -667,6 +696,78 @@ button.btn-delete:hover { background: #c82333; }
         <div id="statusQc" class="status"></div>
 
       </form>
+
+    </div>
+
+    <!-- =====================================
+         TRACKING BATCH KOLONI
+    ===================================== -->
+    <div id="tab-batch" class="tab-content">
+
+      <div id="btSummary" class="bt-summary ok"></div>
+
+      <div id="btStatus"></div>
+
+      <details class="bt-box" id="btAkhirBox">
+        <summary>➕ Catat koloni berakhir (mati / kabur / diganti)</summary>
+        <form id="akhirForm">
+          <div class="form-group">
+            <label for="tanggalAk">Tanggal Berakhir</label>
+            <input type="date" id="tanggalAk" required>
+          </div>
+          <div class="row-inputs">
+            <div class="form-group">
+              <label for="ghAk">Greenhouse</label>
+              <select id="ghAk" required>
+                <option value="">-- GH --</option>
+                <option value="GH 1">GH 1</option>
+                <option value="GH 2">GH 2</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="kotakAk">Kotak</label>
+              <select id="kotakAk" required><option value="">-- Kotak --</option></select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="batchAk">No Batch</label>
+            <input type="text" id="batchAk" placeholder="otomatis terisi dari kotak yang dipilih" required>
+          </div>
+          <div class="form-group">
+            <label for="penyebabAk">Penyebab</label>
+            <select id="penyebabAk" required></select>
+          </div>
+          <div class="form-group">
+            <label for="catatanAk">Catatan (opsional)</label>
+            <input type="text" id="catatanAk" placeholder="mis. habis semprot perimeter, suhu 38°C">
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-submit" id="submitBtnAk">Simpan</button>
+          </div>
+          <div id="statusAk" class="status"></div>
+        </form>
+      </details>
+
+      <h3 style="color:#2d5016;margin-bottom:6px;">Ringkasan per Batch</h3>
+      <div style="overflow-x:auto;margin-bottom:16px;">
+        <table class="history-table">
+          <thead><tr><th>Batch</th><th>Datang</th><th>Koloni</th><th>Masih aktif</th><th>Umur rata/maks</th></tr></thead>
+          <tbody id="btBatchBody"></tbody>
+        </table>
+      </div>
+
+      <h3 style="color:#2d5016;margin-bottom:6px;">Riwayat per Kotak</h3>
+      <div id="btStats" class="bt-stats"></div>
+      <div style="overflow-x:auto;">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Batch</th><th>GH / Kotak</th><th>Mulai</th><th>Umur</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="btHistoryBody"></tbody>
+        </table>
+      </div>
 
     </div>
 
@@ -822,7 +923,8 @@ const storeName = 'formQueue';
 
 let localHistory = {
   kunjungan: [],
-  qc: []
+  qc: [],
+  akhir: []
 };
 
 let currentEditId = null;
@@ -1310,6 +1412,7 @@ function loadLocalHistory() {
   }
   if (!localHistory.kunjungan) localHistory.kunjungan = [];
   if (!localHistory.qc) localHistory.qc = [];
+  if (!localHistory.akhir) localHistory.akhir = [];
   delete localHistory.mortalitas;
 
   // Migrasi sekali: item dari sheet yang tersimpan sebelum fix jam dibuang,
@@ -1478,11 +1581,14 @@ async function autoSync() {
 
         localHistory.kunjungan = mergeData(localHistory.kunjungan, sheetKunjungan);
         localHistory.qc = mergeData(localHistory.qc, sheetQc);
+        mergeAkhirFromServer(result);
         saveLocalHistory();
+        checkServerVersion(result, false);
 
         const activeTab = document.querySelector('.tab-content.active');
         if (activeTab && activeTab.id === 'tab-trend') renderTrendDashboard();
         if (activeTab && activeTab.id === 'tab-riwayat') renderHistory();
+        if (activeTab && activeTab.id === 'tab-batch') renderBatchTab();
       }
     } catch (e) { console.warn('Auto-pull gagal:', e); }
 
@@ -1513,6 +1619,8 @@ initDB()
 
     document.getElementById('tanggal').value = today;
     document.getElementById('tanggalQc').value = today;
+    document.getElementById('tanggalAk').value = today;
+    renderBatchTab();
 
     const todayDate = new Date();
     const lastMonth = new Date();
@@ -1575,6 +1683,7 @@ document.querySelector('.tabs').addEventListener('click', e => {
 
   if (tabName === 'tab-riwayat') renderHistory();
   if (tabName === 'tab-trend') renderTrendDashboard();
+  if (tabName === 'tab-batch') renderBatchTab();
 });
 
 // ============================================
@@ -1811,11 +1920,11 @@ function renderQcKotak(gh, values) {
       <div class="qc-item ${kond ? 'k-' + kond.toLowerCase() : ''}" id="qcItem${i}">
         <div class="qc-title">Kotak ${i}</div>
         <div class="qc-row">
-          <input type="text" class="qc-no" id="kotak${i}_no" placeholder="No koloni"
+          <input type="text" class="qc-no" id="kotak${i}_no" placeholder="No koloni (mis. A1)"
                  value="${qcEsc(values[`kotak${i}_no`])}">
         </div>
         <div class="qc-row">
-          <select id="kotak${i}_kondisi" required onchange="updateQcSummary()">
+          <select id="kotak${i}_kondisi" onchange="updateQcSummary()">
             <option value="">-- Kondisi --</option>
             ${QC_KONDISI.map(k => `<option value="${k}" ${k === kond ? 'selected' : ''}>${k}</option>`).join('')}
           </select>
@@ -1830,6 +1939,10 @@ function renderQcKotak(gh, values) {
                  onchange="qcPickFoto(${i}, this)"></label>
           <img class="qc-prev" id="kotak${i}_prev" alt="">
           <button type="button" class="qc-foto-x" id="kotak${i}_fotox" onclick="qcClearFoto(${i})">✕</button>
+        </div>
+        <div class="qc-row">
+          <input type="text" class="qc-cat" id="kotak${i}_catatan" placeholder="Catatan kotak (opsional)"
+                 value="${qcEsc(values[`kotak${i}_catatan`])}">
         </div>
       </div>`;
   }
@@ -1883,23 +1996,40 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     waktu: document.getElementById('waktuQc').value,
     gh,
     asal: document.getElementById('asalQc').value.trim(),
-    catatan: document.getElementById('catatanQc').value.trim()
+    catatan: document.getElementById('catatanQc').value.trim(),
+    no_batch: document.getElementById('batchQc').value.trim()
   };
 
   const jml = { Bagus: 0, Cukup: 0, Jelek: 0 };
   let totalSisiran = 0;
+  let terisi = 0;
   for (let i = 1; i <= QC_MAX_KOTAK; i++) {
     const kEl = document.getElementById(`kotak${i}_kondisi`);
     const sEl = document.getElementById(`kotak${i}_sisiran`);
-    const kond = (i <= n && kEl) ? kEl.value : '';
-    const sis = (i <= n && sEl && sEl.value !== '') ? (parseInt(sEl.value) || 0) : '';
-    formData[`kotak${i}_no`] = (i <= n && document.getElementById(`kotak${i}_no`)) ? document.getElementById(`kotak${i}_no`).value.trim() : '';
+    const nEl = document.getElementById(`kotak${i}_no`);
+    const cEl = document.getElementById(`kotak${i}_catatan`);
+    const aktif = i <= n && kEl;
+    const kond = aktif ? kEl.value : '';
+    const sis = (aktif && sEl && sEl.value !== '') ? (parseInt(sEl.value) || 0) : '';
+    const no = aktif && nEl ? nEl.value.trim() : '';
+    const cat = aktif && cEl ? cEl.value.trim() : '';
+    const foto = aktif ? (qcFotoState[i] || '') : '';
+
+    if (aktif && (no || kond || sis !== '' || cat || foto)) {
+      terisi++;
+      if (!no) { showStatusQc(`Kotak ${i}: isi No Koloni dulu.`, 'error'); nEl.focus(); return; }
+      if (!kond) { showStatusQc(`Kotak ${i}: pilih Kondisi dulu.`, 'error'); kEl.focus(); return; }
+    }
+
+    formData[`kotak${i}_no`] = no;
     formData[`kotak${i}_kondisi`] = kond;
     formData[`kotak${i}_sisiran`] = sis;
-    formData[`kotak${i}_foto`] = (i <= n) ? (qcFotoState[i] || '') : '';
+    formData[`kotak${i}_foto`] = foto;
+    formData[`kotak${i}_catatan`] = cat;
     if (kond) jml[kond]++;
     if (sis !== '') totalSisiran += sis;
   }
+  if (terisi === 0) { showStatusQc('Isi minimal 1 kotak (No Koloni + Kondisi).', 'error'); return; }
   formData.jml_bagus = jml.Bagus;
   formData.jml_cukup = jml.Cukup;
   formData.jml_jelek = jml.Jelek;
@@ -1935,6 +2065,9 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
       if (isEdit && result.status !== 'success') {
         throw new Error('Data tidak ditemukan di Google Sheet.');
       }
+      if (result.sheet !== 'qc') {
+        throw new Error('Apps Script di server masih versi lama (belum deploy versi baru).');
+      }
 
       isSuccessSync = true;
 
@@ -1960,9 +2093,10 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
 
   } catch (error) {
     console.error('Error:', error);
+    const alasan = friendlyErr(error);
     await saveToQueue(formData, 'qc');
-    showStatusQc('⚠️ Koneksi gagal - Data tersimpan lokal', 'error');
-    showToast('Gagal Kirim ⚠️', 'Tersimpan lokal. Auto-sync akan coba lagi.', 'error', 5000);
+    showStatusQc('⚠️ Belum masuk Sheet: ' + alasan + ' (tersimpan lokal)', 'error');
+    showToast('Gagal Kirim ⚠️', alasan, 'error', 7000);
 
     if (isEdit) updateLocalHistory('qc', currentEditId, qcStripFoto(formData), false);
     else addLocalHistory('qc', qcStripFoto(formData), false);
@@ -2062,7 +2196,7 @@ function renderHistory() {
   const data = localHistory[type] || [];
   const tbody = document.getElementById('historyBody');
   document.getElementById('histCol4').textContent = (type === 'qc') ? 'Kondisi' : 'Suhu';
-  document.getElementById('histCol5').textContent = (type === 'qc') ? 'Asal' : 'Cuaca';
+  document.getElementById('histCol5').textContent = (type === 'qc') ? 'Batch' : 'Cuaca';
 
   if (data.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" class="history-empty">Belum ada data riwayat</td></tr>`;
@@ -2090,7 +2224,7 @@ function renderHistory() {
         <td>${item.waktu || '-'}</td>
         <td>${item.gh || '-'}</td>
         <td>${type === 'qc' ? qcSummaryText(item) : suhuVal}</td>
-        <td>${type === 'qc' ? qcEsc(item.asal || '-') : (item.cuaca || '-')}</td>
+        <td>${type === 'qc' ? qcBatchText(item) : (item.cuaca || '-')}</td>
         <td style="text-align:center;white-space:nowrap;">
           <button class="history-btn history-btn-edit"
             onclick="editHistory('${type}','${item._localId}')">✏️</button>
@@ -2135,6 +2269,7 @@ function editHistory(type, localId) {
     document.getElementById('waktuQc').value = data.waktu || '';
     document.getElementById('ghQc').value = data.gh || '';
     document.getElementById('asalQc').value = data.asal || '';
+    document.getElementById('batchQc').value = data.no_batch || '';
     document.getElementById('catatanQc').value = data.catatan || '';
     renderQcKotak(data.gh || '', data);
 
@@ -2154,6 +2289,7 @@ function activateTab(tabName) {
   if (btn) btn.classList.add('active');
   if (content) content.classList.add('active');
   if (tabName === 'tab-trend') renderTrendDashboard();
+  if (tabName === 'tab-batch') renderBatchTab();
 }
 
 // ============================================
@@ -2215,6 +2351,360 @@ async function deleteHistoryItem(type, localId) {
 }
 
 // ============================================
+// TRACKING BATCH KOLONI
+// ============================================
+
+const BATCH_UMUR_WASPADA = 14; // hari: mulai dipantau
+const BATCH_UMUR_GANTI = 21;   // hari: siap diganti
+const BATCH_UMUR_MAX = 28;     // hari: lewat ini wajib ganti
+const AKHIR_PENYEBAB = [
+  'Kabur',
+  'Mati - kepanasan',
+  'Mati - pestisida',
+  'Mati - hama/penyakit',
+  'Mati - lainnya',
+  'Umur habis / diganti'
+];
+
+function friendlyErr(e) {
+  const m = (e && e.message) ? e.message : String(e);
+  if (e instanceof SyntaxError || /Unexpected token|JSON/i.test(m)) {
+    return 'Respon server bukan JSON (Apps Script belum diotorisasi / belum di-deploy versi baru).';
+  }
+  if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'Tidak bisa terhubung ke server.';
+  return m;
+}
+
+let serverWarned = false;
+function checkServerVersion(result, manual) {
+  const ok = result && result.qcVersion >= 4;
+  if (ok) return;
+  if (manual || !serverWarned) {
+    serverWarned = true;
+    showToast('Apps Script Versi Lama ⚠️', 'Deploy ulang Apps Script (New version) supaya QC & Batch masuk ke Sheet.', 'error', 8000);
+  }
+}
+
+function mergeAkhirFromServer(result) {
+  if (!result || !Array.isArray(result.batch_akhir)) return;
+  const sheet = result.batch_akhir.map(d => ({ ...d, _localId: 'sheet_ak_' + d._sheetRow, _syncedToSheet: true }));
+  const sameAk = (a, b) => a.tanggal === b.tanggal && a.gh === b.gh &&
+    String(a.kotak) === String(b.kotak) && String(a.no_batch) === String(b.no_batch);
+  const localOnly = (localHistory.akhir || []).filter(l => !String(l._localId || '').startsWith('sheet_'));
+  const unsynced = localOnly.filter(l => !sheet.some(sh => sameAk(sh, l)));
+  localHistory.akhir = [...sheet, ...unsynced];
+}
+
+function qcBatchText(item) {
+  const parts = [];
+  for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+    const no = String(item[`kotak${i}_no`] ?? '').trim();
+    if (no) parts.push(`K${i}: ${qcEsc(no)}`);
+  }
+  const head = item.no_batch ? `<b>Batch ${qcEsc(item.no_batch)}</b><br>` : '';
+  return (head + parts.join('<br>')) || qcEsc(item.asal || '-');
+}
+
+function dayNum(str) {
+  const m = String(str || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return NaN;
+  return Math.floor(Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000);
+}
+function daysBetween(a, b) {
+  const x = dayNum(a), y = dayNum(b);
+  return (isNaN(x) || isNaN(y)) ? null : Math.max(0, y - x);
+}
+
+// Satu baris QC = satu kedatangan (1 No Batch). Tiap kotak yang diisi = koloni baru yang menempati kotak itu.
+// Kotak yang tidak diisi tetap membawa batch lamanya. Tiap "penghuni kotak" dilacak umurnya.
+function batchOfRow(row) {
+  return String(row.no_batch ?? '').trim() || ('Tgl ' + (row.tanggal || '?'));
+}
+
+function buildBatches() {
+  const map = {};
+  const today = getLocalDate();
+
+  (localHistory.qc || []).forEach(row => {
+    const batch = batchOfRow(row);
+    for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+      const koloni = String(row[`kotak${i}_no`] ?? '').trim();
+      const kond = row[`kotak${i}_kondisi`] || '';
+      if (!koloni && !kond) continue;
+      const key = `${row.gh}|${i}|${batch}`;
+      const b = map[key] || (map[key] = {
+        key, gh: row.gh, kotak: i, batch, koloni: '', start: row.tanggal || '',
+        kondisi: '', catatan: '', lastQc: ''
+      });
+      if (row.tanggal && (!b.start || row.tanggal < b.start)) b.start = row.tanggal;
+      if (!b.lastQc || (row.tanggal || '') >= b.lastQc) {
+        b.lastQc = row.tanggal || '';
+        b.koloni = koloni || b.koloni;
+        b.kondisi = kond;
+        b.catatan = row[`kotak${i}_catatan`] || '';
+      }
+    }
+  });
+
+  (localHistory.akhir || []).forEach(a => {
+    const batch = String(a.no_batch ?? '').trim();
+    if (!batch || !a.gh) return;
+    const key = `${a.gh}|${a.kotak}|${batch}`;
+    const b = map[key] || (map[key] = {
+      key, gh: a.gh, kotak: parseInt(a.kotak) || a.kotak, batch, koloni: a.no_koloni || '', start: '',
+      kondisi: '', catatan: '', lastQc: ''
+    });
+    if (!b.end || (a.tanggal || '') >= b.end) {
+      b.end = a.tanggal || '';
+      b.penyebab = a.penyebab || '';
+      b.akhirCatatan = a.catatan || '';
+      b.akhirId = a._localId;
+    }
+  });
+
+  const list = Object.values(map);
+
+  // Per GH+kotak: penghuni lama yang tidak dicatat berakhir dianggap diganti saat penghuni baru datang.
+  const groups = {};
+  list.forEach(b => { (groups[`${b.gh}|${b.kotak}`] = groups[`${b.gh}|${b.kotak}`] || []).push(b); });
+  Object.values(groups).forEach(g => {
+    g.sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+    g.forEach((b, idx) => {
+      b.isLatest = idx === g.length - 1;
+      const next = g[idx + 1];
+      if (!b.end && next && next.start) {
+        b.end = next.start;
+        b.penyebab = 'Diganti (batch baru)';
+        b.auto = true;
+      }
+    });
+  });
+
+  list.forEach(b => { b.umur = b.start ? daysBetween(b.start, b.end || today) : null; });
+  return list;
+}
+
+function batchLevel(umur) {
+  if (umur === null) return { cls: 'bt-green', text: 'Aktif' };
+  if (umur >= BATCH_UMUR_MAX) return { cls: 'bt-red', text: 'Lewat ' + BATCH_UMUR_MAX + ' hari — ganti' };
+  if (umur >= BATCH_UMUR_GANTI) return { cls: 'bt-orange', text: 'Siap diganti' };
+  if (umur >= BATCH_UMUR_WASPADA) return { cls: 'bt-yellow', text: 'Mulai dipantau' };
+  return { cls: 'bt-green', text: 'Aman' };
+}
+
+function renderBatchTab() {
+  const box = document.getElementById('btStatus');
+  if (!box) return;
+  const list = buildBatches();
+  const perluBeli = [];
+  let html = '';
+
+  Object.keys(QC_KOTAK_PER_GH).forEach(gh => {
+    html += `<div class="bt-gh-title">${gh}</div><div class="bt-grid">`;
+    const n = QC_KOTAK_PER_GH[gh];
+    for (let k = 1; k <= n; k++) {
+      const b = list.find(x => x.gh === gh && x.kotak === k && x.isLatest);
+      if (!b || b.end) {
+        const info = b ? `Terakhir: ${qcEsc(b.koloni || '-')} · Batch ${qcEsc(b.batch)} · ${b.umur !== null ? b.umur + ' hari' : '?'}<br>${qcEsc(b.penyebab || '')}` : 'Belum ada data';
+        perluBeli.push(`${gh} K${k}`);
+        html += `<div class="bt-card bt-empty"><div class="bt-top"><b>Kotak ${k}</b><span class="bt-days" style="color:#c62828;">KOSONG</span></div>
+          <div>${info}</div><div class="bt-note" style="color:#c62828;">Perlu beli / isi koloni</div></div>`;
+        continue;
+      }
+      const lv = batchLevel(b.umur);
+      if (lv.cls === 'bt-orange' || lv.cls === 'bt-red') perluBeli.push(`${gh} K${k}`);
+      const warnJelek = (b.kondisi === 'Jelek' && b.umur !== null && b.umur < BATCH_UMUR_GANTI)
+        ? '<div>⚠️ Kondisi awal Jelek</div>' : '';
+      html += `<div class="bt-card ${lv.cls}">
+        <div class="bt-top"><b>Kotak ${k}${b.koloni ? ' · ' + qcEsc(b.koloni) : ''}</b><span class="bt-days">${b.umur !== null ? 'Hari ke-' + b.umur : '-'}</span></div>
+        <div>Batch <b>${qcEsc(b.batch)}</b></div>
+        <div>Datang ${qcEsc(b.start || '-')}</div>
+        ${warnJelek}
+        <div class="bt-note">${lv.text}</div>
+        <button type="button" class="bt-btn" data-gh="${gh}" data-k="${k}" data-b="${qcEsc(b.batch)}">Akhiri</button>
+      </div>`;
+    }
+    html += '</div>';
+  });
+  box.innerHTML = html;
+
+  const sum = document.getElementById('btSummary');
+  if (perluBeli.length) {
+    sum.className = 'bt-summary warn';
+    sum.textContent = '🛒 Perlu beli / ganti: ' + perluBeli.join(', ');
+  } else {
+    sum.className = 'bt-summary ok';
+    sum.textContent = '✅ Semua kotak masih aman (umur < ' + BATCH_UMUR_GANTI + ' hari).';
+  }
+
+  // Ringkasan per batch
+  const byBatch = {};
+  list.forEach(b => { (byBatch[b.batch] = byBatch[b.batch] || []).push(b); });
+  const batchRows = Object.entries(byBatch).map(([batch, arr]) => {
+    const starts = arr.map(x => x.start).filter(Boolean).sort();
+    const umurs = arr.map(x => x.umur).filter(u => u !== null);
+    const aktif = arr.filter(x => !x.end).length;
+    return { batch, datang: starts[0] || '-', total: arr.length, aktif,
+      avg: umurs.length ? Math.round(umurs.reduce((t, u) => t + u, 0) / umurs.length) : null,
+      maks: umurs.length ? Math.max(...umurs) : null };
+  }).sort((a, b) => b.datang.localeCompare(a.datang));
+  document.getElementById('btBatchBody').innerHTML = batchRows.length ? batchRows.map(r => `<tr>
+      <td><b>${qcEsc(r.batch)}</b></td><td>${qcEsc(r.datang)}</td><td>${r.total}</td>
+      <td>${r.aktif}</td><td>${r.avg !== null ? r.avg + ' / ' + r.maks + ' hr' : '-'}</td></tr>`).join('')
+    : '<tr><td colspan="5" class="history-empty">Belum ada data batch.</td></tr>';
+
+  // Statistik koloni yang sudah berakhir
+  const ended = list.filter(b => b.end && b.umur !== null);
+  const stats = document.getElementById('btStats');
+  if (ended.length) {
+    const avg = Math.round(ended.reduce((t, b) => t + b.umur, 0) / ended.length);
+    const mn = Math.min(...ended.map(b => b.umur)), mx = Math.max(...ended.map(b => b.umur));
+    const cnt = {};
+    ended.forEach(b => { cnt[b.penyebab || '-'] = (cnt[b.penyebab || '-'] || 0) + 1; });
+    stats.innerHTML = `Rata-rata bertahan <b>${avg} hari</b> (min ${mn}, maks ${mx}) dari ${ended.length} koloni selesai.<br>` +
+      Object.entries(cnt).map(([k, v]) => `${qcEsc(k)}: <b>${v}</b>`).join(' · ');
+  } else {
+    stats.textContent = 'Belum ada koloni yang selesai.';
+  }
+
+  const rows = [...list].sort((a, b) => (b.start || '').localeCompare(a.start || ''));
+  document.getElementById('btHistoryBody').innerHTML = rows.length ? rows.map(b => {
+    const lv = b.end ? null : batchLevel(b.umur);
+    const status = b.end
+      ? `${qcEsc(b.penyebab || 'Selesai')}<br><span style="color:#888;">${qcEsc(b.end)}</span>${b.akhirCatatan ? '<br><i>' + qcEsc(b.akhirCatatan) + '</i>' : ''}`
+      : `<b>Aktif</b><br>${lv.text}`;
+    const aksi = (b.akhirId && !b.auto)
+      ? `<button class="history-btn history-btn-delete" onclick="deleteAkhir('${b.akhirId}')" title="Batalkan catatan berakhir">↩️</button>` : '';
+    return `<tr>
+      <td><b>${qcEsc(b.batch)}</b></td>
+      <td>${b.gh}<br>K${b.kotak}${b.koloni ? '<br>' + qcEsc(b.koloni) : ''}</td>
+      <td>${qcEsc(b.start || '-')}</td>
+      <td>${b.umur !== null ? b.umur + ' hr' : '-'}</td>
+      <td>${status}</td>
+      <td>${aksi}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" class="history-empty">Belum ada data. Isi No Batch & No Koloni di tab QC Koloni.</td></tr>';
+}
+
+// ---- Form "Akhiri batch" ----
+function fillKotakAk() {
+  const gh = document.getElementById('ghAk').value;
+  const sel = document.getElementById('kotakAk');
+  const n = QC_KOTAK_PER_GH[gh] || 0;
+  let o = '<option value="">-- Kotak --</option>';
+  for (let k = 1; k <= n; k++) o += `<option value="${k}">Kotak ${k}</option>`;
+  sel.innerHTML = o;
+  document.getElementById('batchAk').value = '';
+}
+function prefillBatchAk() {
+  const gh = document.getElementById('ghAk').value;
+  const k = parseInt(document.getElementById('kotakAk').value);
+  if (!gh || !k) return;
+  const b = buildBatches().find(x => x.gh === gh && x.kotak === k && x.isLatest && !x.end);
+  document.getElementById('batchAk').value = b ? b.batch : '';
+}
+document.getElementById('penyebabAk').innerHTML =
+  '<option value="">-- Pilih penyebab --</option>' + AKHIR_PENYEBAB.map(p => `<option value="${p}">${p}</option>`).join('');
+document.getElementById('ghAk').addEventListener('change', fillKotakAk);
+document.getElementById('kotakAk').addEventListener('change', prefillBatchAk);
+document.getElementById('btStatus').addEventListener('click', e => {
+  const btn = e.target.closest('.bt-btn');
+  if (!btn) return;
+  document.getElementById('btAkhirBox').open = true;
+  document.getElementById('tanggalAk').value = getLocalDate();
+  document.getElementById('ghAk').value = btn.dataset.gh;
+  fillKotakAk();
+  document.getElementById('kotakAk').value = btn.dataset.k;
+  document.getElementById('batchAk').value = btn.dataset.b;
+  document.getElementById('penyebabAk').focus();
+  document.getElementById('btAkhirBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+function showStatusAk(msg, type) {
+  const el = document.getElementById('statusAk');
+  el.textContent = msg;
+  el.className = 'status ' + type;
+}
+
+document.getElementById('akhirForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const formData = {
+    sheet: 'batch_akhir',
+    action: 'submit',
+    tanggal: document.getElementById('tanggalAk').value,
+    gh: document.getElementById('ghAk').value,
+    kotak: parseInt(document.getElementById('kotakAk').value),
+    no_batch: document.getElementById('batchAk').value.trim(),
+    no_koloni: '',
+    penyebab: document.getElementById('penyebabAk').value,
+    catatan: document.getElementById('catatanAk').value.trim()
+  };
+  if (!formData.no_batch) { showStatusAk('Isi No Batch.', 'error'); return; }
+  const hit = buildBatches().find(x => x.gh === formData.gh && x.kotak === formData.kotak && x.batch === formData.no_batch);
+  if (hit) formData.no_koloni = hit.koloni || '';
+
+  const btn = document.getElementById('submitBtnAk');
+  btn.disabled = true;
+  showStatusAk('Menyimpan...', 'loading');
+  let synced = false;
+  try {
+    if (isAuthenticated && scriptUrl && navigator.onLine) {
+      const res = await fetch(scriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(formData)
+      });
+      const result = await res.json();
+      if (result.status === 'error') throw new Error(result.message || 'Gagal');
+      if (result.sheet !== 'batch_akhir') throw new Error('Apps Script di server masih versi lama (belum deploy versi baru).');
+      synced = true;
+      showStatusAk('✓ Tersimpan di Sheet.', 'success');
+    } else {
+      await saveToQueue(formData, 'akhir');
+      showStatusAk('📥 Tersimpan lokal. Auto-sync akan kirim otomatis.', 'info');
+    }
+  } catch (err) {
+    console.error(err);
+    await saveToQueue(formData, 'akhir');
+    showStatusAk('⚠️ Belum masuk Sheet: ' + friendlyErr(err) + ' (tersimpan lokal)', 'error');
+  }
+
+  // ganti catatan lama untuk batch yang sama (hindari dobel)
+  localHistory.akhir = (localHistory.akhir || []).filter(a => !(a.gh === formData.gh &&
+    String(a.kotak) === String(formData.kotak) && String(a.no_batch) === String(formData.no_batch)));
+  addLocalHistory('akhir', { ...formData }, synced);
+  updateQueueBadge();
+  btn.disabled = false;
+  document.getElementById('akhirForm').reset();
+  document.getElementById('tanggalAk').value = getLocalDate();
+  fillKotakAk();
+  renderBatchTab();
+});
+
+async function deleteAkhir(localId) {
+  const a = (localHistory.akhir || []).find(x => x._localId === localId);
+  if (!a) return;
+  if (!confirm(`Batalkan catatan "${a.penyebab}" untuk batch ${a.no_batch}? Batch akan dianggap aktif lagi.`)) return;
+  try {
+    if (isAuthenticated && scriptUrl && navigator.onLine) {
+      const res = await fetch(scriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ sheet: 'batch_akhir', action: 'delete-row', tanggal: a.tanggal, gh: a.gh, kotak: a.kotak, no_batch: a.no_batch })
+      });
+      const result = await res.json();
+      if (result.status === 'error') throw new Error(result.message || 'Gagal');
+    }
+    localHistory.akhir = localHistory.akhir.filter(x => x._localId !== localId);
+    saveLocalHistory();
+    renderBatchTab();
+    showToast('Dibatalkan', 'Catatan batch berakhir dihapus.', 'success', 3000);
+  } catch (err) {
+    showToast('Gagal Hapus', friendlyErr(err), 'error', 5000);
+  }
+}
+
+// ============================================
 // FETCH / SYNC SHEET (Manual)
 // ============================================
 
@@ -2270,9 +2760,12 @@ async function fetchAllDataFromSheet() {
 
     localHistory.kunjungan = mergeData(localHistory.kunjungan, sheetKunjungan);
     localHistory.qc = mergeData(localHistory.qc, sheetQc);
+    mergeAkhirFromServer(result);
     saveLocalHistory();
+    checkServerVersion(result, true);
 
     renderHistory();
+    renderBatchTab();
     hideLoadingOverlay();
 
     syncStatus.className = 'status success';

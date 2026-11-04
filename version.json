@@ -1,5 +1,5 @@
 {
-  "version": "1.0.6",
-  "released": "2026-11-03",
-  "notes": "QC Koloni: tambah No Koloni dan foto per kotak"
+  "version": "1.0.7",
+  "released": "2026-11-04",
+  "notes": "QC: No Batch per kedatangan + catatan per kotak; tab Batch untuk tracking umur koloni"
 }
