@@ -730,9 +730,10 @@ button.btn-delete:hover { background: #c82333; }
             </div>
           </div>
           <div class="form-group">
-            <label for="batchAk">No Batch</label>
-            <input type="text" id="batchAk" placeholder="otomatis terisi dari kotak yang dipilih" required>
-          </div>
+  <label for="batchAk">No Batch</label>
+  <input type="text" id="batchAk" list="batchAkList" placeholder="otomatis terisi dari kotak yang dipilih" required>
+  <datalist id="batchAkList"></datalist>
+</div>
           <div class="form-group">
             <label for="penyebabAk">Penyebab</label>
             <select id="penyebabAk" required></select>
@@ -2594,19 +2595,52 @@ function fillKotakAk() {
   let o = '<option value="">-- Kotak --</option>';
   for (let k = 1; k <= n; k++) o += `<option value="${k}">Kotak ${k}</option>`;
   sel.innerHTML = o;
+  
   document.getElementById('batchAk').value = '';
+  const datalist = document.getElementById('batchAkList');
+  if (datalist) datalist.innerHTML = '';
 }
+
 function prefillBatchAk() {
   const gh = document.getElementById('ghAk').value;
   const k = parseInt(document.getElementById('kotakAk').value);
-  if (!gh || !k) return;
-  const b = buildBatches().find(x => x.gh === gh && x.kotak === k && x.isLatest && !x.end);
-  document.getElementById('batchAk').value = b ? b.batch : '';
+  const list = document.getElementById('batchAkList');
+  const input = document.getElementById('batchAk');
+  
+  if (!gh || !k) {
+    if(list) list.innerHTML = '';
+    return;
+  }
+
+  // Ambil semua batch (aktif dan lampau) untuk GH+Kotak ini
+  const allB = buildBatches().filter(x => x.gh === gh && x.kotak === k)
+    .sort((a, b) => (b.start || '').localeCompare(a.start || ''));
+
+  let html = '';
+  allB.forEach(b => {
+    const status = b.end ? `[Selesai]` : `[Aktif]`;
+    html += `<option value="${qcEsc(b.batch)}">${qcEsc(b.batch)} - ${qcEsc(b.koloni || '-')} ${status}</option>`;
+  });
+  if(list) list.innerHTML = html;
+
+  // Auto-fill dengan batch yang masih aktif terbaru
+  const active = allB.find(x => !x.end);
+  if (active) {
+    input.value = active.batch;
+  } else if (allB.length > 0) {
+    input.value = allB[0].batch; // Kalau semua sudah selesai, ambil yang terakhir
+  } else {
+    input.value = '';
+  }
 }
+
+// --- JANGAN HAPUS BAGIAN INI ---
 document.getElementById('penyebabAk').innerHTML =
   '<option value="">-- Pilih penyebab --</option>' + AKHIR_PENYEBAB.map(p => `<option value="${p}">${p}</option>`).join('');
+
 document.getElementById('ghAk').addEventListener('change', fillKotakAk);
 document.getElementById('kotakAk').addEventListener('change', prefillBatchAk);
+
 document.getElementById('btStatus').addEventListener('click', e => {
   const btn = e.target.closest('.bt-btn');
   if (!btn) return;
@@ -2615,7 +2649,12 @@ document.getElementById('btStatus').addEventListener('click', e => {
   document.getElementById('ghAk').value = btn.dataset.gh;
   fillKotakAk();
   document.getElementById('kotakAk').value = btn.dataset.k;
-  document.getElementById('batchAk').value = btn.dataset.b;
+  
+  // Panggil prefill agar datalist langsung terisi saat tombol "Akhiri" diklik
+  prefillBatchAk(); 
+  // Timpa dengan batch dari tombol yang diklik (jika berbeda)
+  document.getElementById('batchAk').value = btn.dataset.b; 
+  
   document.getElementById('penyebabAk').focus();
   document.getElementById('btAkhirBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
