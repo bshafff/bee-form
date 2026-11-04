@@ -1006,8 +1006,10 @@ function mapSheetRow(d) {
 // AUTH (Auto-Connect)
 // ============================================
 
-// Prioritas URL: localStorage (jika admin override) → DEFAULT_SCRIPT_URL
-let scriptUrl = localStorage.getItem('bee_script_url') || DEFAULT_SCRIPT_URL;
+// Paksa aplikasi selalu menggunakan URL terbaru dari kode (DEFAULT_SCRIPT_URL)
+let scriptUrl = DEFAULT_SCRIPT_URL;
+// Timpa URL lama di localStorage dengan yang baru
+localStorage.setItem('bee_script_url', DEFAULT_SCRIPT_URL);
 
 // Auto-connect: kecuali user pernah sengaja memutuskan koneksi
 let isAuthenticated = (localStorage.getItem('bee_auth') === 'false') ? false : true;
@@ -2379,7 +2381,10 @@ function friendlyErr(e) {
 let serverWarned = false;
 function checkServerVersion(result, manual) {
   const ok = result && result.qcVersion >= 4;
-  if (ok) return;
+  if (ok) {
+    serverWarned = false; // <--- TAMBAHKAN BARIS INI
+    return;
+  }
   if (manual || !serverWarned) {
     serverWarned = true;
     showToast('Apps Script Versi Lama ⚠️', 'Deploy ulang Apps Script (New version) supaya QC & Batch masuk ke Sheet.', 'error', 8000);
