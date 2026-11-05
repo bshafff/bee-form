@@ -1,5 +1,5 @@
 {
-  "version": "1.1.5",
+  "version": "1.1.6",
   "released": "2026-11-05",
-  "notes": "QC: No Batch per kedatangan + catatan per kotak; tab Batch untuk tracking umur koloni"
+  "notes": "Fix Bug macet & perbaikan layout grafik"
 }
