@@ -878,6 +878,10 @@ button.btn-delete:hover { background: #c82333; }
       </div>
 
       <div class="chart-card">
+        <!-- TAMBAHKAN BARIS INI -->
+        <div id="barChartWarning" style="display:none; background:#fff3e0; color:#e65100; padding:10px; border-radius:8px; font-size:12px; margin-bottom:10px; border:1px solid #ffcc80; line-height:1.4;"></div>
+        <!-- SAMPAI SINI -->
+        
         <div class="chart-container">
           <canvas id="barChart"></canvas>
         </div>
@@ -3213,6 +3217,23 @@ function renderBarChart(filteredData, ghFilter) {
       bayTotals[i - 1] += parseInt(item['bay' + i]) || 0;
     }
   });
+
+  // --- MULAI TAMBAHAN KETERANGAN OTOMATIS ---
+  const zeroBays = [];
+  bayTotals.forEach((total, index) => {
+    if (total === 0) zeroBays.push(index + 1);
+  });
+
+  const warnEl = document.getElementById('barChartWarning');
+  if (warnEl) {
+    if (zeroBays.length > 0) {
+      warnEl.style.display = 'block';
+      warnEl.innerHTML = `ℹ️ <b>Keterangan Grafik:</b> Bay <b>${zeroBays.join(', ')}</b> menunjukkan angka 0. Jika di lapangan sebenarnya ada lebah yang aktif di bay tersebut, berarti <b>data kunjungan belum diinput</b> oleh petugas ke aplikasi.`;
+    } else {
+      warnEl.style.display = 'none';
+    }
+  }
+  // --- SAMPAI SINI ---
 
   const ctx2 = document.getElementById('barChart').getContext('2d');
   if (barChartInstance) barChartInstance.destroy();
