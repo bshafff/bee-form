@@ -2073,8 +2073,9 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     const sis = (aktif && sEl && sEl.value !== '') ? (parseInt(sEl.value) || 0) : '';
     const no = aktif && nEl ? nEl.value.trim() : '';
     
-    // --- MULAI GANTI DARI SINI ---
+        // --- MULAI GANTI DARI SINI ---
     let cat = aktif && cEl ? cEl.value.trim() : '';
+    const foto = aktif ? (qcFotoState[i] || '') : ''; // <-- DIPINDAH KE SINI
     
     // Gabungkan Quick Flags ke dalam Catatan
     if (aktif) {
@@ -2093,8 +2094,6 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
       if (!no) { showStatusQc(`Kotak ${i}: isi No Koloni dulu.`, 'error'); nEl.focus(); return; }
       if (!kond) { showStatusQc(`Kotak ${i}: pilih Kondisi dulu.`, 'error'); kEl.focus(); return; }
     }
-    
-    const foto = aktif ? (qcFotoState[i] || '') : '';
 
     formData[`kotak${i}_no`] = no;
     formData[`kotak${i}_kondisi`] = kond;
