@@ -877,11 +877,6 @@ button.btn-delete:hover { background: #c82333; }
         </div>
       </div>
 
-      <div class="chart-card">
-        <!-- TAMBAHKAN BARIS INI -->
-        <div id="barChartWarning" style="display:none; background:#fff3e0; color:#e65100; padding:10px; border-radius:8px; font-size:12px; margin-bottom:10px; border:1px solid #ffcc80; line-height:1.4;"></div>
-        <!-- SAMPAI SINI -->
-        
         <div class="chart-container">
           <canvas id="barChart"></canvas>
         </div>
@@ -3218,21 +3213,44 @@ function renderBarChart(filteredData, ghFilter) {
     }
   });
 
-  // --- MULAI TAMBAHAN KETERANGAN OTOMATIS ---
-  const zeroBays = [];
-  bayTotals.forEach((total, index) => {
-    if (total === 0) zeroBays.push(index + 1);
-  });
+  const ctx2 = document.getElementById('barChart').getContext('2d');
+  if (barChartInstance) barChartInstance.destroy();
 
-  const warnEl = document.getElementById('barChartWarning');
-  if (warnEl) {
-    if (zeroBays.length > 0) {
-      warnEl.style.display = 'block';
-      warnEl.innerHTML = `ℹ️ <b>Keterangan Grafik:</b> Bay <b>${zeroBays.join(', ')}</b> menunjukkan angka 0. Jika di lapangan sebenarnya ada lebah yang aktif di bay tersebut, berarti <b>data kunjungan belum diinput</b> oleh petugas ke aplikasi.`;
-    } else {
-      warnEl.style.display = 'none';
+  barChartInstance = new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels: Array.from({ length: 10 }, (_, i) => 'Bay ' + (i + 1)),
+      datasets: [{
+        label: 'Total Kunjungan',
+        data: bayTotals,
+        backgroundColor: '#4a7c2c',
+        borderColor: '#2d5016',
+        borderWidth: 1,
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        title: {
+          display: true,
+          text: `Distribusi Kunjungan per Bay - ${ghFilter || 'Semua GH'}`,
+          font: { weight: 'bold', size: 14, family: 'sans-serif' },
+          color: '#2d5016'
+        },
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Total Kunjungan', font: { weight: 'bold' } },
+          grid: { color: '#f0f0f0' }
+        },
+        x: { grid: { display: false } }
+      }
     }
-  }
+  });
+}
   // --- SAMPAI SINI ---
 
   const ctx2 = document.getElementById('barChart').getContext('2d');
