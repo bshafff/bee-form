@@ -529,7 +529,31 @@ button.btn-delete:hover { background: #c82333; }
   accent-color: #dc3545;
   cursor: pointer;
 }
+/* ===== LAPORAN & PRINT STYLE ===== */
+.report-paper {
+  background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 8px;
+}
+.report-header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+.report-header h2 { margin: 0; font-size: 18px; color: #000; }
+.report-header p { margin: 4px 0 0; font-size: 12px; color: #555; }
+.report-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px; }
+.report-table th, .report-table td { border: 1px solid #999; padding: 6px; text-align: left; }
+.report-table th { background: #eee; font-weight: bold; }
+.report-foto { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; }
+.report-ttd { display: flex; justify-content: space-between; margin-top: 30px; font-size: 12px; }
+.report-ttd div { text-align: center; width: 200px; }
+.report-ttd .line { margin-top: 50px; border-top: 1px solid #000; }
 
+@media print {
+  body { background: #fff; padding: 0; margin: 0; color: #000; }
+  .container { max-width: 100%; box-shadow: none; border: none; }
+  .no-print, .header, .tabs, .toast-container, #installBtn, .loading-overlay { display: none !important; }
+  .content { padding: 0; }
+  .tab-content { display: none !important; }
+  #tab-laporan { display: block !important; }
+  .report-paper { border: none; padding: 0; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}
 </style>
 
 </head>
@@ -592,6 +616,7 @@ button.btn-delete:hover { background: #c82333; }
     <button class="tab-btn" data-tab="tab-batch">🐝 Batch</button>
     <button class="tab-btn" data-tab="tab-trend">📈 Trend</button>
     <button class="tab-btn" data-tab="tab-riwayat">Riwayat</button>
+     <button class="tab-btn" data-tab="tab-laporan">📄 Laporan</button>
   </div>
 
   <div class="content">
@@ -890,7 +915,7 @@ button.btn-delete:hover { background: #c82333; }
 
     </div>
 
-    <!-- =====================================
+     <!-- =====================================
          RIWAYAT
     ===================================== -->
     <div id="tab-riwayat" class="tab-content">
@@ -905,6 +930,51 @@ button.btn-delete:hover { background: #c82333; }
           🔄 Sinkron ke Sheet
         </button>
       </div>
+
+      <div style="overflow-x:auto;">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Tanggal</th>
+              <th>Waktu</th>
+              <th>GH</th>
+              <th id="histCol4">Suhu</th>
+              <th id="histCol5">Cuaca</th>
+              <th style="text-align:center;">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr><td colspan="6" class="history-empty">Memuat data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="syncStatus" class="status"></div>
+
+    </div>
+
+    <!-- =====================================
+         LAPORAN MANAJEMEN
+    ===================================== -->
+    <div id="tab-laporan" class="tab-content">
+      
+      <!-- Panel Kontrol (Akan hilang saat dicetak) -->
+      <div class="no-print" style="background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 20px;">
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label for="reportBatchSelect">Pilih Batch Kedatangan</label>
+          <select id="reportBatchSelect" onchange="renderReport()" style="font-weight:bold; color:#2d5016;"></select>
+        </div>
+        <button type="button" class="btn btn-submit" onclick="window.print()" style="width: 100%;">
+          🖨️ Cetak / Simpan sebagai PDF
+        </button>
+      </div>
+
+      <!-- Kertas Laporan -->
+      <div id="reportContent" class="report-paper">
+        <!-- Diisi otomatis oleh JavaScript renderReport() -->
+      </div>
+
+    </div>
 
       <div style="overflow-x:auto;">
         <table class="history-table">
@@ -3347,6 +3417,158 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+  // ============================================
+// LAPORAN MANAJEMEN
+// ============================================
+
+function populateReportBatch() {
+  const sel = document.getElementById('reportBatchSelect');
+  if (!sel) return;
+  
+  // Ambil semua no_batch unik dari data QC
+  const batches = [...new Set((localHistory.qc || []).map(r => r.no_batch).filter(Boolean))];
+  // Urutkan dari yang terbaru
+  batches.sort().reverse();
+  
+  if (batches.length === 0) {
+    sel.innerHTML = '<option value="">-- Belum ada data QC --</option>';
+    renderReport();
+    return;
+  }
+  
+  sel.innerHTML = batches.map(b => `<option value="${b}">${cleanBatchName(b)}</option>`).join('');
+  renderReport();
+}
+
+function renderReport() {
+  const batchNo = document.getElementById('reportBatchSelect').value;
+  const container = document.getElementById('reportContent');
+  if (!container) return;
+
+  if (!batchNo) {
+    container.innerHTML = '<p style="text-align:center; color:#999;">Belum ada data untuk dilaporkan.</p>';
+    return;
+  }
+
+  const rows = (localHistory.qc || []).filter(r => r.no_batch === batchNo);
+  if (rows.length === 0) {
+    container.innerHTML = '<p style="text-align:center; color:#999;">Data tidak ditemukan.</p>';
+    return;
+  }
+
+  // Ambil data dari kedatangan pertama di batch ini untuk info header
+  const mainRow = rows[0];
+  let totalDatang = 0;
+  let totalDitolak = 0;
+  let totalDiterima = 0;
+  let htmlKotak = '';
+
+  // Loop setiap baris (jika 1 batch datang 2 kali di hari berbeda)
+  rows.forEach(row => {
+    for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+      const no = row[`kotak${i}_no`];
+      const kond = row[`kotak${i}_kondisi`];
+      if (!no && !kond) continue; // Skip kotak kosong
+
+      totalDatang++;
+      const cat = String(row[`kotak${i}_catatan`] || '');
+      const isReject = cat.includes('[❌ DITOLAK]');
+      if (isReject) totalDitolak++;
+      else totalDiterima++;
+
+      let cleanCat = cat.replace('[❌ DITOLAK]', '').replace(/\[⚠️.*?\]/g, '').trim() || '-';
+      const flags = cat.match(/\[⚠️ (.*?)\]/);
+      const flagText = flags ? `<br><span style="color:#c62828;font-size:9px;">⚠️ ${flags[1]}</span>` : '';
+      
+      const fotoUrl = qcFotoThumb(row[`kotak${i}_foto`]);
+      const fotoHtml = fotoUrl ? `<img src="${fotoUrl}" class="report-foto" crossorigin="anonymous">` : '-';
+
+      htmlKotak += `
+        <tr>
+          <td style="text-align:center;">${row.gh}<br>K-${i}</td>
+          <td><b>${qcEsc(no || '-')}</b></td>
+          <td>${qcEsc(kond || '-')}<br>${qcEsc(row[`kotak${i}_sisiran`] || 0)} sisiran</td>
+          <td>
+            ${isReject ? '<b style="color:#c62828;">DITOLAK</b>' : '<b style="color:#2e7d32;">DITERIMA</b>'}
+            ${flagText}
+          </td>
+          <td>${qcEsc(cleanCat)}</td>
+          <td style="text-align:center;">${fotoHtml}</td>
+        </tr>
+      `;
+    }
+  });
+
+  const today = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  container.innerHTML = `
+    <div class="report-header">
+      <h2>PT AGRI WANGI BERRY</h2>
+      <p>Laporan Penerimaan & Quality Control (QC) Koloni Lebah</p>
+    </div>
+    
+    <table style="width:100%; font-size:12px; margin-bottom:15px; border-collapse:collapse;">
+      <tr>
+        <td style="width:120px; padding:4px 0;"><b>No Batch</b></td>
+        <td>: ${qcEsc(cleanBatchName(mainRow.no_batch))}</td>
+        <td style="width:120px; padding:4px 0;"><b>Tanggal Laporan</b></td>
+        <td>: ${today}</td>
+      </tr>
+      <tr>
+        <td style="padding:4px 0;"><b>Greenhouse</b></td>
+        <td>: ${qcEsc(mainRow.gh)}</td>
+        <td style="padding:4px 0;"><b>Pemasok</b></td>
+        <td>: ${qcEsc(mainRow.asal || '-')}</td>
+      </tr>
+    </table>
+
+    <div style="display:flex; gap:10px; margin-bottom:15px; text-align:center;">
+      <div style="flex:1; border:1px solid #999; padding:8px; background:#f9f9f9;">
+        <div style="font-size:10px; color:#666;">TOTAL DATANG</div>
+        <div style="font-size:20px; font-weight:bold;">${totalDatang} Kotak</div>
+      </div>
+      <div style="flex:1; border:1px solid #999; padding:8px; background:#e8f5e9;">
+        <div style="font-size:10px; color:#2e7d32;">DITERIMA (MASUK GH)</div>
+        <div style="font-size:20px; font-weight:bold; color:#2e7d32;">${totalDiterima} Kotak</div>
+      </div>
+      <div style="flex:1; border:1px solid #999; padding:8px; background:#ffebee;">
+        <div style="font-size:10px; color:#c62828;">DITOLAK / RETUR</div>
+        <div style="font-size:20px; font-weight:bold; color:#c62828;">${totalDitolak} Kotak</div>
+      </div>
+    </div>
+
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th style="width:50px; text-align:center;">GH / Kotak</th>
+          <th style="width:80px;">No Koloni</th>
+          <th style="width:100px;">Kondisi</th>
+          <th style="width:90px;">Status QC</th>
+          <th>Catatan / Temuan</th>
+          <th style="width:70px; text-align:center;">Foto</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${htmlKotak}
+      </tbody>
+    </table>
+
+    <div class="report-ttd">
+      <div>
+        <p>Pemeriksa QC</p>
+        <div class="line"></div>
+        <p>(............................................)</p>
+      </div>
+      <div>
+        <p>Mengetahui, Manajemen</p>
+        <div class="line"></div>
+        <p>(............................................)</p>
+      </div>
+    </div>
+  `;
+}
+
+// Update pemanggilan di renderBatchTab atau setelah sinkronisasi
 // ============================================
 // PWA INSTALL
 // ============================================
