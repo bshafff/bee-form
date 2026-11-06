@@ -734,6 +734,11 @@ button.btn-delete:hover { background: #c82333; }
       <div id="btSummary" class="bt-summary ok"></div>
 
       <div id="btStatus"></div>
+      
+       <!-- TAMBAHKAN KODE INI -->
+      <h3 style="color:#c62828;margin-top:20px;margin-bottom:8px;">❌ Kotak Ditolak / Retur</h3>
+      <div id="rejectedList" style="margin-bottom:20px;"></div>
+      <!-- SAMPAI SINI -->
 
       <details class="bt-box" id="btAkhirBox">
         <summary>➕ Catat koloni berakhir (mati / kabur / diganti)</summary>
@@ -1948,10 +1953,16 @@ function renderQcKotak(gh, values) {
     const kond = values[`kotak${i}_kondisi`] || '';
     const sis = values[`kotak${i}_sisiran`];
     
-    // Ekstrak flags dari catatan lama
+    // Ekstrak flags dan status tolak dari catatan lama
     let catVal = values[`kotak${i}_catatan`] || '';
     let cleanCat = catVal;
-    let f1 = false, f2 = false, f3 = false, f4 = false;
+    let f1 = false, f2 = false, f3 = false, f4 = false, isRejected = false;
+
+    if (catVal.includes('[❌ DITOLAK]')) {
+      isRejected = true;
+      cleanCat = cleanCat.replace('[❌ DITOLAK]', '').trim();
+    }
+
     if (catVal.startsWith('[⚠️ ')) {
        const match = catVal.match(/^\[⚠️ (.*?)\]\s*(.*)$/);
        if (match) {
@@ -1960,7 +1971,7 @@ function renderQcKotak(gh, values) {
           f2 = flags.includes('Hama/Penyakit');
           f3 = flags.includes('Stres/Panas');
           f4 = flags.includes('Kurang Aktif');
-          cleanCat = match[2];
+          cleanCat = match[2].replace('[❌ DITOLAK]', '').trim();
        }
     }
 
@@ -1991,6 +2002,13 @@ function renderQcKotak(gh, values) {
           <label><input type="checkbox" id="kotak${i}_f4" ${f4 ? 'checked' : ''}> 💤 Kurang Aktif</label>
         </div>
 
+        <!-- CHECKBOX TOLAK -->
+        <div class="qc-flags" style="border-color:#ffcdd2; background:#ffebee;">
+          <label style="color:#c62828; font-weight:800;">
+            <input type="checkbox" id="kotak${i}_tolak" ${isRejected ? 'checked' : ''} style="accent-color:#c62828;"> ❌ Tolak / Retur (Tidak masuk GH)
+          </label>
+        </div>
+
         <div class="qc-row">
           <label class="qc-foto-btn" id="kotak${i}_fotolbl">📷 Foto<input type="file" accept="image/*" hidden
                  onchange="qcPickFoto(${i}, this)"></label>
@@ -2007,7 +2025,6 @@ function renderQcKotak(gh, values) {
   for (let i = 1; i <= n; i++) qcShowFoto(i);
   updateQcSummary();
 }
-
 function updateQcSummary() {
   const n = QC_KOTAK_PER_GH[document.getElementById('ghQc').value] || 0;
   const c = { Bagus: 0, Cukup: 0, Jelek: 0 };
@@ -2087,7 +2104,13 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
       if (flags.length > 0) {
         cat = `[⚠️ ${flags.join(', ')}] ${cat}`.trim();
       }
+     
+      // TAMBAHKAN LOGIKA INI UNTUK TOLAK/RETUR
+      if (document.getElementById(`kotak${i}_tolak`)?.checked) {
+        cat = `[❌ DITOLAK] ${cat}`.trim();
+      }
     }
+
 
     if (aktif && (no || kond || sis !== '' || cat || foto)) {
       terisi++;
@@ -2504,12 +2527,18 @@ function buildBatches() {
   const map = {};
   const today = getLocalDate();
 
-  (localHistory.qc || []).forEach(row => {
+   (localHistory.qc || []).forEach(row => {
     const batch = batchOfRow(row);
     for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+      const catatan = String(row[`kotak${i}_catatan`] || '');
+      
+      // JIKA DITOLAK, LEWATI (Jangan dihitung sebagai koloni aktif)
+      if (catatan.includes('[❌ DITOLAK]')) continue;
+
       const koloni = String(row[`kotak${i}_no`] ?? '').trim();
       const kond = row[`kotak${i}_kondisi`] || '';
       if (!koloni && !kond) continue;
+      // ... (biarkan sisa kodenya sama)
       const key = `${row.gh}|${i}|${batch}`;
       const b = map[key] || (map[key] = {
         key, gh: row.gh, kotak: i, batch, koloni: '', start: row.tanggal || '',
@@ -2663,6 +2692,33 @@ function renderBatchTab() {
       <td>${aksi}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="6" class="history-empty">Belum ada data. Isi No Batch & No Koloni di tab QC Koloni.</td></tr>';
+
+  // --- TAMPILKAN KOTAK YANG DITOLAK ---
+  const rejectedHtml = [];
+  (localHistory.qc || []).forEach(row => {
+    for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+      const cat = String(row[`kotak${i}_catatan`] || '');
+      if (cat.includes('[❌ DITOLAK]')) {
+        const alasan = cat.replace('[❌ DITOLAK]', '').replace(/\[⚠️.*?\]/g, '').trim() || 'Tanpa catatan';
+        rejectedHtml.push(`
+          <div class="bt-card bt-red" style="margin-bottom:8px;">
+            <div class="bt-top">
+              <b>${row.gh} - Kotak ${i} (${row[`kotak${i}_no`] || '-'})</b>
+              <span class="bt-days">${row.tanggal}</span>
+            </div>
+            <div>Batch: <b>${row.no_batch || '-'}</b></div>
+            <div style="margin-top:4px; color:#c62828; font-weight:bold;">Alasan: ${qcEsc(alasan)}</div>
+          </div>
+        `);
+      }
+    }
+  });
+  
+  const rejBox = document.getElementById('rejectedList');
+  if (rejBox) {
+    rejBox.innerHTML = rejectedHtml.length ? rejectedHtml.join('') : '<div class="qc-hint">Tidak ada kotak yang ditolak. Semua aman.</div>';
+  }
+  // ------------------------------------
 }
 
 // ---- Form "Akhiri batch" ----
