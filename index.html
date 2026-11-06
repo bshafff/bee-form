@@ -529,6 +529,7 @@ button.btn-delete:hover { background: #c82333; }
   accent-color: #dc3545;
   cursor: pointer;
 }
+
 /* ===== LAPORAN & PRINT STYLE ===== */
 .report-paper {
   background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 8px;
@@ -616,7 +617,7 @@ button.btn-delete:hover { background: #c82333; }
     <button class="tab-btn" data-tab="tab-batch">🐝 Batch</button>
     <button class="tab-btn" data-tab="tab-trend">📈 Trend</button>
     <button class="tab-btn" data-tab="tab-riwayat">Riwayat</button>
-     <button class="tab-btn" data-tab="tab-laporan">📄 Laporan</button>
+    <button class="tab-btn" data-tab="tab-laporan">📄 Laporan</button>
   </div>
 
   <div class="content">
@@ -760,10 +761,8 @@ button.btn-delete:hover { background: #c82333; }
 
       <div id="btStatus"></div>
       
-       <!-- TAMBAHKAN KODE INI -->
       <h3 style="color:#c62828;margin-top:20px;margin-bottom:8px;">❌ Kotak Ditolak / Retur</h3>
       <div id="rejectedList" style="margin-bottom:20px;"></div>
-      <!-- SAMPAI SINI -->
 
       <details class="bt-box" id="btAkhirBox">
         <summary>➕ Catat koloni berakhir (mati / kabur / diganti)</summary>
@@ -915,7 +914,7 @@ button.btn-delete:hover { background: #c82333; }
 
     </div>
 
-     <!-- =====================================
+    <!-- =====================================
          RIWAYAT
     ===================================== -->
     <div id="tab-riwayat" class="tab-content">
@@ -976,28 +975,6 @@ button.btn-delete:hover { background: #c82333; }
 
     </div>
 
-      <div style="overflow-x:auto;">
-        <table class="history-table">
-          <thead>
-            <tr>
-              <th>Tanggal</th>
-              <th>Waktu</th>
-              <th>GH</th>
-              <th id="histCol4">Suhu</th>
-              <th id="histCol5">Cuaca</th>
-              <th style="text-align:center;">Aksi</th>
-            </tr>
-          </thead>
-          <tbody id="historyBody">
-            <tr><td colspan="6" class="history-empty">Memuat data...</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div id="syncStatus" class="status"></div>
-
-    </div>
-
   </div>
 
 </div>
@@ -1007,13 +984,6 @@ button.btn-delete:hover { background: #c82333; }
 // ============================================
 // 🔧 KONFIGURASI AUTO-CONNECT
 // ============================================
-//
-// ⚠️ DEVELOPER: GANTI URL DI BAWAH INI dengan
-// URL Web App Apps Script Anda (yang berakhiran /exec).
-//
-// Setelah itu, user awam TIDAK PERLU isi URL lagi.
-// Cukup buka aplikasi → otomatis tersambung.
-//
 const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjpsdJ0-FmXrrGzF6LxzvahmO5NKJ9tfhaXXMOvJ-rkmk6djouLD3HnvpSj5tsW6cosg/exec';
 
 // ============================================
@@ -1054,13 +1024,8 @@ function normalizeSuhu(val) {
 
 // ============================================
 // FIX JAM DARI SHEET
-// Sel jam di Sheets disimpan sebagai tanggal 30 Des 1899. Saat dibaca server
-// (zona Asia/Jakarta) jam jadi bergeser +7 jam 07 menit (offset LMT Batavia),
-// mis. 11:05 di sheet -> 18:12 di riwayat. Di sini kita kembalikan ke jam asli.
-// Otomatis: kalau respons server memuat timeFix, tidak ada koreksi.
 // ============================================
 const WAKTU_SHIFT_LEGACY_MIN = 7 * 60 + 7;
-// Server lama (belum di-deploy ulang) -> geser 7:07. Server baru mengirim timeFix:2 -> 0.
 let serverWaktuShiftMin = WAKTU_SHIFT_LEGACY_MIN;
 
 function pad2(n) { return String(n).padStart(2, '0'); }
@@ -1069,7 +1034,6 @@ function fixSheetWaktu(val) {
   if (val === undefined || val === null || val === '') return '';
   const str = String(val).trim();
 
-  // Format ISO (jaga-jaga jika ada sisa data dari server versi lama)
   if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
     const d = new Date(str);
     if (isNaN(d)) return '';
@@ -1081,9 +1045,6 @@ function fixSheetWaktu(val) {
     return pad2(w.getUTCHours()) + ':' + pad2(w.getUTCMinutes());
   }
 
-  // Format "HH:mm" / "HH:mm:ss" 
-  // ⚠️ PERBAIKAN: Server (Apps Script) sudah mengirim jam yang benar (misal "13:07").
-  // Jadi jangan dikurangi 7:07 lagi, cukup rapikan formatnya saja.
   const m = str.match(/^(\d{1,2}):(\d{2})/);
   if (m) {
     return pad2(parseInt(m[1], 10)) + ':' + m[2];
@@ -1107,13 +1068,9 @@ function mapSheetRow(d) {
 // ============================================
 // AUTH (Auto-Connect)
 // ============================================
-
-// Paksa aplikasi selalu menggunakan URL terbaru dari kode (DEFAULT_SCRIPT_URL)
 let scriptUrl = DEFAULT_SCRIPT_URL;
-// Timpa URL lama di localStorage dengan yang baru
 localStorage.setItem('bee_script_url', DEFAULT_SCRIPT_URL);
 
-// Auto-connect: kecuali user pernah sengaja memutuskan koneksi
 let isAuthenticated = (localStorage.getItem('bee_auth') === 'false') ? false : true;
 
 // ============================================
@@ -1338,7 +1295,6 @@ function updateAuthStatus() {
     status.innerHTML = '✓ Tersambung otomatis ke Google Sheets';
     status.className = 'auth-status-text ok';
 
-    // Tombol jadi "Putuskan" (kalau user mau disconnect)
     authBtn.textContent = '✓ Tersambung';
     authBtn.className = 'hdr-btn hdr-btn-logout';
     authBtn.title = 'Klik untuk memutuskan koneksi';
@@ -1364,7 +1320,6 @@ function updateAuthStatus() {
 }
 
 function handleAuthClick() {
-  // Kalau sudah tersambung → tawaran putuskan
   if (isAuthenticated) {
     if (!confirm('Putuskan koneksi ke Google Sheets?\n\nData baru akan disimpan lokal sampai Anda menyambung kembali.')) {
       return;
@@ -1377,7 +1332,6 @@ function handleAuthClick() {
     return;
   }
 
-  // Kalau belum tersambung → langsung sambungkan (TANPA prompt URL)
   if (!scriptUrl) {
     showToast('URL Belum Disetel', 'Hubungi admin untuk setup aplikasi.', 'error', 5000);
     return;
@@ -1389,7 +1343,6 @@ function handleAuthClick() {
   updateAuthStatus();
   showToast('Tersambung! ✓', 'Berhasil connect. Auto-sync aktif.', 'success');
 
-  // Langsung sync
   setTimeout(() => autoSync(), 500);
 }
 
@@ -1520,8 +1473,6 @@ function loadLocalHistory() {
   if (!localHistory.akhir) localHistory.akhir = [];
   delete localHistory.mortalitas;
 
-  // Migrasi sekali: item dari sheet yang tersimpan sebelum fix jam dibuang,
-  // nanti diambil ulang dari sheet dengan jam yang benar.
   if (!localStorage.getItem('bee_waktu_fix_v1')) {
     ['kunjungan', 'qc'].forEach(t => {
       localHistory[t] = localHistory[t].filter(
@@ -1666,7 +1617,6 @@ async function autoSync() {
         const sheetKunjungan = (result.kunjungan || []).map(mapSheetRow);
         const sheetQc = (result.qc || []).map(mapSheetRow);
 
-        // --- PERBAIKAN: Hapus data lokal yang sudah ada di Sheet ---
         const mergeData = (local, sheet) => {
           const localOnly = (local || []).filter(
             l => !String(l._localId || '').startsWith('sheet_')
@@ -1694,6 +1644,7 @@ async function autoSync() {
         if (activeTab && activeTab.id === 'tab-trend') renderTrendDashboard();
         if (activeTab && activeTab.id === 'tab-riwayat') renderHistory();
         if (activeTab && activeTab.id === 'tab-batch') renderBatchTab();
+        if (activeTab && activeTab.id === 'tab-laporan') populateReportBatch();
       }
     } catch (e) { console.warn('Auto-pull gagal:', e); }
 
@@ -1743,26 +1694,20 @@ initDB()
 
     console.log('Database initialized');
 
-    // === AUTO-CONNECT: pastikan scriptUrl tersimpan ===
     if (scriptUrl) {
-      // Simpan ke localStorage agar persist
       localStorage.setItem('bee_script_url', scriptUrl);
       console.log('✅ Auto-connect URL:', scriptUrl);
 
-      // Kalau authenticated → langsung sync
       if (isAuthenticated && navigator.onLine) {
-        // Toast kecil konfirmasi auto-connect (hanya sekali per session)
         if (!sessionStorage.getItem('bee_auto_connect_toast_shown')) {
           sessionStorage.setItem('bee_auto_connect_toast_shown', 'true');
           showToast('Tersambung Otomatis ✓', 'Google Sheets siap digunakan.', 'success', 3000);
         }
 
-        // Delay sedikit agar tidak blocking init
         setTimeout(() => autoSync(), 2000);
       }
     }
 
-    // === AUTO UPDATE: cek versi ===
     checkVersion(true);
     startVersionCheckInterval();
   })
@@ -1789,6 +1734,7 @@ document.querySelector('.tabs').addEventListener('click', e => {
   if (tabName === 'tab-riwayat') renderHistory();
   if (tabName === 'tab-trend') renderTrendDashboard();
   if (tabName === 'tab-batch') renderBatchTab();
+  if (tabName === 'tab-laporan') populateReportBatch(); // <-- TAMBAHKAN INI
 });
 
 // ============================================
@@ -1994,7 +1940,6 @@ function qcClearFoto(i) {
   qcShowFoto(i);
 }
 
-// Salinan data untuk riwayat lokal: buang base64 (localStorage terbatas)
 function qcStripFoto(fd) {
   const c = { ...fd };
   for (let i = 1; i <= QC_MAX_KOTAK; i++) {
@@ -2023,7 +1968,6 @@ function renderQcKotak(gh, values) {
     const kond = values[`kotak${i}_kondisi`] || '';
     const sis = values[`kotak${i}_sisiran`];
     
-    // Ekstrak flags dan status tolak dari catatan lama
     let catVal = values[`kotak${i}_catatan`] || '';
     let cleanCat = catVal;
     let f1 = false, f2 = false, f3 = false, f4 = false, isRejected = false;
@@ -2095,6 +2039,7 @@ function renderQcKotak(gh, values) {
   for (let i = 1; i <= n; i++) qcShowFoto(i);
   updateQcSummary();
 }
+
 function updateQcSummary() {
   const n = QC_KOTAK_PER_GH[document.getElementById('ghQc').value] || 0;
   const c = { Bagus: 0, Cukup: 0, Jelek: 0 };
@@ -2160,11 +2105,9 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     const sis = (aktif && sEl && sEl.value !== '') ? (parseInt(sEl.value) || 0) : '';
     const no = aktif && nEl ? nEl.value.trim() : '';
     
-    // --- MULAI GANTI DARI SINI ---
     let cat = aktif && cEl ? cEl.value.trim() : '';
-    const foto = aktif ? (qcFotoState[i] || '') : ''; // <-- DIPINDAH KE SINI
+    const foto = aktif ? (qcFotoState[i] || '') : '';
     
-    // Gabungkan Quick Flags ke dalam Catatan
     if (aktif) {
       const flags = [];
       if (document.getElementById(`kotak${i}_f1`)?.checked) flags.push('Ratu Hilang');
@@ -2175,12 +2118,10 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
         cat = `[⚠️ ${flags.join(', ')}] ${cat}`.trim();
       }
      
-      // TAMBAHKAN LOGIKA INI UNTUK TOLAK/RETUR
       if (document.getElementById(`kotak${i}_tolak`)?.checked) {
         cat = `[❌ DITOLAK] ${cat}`.trim();
       }
     }
-
 
     if (aktif && (no || kond || sis !== '' || cat || foto)) {
       terisi++;
@@ -2192,8 +2133,7 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     formData[`kotak${i}_kondisi`] = kond;
     formData[`kotak${i}_sisiran`] = sis;
     formData[`kotak${i}_foto`] = foto;
-    formData[`kotak${i}_catatan`] = cat; // Simpan catatan yang sudah digabung
-    // --- SAMPAI SINI ---
+    formData[`kotak${i}_catatan`] = cat;
     
     if (kond) jml[kond]++;
     if (sis !== '') totalSisiran += sis;
@@ -2459,6 +2399,7 @@ function activateTab(tabName) {
   if (content) content.classList.add('active');
   if (tabName === 'tab-trend') renderTrendDashboard();
   if (tabName === 'tab-batch') renderBatchTab();
+  if (tabName === 'tab-laporan') populateReportBatch();
 }
 
 // ============================================
@@ -2574,7 +2515,6 @@ function qcBatchText(item) {
     if (no) parts.push(`K${i}: ${qcEsc(no)}`);
   }
   
-  // Gunakan cleanBatchName agar teks Batch yang jadi tanggal ikut rapi
   const batchName = item.no_batch ? cleanBatchName(item.no_batch) : '';
   const head = batchName ? `<b>Batch ${qcEsc(batchName)}</b><br>` : '';
   
@@ -2815,6 +2755,9 @@ function renderBatchTab() {
     rejBox.innerHTML = rejectedHtml.length ? rejectedHtml.join('') : '<div class="qc-hint">Tidak ada kotak yang ditolak. Semua aman.</div>';
   }
   // ------------------------------------
+
+  // TAMBAHKAN INI AGAR LAPORAN SELALU UPDATE
+  populateReportBatch();
 }
 
 // ---- Form "Akhiri batch" ----
@@ -2842,7 +2785,6 @@ function prefillBatchAk() {
     return;
   }
 
-  // Ambil semua batch (aktif dan lampau) untuk GH+Kotak ini
   const allB = buildBatches().filter(x => x.gh === gh && x.kotak === k)
     .sort((a, b) => (b.start || '').localeCompare(a.start || ''));
 
@@ -2853,18 +2795,16 @@ function prefillBatchAk() {
   });
   if(list) list.innerHTML = html;
 
-  // Auto-fill dengan batch yang masih aktif terbaru
   const active = allB.find(x => !x.end);
   if (active) {
     input.value = active.batch;
   } else if (allB.length > 0) {
-    input.value = allB[0].batch; // Kalau semua sudah selesai, ambil yang terakhir
+    input.value = allB[0].batch; 
   } else {
     input.value = '';
   }
 }
 
-// --- JANGAN HAPUS BAGIAN INI ---
 document.getElementById('penyebabAk').innerHTML =
   '<option value="">-- Pilih penyebab --</option>' + AKHIR_PENYEBAB.map(p => `<option value="${p}">${p}</option>`).join('');
 
@@ -2880,9 +2820,7 @@ document.getElementById('btStatus').addEventListener('click', e => {
   fillKotakAk();
   document.getElementById('kotakAk').value = btn.dataset.k;
   
-  // Panggil prefill agar datalist langsung terisi saat tombol "Akhiri" diklik
   prefillBatchAk(); 
-  // Timpa dengan batch dari tombol yang diklik (jika berbeda)
   document.getElementById('batchAk').value = btn.dataset.b; 
   
   document.getElementById('penyebabAk').focus();
@@ -2938,7 +2876,6 @@ document.getElementById('akhirForm').addEventListener('submit', async e => {
     showStatusAk('⚠️ Belum masuk Sheet: ' + friendlyErr(err) + ' (tersimpan lokal)', 'error');
   }
 
-  // ganti catatan lama untuk batch yang sama (hindari dobel)
   localHistory.akhir = (localHistory.akhir || []).filter(a => !(a.gh === formData.gh &&
     String(a.kotak) === String(formData.kotak) && String(a.no_batch) === String(formData.no_batch)));
   addLocalHistory('akhir', { ...formData }, synced);
@@ -3009,7 +2946,6 @@ async function fetchAllDataFromSheet() {
 
     const sheetQc = (result.qc || []).map(mapSheetRow);
 
-    // --- PERBAIKAN: Hapus data lokal yang sudah ada di Sheet ---
     const mergeData = (local, sheet) => {
       const localOnly = (local || []).filter(
         l => !String(l._localId || '').startsWith('sheet_')
@@ -3046,6 +2982,7 @@ async function fetchAllDataFromSheet() {
 
     const activeTab = document.querySelector('.tab-content.active');
     if (activeTab && activeTab.id === 'tab-trend') renderTrendDashboard();
+    if (activeTab && activeTab.id === 'tab-laporan') populateReportBatch();
 
     setTimeout(() => { syncStatus.className = 'status'; }, 5000);
 
@@ -3406,18 +3343,6 @@ function renderBarChart(filteredData, ghFilter) {
 }
 
 // ============================================
-// SERVICE WORKER
-// ============================================
-
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js', { scope: './' })
-      .then(reg => console.log('✅ SW registered:', reg.scope))
-      .catch(err => console.error('❌ SW gagal:', err));
-  });
-}
-
-  // ============================================
 // LAPORAN MANAJEMEN
 // ============================================
 
@@ -3568,7 +3493,18 @@ function renderReport() {
   `;
 }
 
-// Update pemanggilan di renderBatchTab atau setelah sinkronisasi
+// ============================================
+// SERVICE WORKER
+// ============================================
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
+      .then(reg => console.log('✅ SW registered:', reg.scope))
+      .catch(err => console.error('❌ SW gagal:', err));
+  });
+}
+
 // ============================================
 // PWA INSTALL
 // ============================================
