@@ -158,8 +158,7 @@ body {
   margin-bottom: 10px; border: 1px solid #e0e0e0;
 }
 
-.bay-label { font-weight: 600; color: #2d5016; min-width: 50px; }
-.bay-row { margin-left: auto; margin-right: 8px; width: 64px; font-size: 12px; padding: 4px; border: 1px solid #ccc; border-radius: 6px; }
+.bay-label { font-weight: 600; color: #2d5016; flex: 1; }
 
 .counter {
   display: flex; align-items: center; gap: 8px;
@@ -647,7 +646,6 @@ button.btn-delete:hover { background: #c82333; }
 
         <div class="bays-section">
           <h3>Jumlah Kunjungan per Bay</h3>
-          <button type="button" class="btn" style="width:100%;margin-bottom:10px;background:#eef3e8;color:#2d5016;" onclick="acakRow()">🎲 Acak row tiap bay</button>
           <div id="kejadianBox" style="display:flex;flex-wrap:wrap;gap:12px;font-size:13px;margin-bottom:10px;">
             <label><input type="checkbox" value="Habis semprot"> Habis semprot</label>
             <label><input type="checkbox" value="Pruning"> Pruning</label>
@@ -742,10 +740,8 @@ button.btn-delete:hover { background: #c82333; }
 
       <div id="btStatus"></div>
       
-       <!-- TAMBAHKAN KODE INI -->
       <h3 style="color:#c62828;margin-top:20px;margin-bottom:8px;">❌ Kotak Ditolak / Retur</h3>
       <div id="rejectedList" style="margin-bottom:20px;"></div>
-      <!-- SAMPAI SINI -->
 
       <details class="bt-box" id="btAkhirBox">
         <summary>➕ Catat koloni berakhir (mati / kabur / diganti)</summary>
@@ -944,13 +940,6 @@ button.btn-delete:hover { background: #c82333; }
 // ============================================
 // 🔧 KONFIGURASI AUTO-CONNECT
 // ============================================
-//
-// ⚠️ DEVELOPER: GANTI URL DI BAWAH INI dengan
-// URL Web App Apps Script Anda (yang berakhiran /exec).
-//
-// Setelah itu, user awam TIDAK PERLU isi URL lagi.
-// Cukup buka aplikasi → otomatis tersambung.
-//
 const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjpsdJ0-FmXrrGzF6LxzvahmO5NKJ9tfhaXXMOvJ-rkmk6djouLD3HnvpSj5tsW6cosg/exec';
 
 // ============================================
@@ -968,18 +957,15 @@ let localHistory = {
 };
 
 let currentEditId = null;
-let editExtra = {}; // cid & waktu_selesai baris yang sedang diedit
+let editExtra = {}; 
 let currentEditType = null;
-let editOriginalKey = null; // kunci asli baris (tanggal+waktu+gh) saat mode edit
+let editOriginalKey = null; 
 
-// Suhu dari sheet bisa 'rusak' jadi tanggal ISO (mis. 27.8 -> 2026-08-27T...)
-// Kembalikan ke format angka supaya tampil benar.
 function normalizeSuhu(val) {
   if (val === undefined || val === null || val === '') return '';
   if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(val)) {
     const d = new Date(val);
     if (!isNaN(d)) {
-      // sheet di zona WIB: tanggal-bulan = angka-desimal (27 Agu -> 27.8)
       const wib = new Date(d.getTime() + 7 * 3600 * 1000);
       return parseFloat(wib.getUTCDate() + '.' + (wib.getUTCMonth() + 1));
     }
@@ -989,16 +975,7 @@ function normalizeSuhu(val) {
   return isNaN(n) ? '' : n;
 }
 
-
-// ============================================
-// FIX JAM DARI SHEET
-// Sel jam di Sheets disimpan sebagai tanggal 30 Des 1899. Saat dibaca server
-// (zona Asia/Jakarta) jam jadi bergeser +7 jam 07 menit (offset LMT Batavia),
-// mis. 11:05 di sheet -> 18:12 di riwayat. Di sini kita kembalikan ke jam asli.
-// Otomatis: kalau respons server memuat timeFix, tidak ada koreksi.
-// ============================================
 const WAKTU_SHIFT_LEGACY_MIN = 7 * 60 + 7;
-// Server lama (belum di-deploy ulang) -> geser 7:07. Server baru mengirim timeFix:2 -> 0.
 let serverWaktuShiftMin = WAKTU_SHIFT_LEGACY_MIN;
 
 function pad2(n) { return String(n).padStart(2, '0'); }
@@ -1008,21 +985,17 @@ function fixSheetWaktu(val) {
   if (val === undefined || val === null || val === '') return '';
   const str = String(val).trim();
 
-  // Format ISO (jaga-jaga jika ada sisa data dari server versi lama)
   if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
     const d = new Date(str);
     if (isNaN(d)) return '';
     const yr = d.getUTCFullYear();
     const shiftMs = yr < 1901
-      ? (7 * 3600 + 7 * 60 + 12) * 1000   // LMT Batavia
-      : 7 * 3600 * 1000;                  // WIB biasa
+      ? (7 * 3600 + 7 * 60 + 12) * 1000 
+      : 7 * 3600 * 1000;                  
     const w = new Date(d.getTime() + shiftMs);
     return pad2(w.getUTCHours()) + ':' + pad2(w.getUTCMinutes());
   }
 
-  // Format "HH:mm" / "HH:mm:ss" 
-  // ⚠️ PERBAIKAN: Server (Apps Script) sudah mengirim jam yang benar (misal "13:07").
-  // Jadi jangan dikurangi 7:07 lagi, cukup rapikan formatnya saja.
   const m = str.match(/^(\d{1,2}):(\d{2})/);
   if (m) {
     return pad2(parseInt(m[1], 10)) + ':' + m[2];
@@ -1031,7 +1004,6 @@ function fixSheetWaktu(val) {
   return str;
 }
 
-// Ubah 1 baris dari sheet jadi item riwayat (jam dikoreksi, nilai asli disimpan untuk kunci edit/hapus)
 function mapSheetRow(d) {
   const rawWaktu = d.waktu;
   return {
@@ -1043,36 +1015,16 @@ function mapSheetRow(d) {
   };
 }
 
-// ============================================
-// AUTH (Auto-Connect)
-// ============================================
-
-// Paksa aplikasi selalu menggunakan URL terbaru dari kode (DEFAULT_SCRIPT_URL)
 let scriptUrl = DEFAULT_SCRIPT_URL;
-// Timpa URL lama di localStorage dengan yang baru
 localStorage.setItem('bee_script_url', DEFAULT_SCRIPT_URL);
-
-// Auto-connect: kecuali user pernah sengaja memutuskan koneksi
 let isAuthenticated = (localStorage.getItem('bee_auth') === 'false') ? false : true;
 
-// ============================================
-// AUTO SYNC CONFIG
-// ============================================
-
-const AUTO_SYNC_INTERVAL_MS = 3 * 60 * 1000; // 3 menit
+const AUTO_SYNC_INTERVAL_MS = 3 * 60 * 1000; 
 let autoSyncTimer = null;
 let isSyncing = false;
 
-// ============================================
-// AUTO UPDATE VERSION
-// ============================================
-
 const APP_VERSION_KEY = 'pwa_app_version_v1';
 let currentRemoteVersion = null;
-
-// ============================================
-// LOCAL DATE
-// ============================================
 
 function getLocalDate() {
   const now = new Date();
@@ -1083,10 +1035,6 @@ function getLocalDate() {
 }
 
 const today = getLocalDate();
-
-// ============================================
-// TOAST
-// ============================================
 
 function showToast(title, message, type = 'success', duration = 3500) {
   const container = document.getElementById('toastContainer');
@@ -1116,10 +1064,6 @@ function showToast(title, message, type = 'success', duration = 3500) {
   return toast;
 }
 
-// ============================================
-// LOADING
-// ============================================
-
 function showLoadingOverlay(text = 'Memproses...') {
   document.getElementById('loadingText').textContent = text;
   document.getElementById('loadingOverlay').classList.add('show');
@@ -1128,10 +1072,6 @@ function showLoadingOverlay(text = 'Memproses...') {
 function hideLoadingOverlay() {
   document.getElementById('loadingOverlay').classList.remove('show');
 }
-
-// ============================================
-// AUTO UPDATE VERSION LOGIC
-// ============================================
 
 async function checkVersion(silent) {
   try {
@@ -1184,16 +1124,14 @@ async function performHardReset(newVersion) {
     try {
       const regs = await navigator.serviceWorker.getRegistrations();
       await Promise.all(regs.map(r => r.unregister()));
-      console.log('[UPDATE] Unregistered', regs.length, 'SW');
-    } catch (e) { console.warn('[UPDATE] SW fail:', e); }
+    } catch (e) { }
   }
 
   if ('caches' in window) {
     try {
       const keys = await caches.keys();
       await Promise.all(keys.map(k => caches.delete(k)));
-      console.log('[UPDATE] Deleted', keys.length, 'cache');
-    } catch (e) { console.warn('[UPDATE] Cache fail:', e); }
+    } catch (e) { }
   }
 
   setTimeout(() => {
@@ -1263,10 +1201,6 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// ============================================
-// AUTH STATUS (Auto-Connect)
-// ============================================
-
 function updateAuthStatus() {
   const status = document.getElementById('authStatus');
   const authBtn = document.getElementById('authBtn');
@@ -1277,7 +1211,6 @@ function updateAuthStatus() {
     status.innerHTML = '✓ Tersambung otomatis ke Google Sheets';
     status.className = 'auth-status-text ok';
 
-    // Tombol jadi "Putuskan" (kalau user mau disconnect)
     authBtn.textContent = '✓ Tersambung';
     authBtn.className = 'hdr-btn hdr-btn-logout';
     authBtn.title = 'Klik untuk memutuskan koneksi';
@@ -1303,7 +1236,6 @@ function updateAuthStatus() {
 }
 
 function handleAuthClick() {
-  // Kalau sudah tersambung → tawaran putuskan
   if (isAuthenticated) {
     if (!confirm('Putuskan koneksi ke Google Sheets?\n\nData baru akan disimpan lokal sampai Anda menyambung kembali.')) {
       return;
@@ -1316,7 +1248,6 @@ function handleAuthClick() {
     return;
   }
 
-  // Kalau belum tersambung → langsung sambungkan (TANPA prompt URL)
   if (!scriptUrl) {
     showToast('URL Belum Disetel', 'Hubungi admin untuk setup aplikasi.', 'error', 5000);
     return;
@@ -1328,13 +1259,8 @@ function handleAuthClick() {
   updateAuthStatus();
   showToast('Tersambung! ✓', 'Berhasil connect. Auto-sync aktif.', 'success');
 
-  // Langsung sync
   setTimeout(() => autoSync(), 500);
 }
-
-// ============================================
-// INDEXED DB
-// ============================================
 
 function initDB() {
   return new Promise((resolve, reject) => {
@@ -1394,10 +1320,6 @@ async function updateQueueBadge() {
   } catch (e) { console.error(e); }
 }
 
-// ============================================
-// SYNC QUEUE (Manual)
-// ============================================
-
 async function syncQueuedData() {
   if (!isAuthenticated || !scriptUrl) {
     showToast('Belum Tersambung', 'Klik tombol "Sambungkan" dulu ya.', 'error');
@@ -1438,16 +1360,12 @@ async function syncQueuedData() {
 
   if (failed === 0) {
     showToast('Sinkron Berhasil! 🎉', `${synced} data terkirim.`, 'success', 4000);
-    fetchAllDataFromSheet(); // Refresh data lokal agar duplikat hilang
+    fetchAllDataFromSheet(); 
   } else {
     showToast('Sinkron Sebagian', `${synced} berhasil, ${failed} gagal.`, 'error', 5000);
-    if (synced > 0) fetchAllDataFromSheet(); // Tetap refresh jika ada yang berhasil
+    if (synced > 0) fetchAllDataFromSheet(); 
   }
 }
-
-// ============================================
-// LOCAL HISTORY
-// ============================================
 
 function loadLocalHistory() {
   const saved = localStorage.getItem('bee_local_history');
@@ -1459,8 +1377,6 @@ function loadLocalHistory() {
   if (!localHistory.akhir) localHistory.akhir = [];
   delete localHistory.mortalitas;
 
-  // Migrasi sekali: item dari sheet yang tersimpan sebelum fix jam dibuang,
-  // nanti diambil ulang dari sheet dengan jam yang benar.
   if (!localStorage.getItem('bee_waktu_fix_v1')) {
     ['kunjungan', 'qc'].forEach(t => {
       localHistory[t] = localHistory[t].filter(
@@ -1503,10 +1419,6 @@ function deleteLocalHistory(type, localId) {
   saveLocalHistory();
 }
 
-// ============================================
-// CONNECTION STATUS
-// ============================================
-
 function updateConnectionStatus() {
   const online = navigator.onLine;
   const el = document.getElementById('connectionStatus');
@@ -1533,10 +1445,6 @@ window.addEventListener('offline', () => {
   showToast('Mode Offline', 'Data akan disimpan lokal dulu.', 'info', 3000);
 });
 
-// ============================================
-// AUTO SYNC
-// ============================================
-
 function updateAutoSyncIndicator(status) {
   const el = document.getElementById('autoSyncStatus');
   if (!el) return;
@@ -1558,14 +1466,12 @@ function updateAutoSyncIndicator(status) {
 function startAutoSync() {
   if (autoSyncTimer) clearInterval(autoSyncTimer);
   autoSyncTimer = setInterval(autoSync, AUTO_SYNC_INTERVAL_MS);
-  console.log('✅ Auto-sync started');
 }
 
 function stopAutoSync() {
   if (autoSyncTimer) {
     clearInterval(autoSyncTimer);
     autoSyncTimer = null;
-    console.log('🛑 Auto-sync stopped');
   }
 }
 
@@ -1593,7 +1499,7 @@ async function autoSync() {
           await deleteFromQueue(item.id);
           pushedCount++;
         }
-      } catch (e) { console.warn('Auto-push gagal 1 item:', e); }
+      } catch (e) { }
     }
 
     try {
@@ -1605,7 +1511,6 @@ async function autoSync() {
         const sheetKunjungan = (result.kunjungan || []).map(mapSheetRow);
         const sheetQc = (result.qc || []).map(mapSheetRow);
 
-        // --- PERBAIKAN: Hapus data lokal yang sudah ada di Sheet ---
         const mergeData = (local, sheet) => {
           const localOnly = (local || []).filter(
             l => !String(l._localId || '').startsWith('sheet_')
@@ -1634,7 +1539,7 @@ async function autoSync() {
         if (activeTab && activeTab.id === 'tab-riwayat') renderHistory();
         if (activeTab && activeTab.id === 'tab-batch') renderBatchTab();
       }
-    } catch (e) { console.warn('Auto-pull gagal:', e); }
+    } catch (e) { }
 
     if (pushedCount > 0) {
       showToast('Auto-Sync ✓', `${pushedCount} data terkirim otomatis.`, 'success', 2500);
@@ -1642,16 +1547,11 @@ async function autoSync() {
 
     updateAutoSyncIndicator('aktif');
   } catch (e) {
-    console.warn('AutoSync error:', e);
     updateAutoSyncIndicator('aktif');
   } finally {
     isSyncing = false;
   }
 }
-
-// ============================================
-// INIT
-// ============================================
 
 initDB()
   .then(() => {
@@ -1681,36 +1581,22 @@ initDB()
     document.getElementById('trendFromDate').value = fmt(lastMonth);
     document.getElementById('trendToDate').value = fmt(todayDate);
 
-    console.log('Database initialized');
-
-    // === AUTO-CONNECT: pastikan scriptUrl tersimpan ===
     if (scriptUrl) {
-      // Simpan ke localStorage agar persist
       localStorage.setItem('bee_script_url', scriptUrl);
-      console.log('✅ Auto-connect URL:', scriptUrl);
 
-      // Kalau authenticated → langsung sync
       if (isAuthenticated && navigator.onLine) {
-        // Toast kecil konfirmasi auto-connect (hanya sekali per session)
         if (!sessionStorage.getItem('bee_auto_connect_toast_shown')) {
           sessionStorage.setItem('bee_auto_connect_toast_shown', 'true');
           showToast('Tersambung Otomatis ✓', 'Google Sheets siap digunakan.', 'success', 3000);
         }
-
-        // Delay sedikit agar tidak blocking init
         setTimeout(() => autoSync(), 2000);
       }
     }
 
-    // === AUTO UPDATE: cek versi ===
     checkVersion(true);
     startVersionCheckInterval();
   })
   .catch(err => console.error('DB init failed:', err));
-
-// ============================================
-// TAB NAVIGATION
-// ============================================
 
 document.querySelector('.tabs').addEventListener('click', e => {
   const btn = e.target.closest('.tab-btn');
@@ -1735,12 +1621,7 @@ document.querySelector('.tabs').addEventListener('click', e => {
 // KUNJUNGAN
 // ============================================
 
-// ============================================
-// STRUKTUR ROW PER BAY (fisik greenhouse)
-// GH 1: 89 row total. Bay 1-9 masing2 9 row, bay 10 hanya 8 row (82-89)
-// GH 2: 99 row total. Bay 1-8 masing2 9 row, bay 9-10 fisik digabung (73-90),
-//       dan bay 11 fisik jadi bay 10 di app (91-99)
-// ============================================
+// Struktur Row Fisik (Hanya untuk tampilan info text)
 const GH_BAY_ROWS = {
   'GH 1': {
     1:  [1,2,3,4,5,6,7,8,9],
@@ -1768,21 +1649,18 @@ const GH_BAY_ROWS = {
   }
 };
 
-// Isi ulang dropdown row tiap bay sesuai GH yang dipilih
-function renderBayRowOptions(gh) {
+function updateBayRanges(gh) {
   const map = GH_BAY_ROWS[gh] || null;
   for (let i = 1; i <= 10; i++) {
-    const sel = document.getElementById('row-bay' + i);
-    if (!sel) continue;
-    const prev = sel.value;
-    let opts = '<option value="">row</option>';
+    const label = document.getElementById('range-bay' + i);
+    if (!label) continue;
     if (map && map[i]) {
-      opts += map[i].map(n => `<option value="${n}">Row ${n}</option>`).join('');
-    }
-    sel.innerHTML = opts;
-    // Pertahankan nilai lama kalau masih valid untuk GH yang dipilih
-    if (prev && map && map[i] && map[i].includes(parseInt(prev))) {
-      sel.value = prev;
+      const r = map[i];
+      const min = Math.min(...r);
+      const max = Math.max(...r);
+      label.textContent = `(Row ${min}${min !== max ? '-' + max : ''})`;
+    } else {
+      label.textContent = '';
     }
   }
 }
@@ -1795,8 +1673,7 @@ for (let i = 1; i <= 10; i++) {
   const bayItem = document.createElement('div');
   bayItem.className = 'bay-item';
   bayItem.innerHTML = `
-    <span class="bay-label">Bay ${i}</span>
-    <select class="bay-row" id="row-bay${i}" title="Row yang dijalani"><option value="">row</option></select>
+    <span class="bay-label">Bay ${i} <small id="range-bay${i}" style="color:#666;font-weight:normal;font-size:11px;display:block;margin-top:2px;"></small></span>
     <div class="counter">
       <button type="button" onclick="decrementBay('bay${i}')">−</button>
       <div class="counter-value" id="value-bay${i}">0</div>
@@ -1806,25 +1683,11 @@ for (let i = 1; i <= 10; i++) {
   baysList.appendChild(bayItem);
 }
 
-// Saat GH diganti → perbarui pilihan row per bay
+// Saat GH diganti → perbarui teks range row
 document.getElementById('gh').addEventListener('change', e => {
-  renderBayRowOptions(e.target.value);
+  updateBayRanges(e.target.value);
 });
 
-function acakRow() {
-  const gh = document.getElementById('gh').value;
-  const map = GH_BAY_ROWS[gh];
-  for (let i = 1; i <= 10; i++) {
-    const sel = document.getElementById('row-bay' + i);
-    if (!sel) continue;
-    if (map && map[i] && map[i].length) {
-      const arr = map[i];
-      sel.value = String(arr[Math.floor(Math.random() * arr.length)]);
-    } else {
-      sel.value = '';
-    }
-  }
-}
 function newCid() { return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'c' + Date.now() + Math.random().toString(36).slice(2, 8); }
 function incrementBay(bayId) { bays[bayId]++; updateBayDisplay(bayId); }
 function decrementBay(bayId) { if (bays[bayId] > 0) bays[bayId]--; updateBayDisplay(bayId); }
@@ -1843,7 +1706,7 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
     gh: document.getElementById('gh').value,
     suhu: document.getElementById('suhu').value,
     cuaca: document.getElementById('cuaca').value,
-    rows: Array.from({ length: 10 }, (_, i) => document.getElementById('row-bay' + (i + 1)).value).join(',').replace(/^,*$/, ''),
+    rows: '', // Tidak memakai dropdown row lagi
     kejadian: [...document.querySelectorAll('#kejadianBox input:checked')].map(x => x.value).join(', '),
     cid: (isEdit && editExtra.cid) ? editExtra.cid : newCid(),
     waktu_selesai: isEdit ? (editExtra.waktu_selesai || '') : nowHHMM(),
@@ -1871,7 +1734,7 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
   showStatusKunjungan(isEdit ? 'Mengupdate data...' : 'Mengirim data...', 'loading');
 
   try {
-    let isSuccessSync = false; // <-- TAMBAHAN
+    let isSuccessSync = false; 
 
     if (isAuthenticated && scriptUrl && navigator.onLine) {
       const res = await fetch(scriptUrl, {
@@ -1886,7 +1749,7 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
         throw new Error('Data tidak ditemukan di Google Sheet.');
       }
 
-      isSuccessSync = true; // <-- TAMBAHAN
+      isSuccessSync = true; 
 
       showStatusKunjungan(isEdit ? '✓ Data berhasil diupdate!' : '✓ Data berhasil dikirim!', 'success');
       showToast(isEdit ? 'Update Berhasil! ✏️' : 'Data Terkirim! ✓',
@@ -1928,7 +1791,7 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
 
 function resetFormKunjungan() {
   document.getElementById('beeForm').reset();
-  renderBayRowOptions('');   // <-- reset dropdown row sesuai GH kosong
+  updateBayRanges('');   
   Object.keys(bays).forEach(bay => { bays[bay] = 0; updateBayDisplay(bay); });
   document.getElementById('tanggal').value = getLocalDate();
   document.getElementById('waktu').value = nowHHMM();
@@ -1965,7 +1828,7 @@ function qcEsc(v) {
     .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-const qcFotoState = {}; // i -> dataURL baru, URL Drive lama, atau ''
+const qcFotoState = {}; 
 
 function qcFotoThumb(val) {
   if (!val) return '';
@@ -2020,7 +1883,6 @@ function qcClearFoto(i) {
   qcShowFoto(i);
 }
 
-// Salinan data untuk riwayat lokal: buang base64 (localStorage terbatas)
 function qcStripFoto(fd) {
   const c = { ...fd };
   for (let i = 1; i <= QC_MAX_KOTAK; i++) {
@@ -2049,7 +1911,6 @@ function renderQcKotak(gh, values) {
     const kond = values[`kotak${i}_kondisi`] || '';
     const sis = values[`kotak${i}_sisiran`];
     
-    // Ekstrak flags dan status tolak dari catatan lama
     let catVal = values[`kotak${i}_catatan`] || '';
     let cleanCat = catVal;
     let f1 = false, f2 = false, f3 = false, f4 = false, isRejected = false;
@@ -2090,7 +1951,6 @@ function renderQcKotak(gh, values) {
           </div>
         </div>
         
-        <!-- QUICK FLAGS -->
         <div class="qc-flags">
           <label><input type="checkbox" id="kotak${i}_f1" ${f1 ? 'checked' : ''}> 🐝 Ratu Hilang</label>
           <label><input type="checkbox" id="kotak${i}_f2" ${f2 ? 'checked' : ''}> 🕷️ Hama</label>
@@ -2098,7 +1958,6 @@ function renderQcKotak(gh, values) {
           <label><input type="checkbox" id="kotak${i}_f4" ${f4 ? 'checked' : ''}> 💤 Kurang Aktif</label>
         </div>
 
-        <!-- CHECKBOX TOLAK -->
         <div class="qc-flags" style="border-color:#ffcdd2; background:#ffebee;">
           <label style="color:#c62828; font-weight:800;">
             <input type="checkbox" id="kotak${i}_tolak" ${isRejected ? 'checked' : ''} style="accent-color:#c62828;"> ❌ Tolak / Retur (Tidak masuk GH)
@@ -2189,7 +2048,6 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     let cat = aktif && cEl ? cEl.value.trim() : '';
     const foto = aktif ? (qcFotoState[i] || '') : '';
     
-    // Gabungkan Quick Flags ke dalam Catatan
     if (aktif) {
       const flags = [];
       if (document.getElementById(`kotak${i}_f1`)?.checked) flags.push('Ratu Hilang');
@@ -2200,7 +2058,6 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
         cat = `[⚠️ ${flags.join(', ')}] ${cat}`.trim();
       }
      
-      // TAMBAHKAN LOGIKA INI UNTUK TOLAK/RETUR
       if (document.getElementById(`kotak${i}_tolak`)?.checked) {
         cat = `[❌ DITOLAK] ${cat}`.trim();
       }
@@ -2217,7 +2074,7 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     formData[`kotak${i}_kondisi`] = kond;
     formData[`kotak${i}_sisiran`] = sis;
     formData[`kotak${i}_foto`] = foto;
-    formData[`kotak${i}_catatan`] = cat;
+    formData[`kotak${i}_catatan`] = cat; 
     
     if (kond) jml[kond]++;
     if (sis !== '') totalSisiran += sis;
@@ -2446,12 +2303,11 @@ function editHistory(type, localId) {
     document.getElementById('tanggal').value = data.tanggal || getLocalDate();
     document.getElementById('waktu').value = data.waktu || '';
     document.getElementById('gh').value = data.gh || '';
-    renderBayRowOptions(data.gh || '');   // <-- isi ulang dropdown row sesuai GH
+    updateBayRanges(data.gh || '');   
     document.getElementById('suhu').value = normalizeSuhu(data.suhu);
     document.getElementById('cuaca').value = data.cuaca || '';
     editExtra = { cid: data.cid || '', waktu_selesai: data.waktu_selesai || '' };
-    const rw = String(data.rows || '').split(',');
-    for (let i = 1; i <= 10; i++) document.getElementById('row-bay' + i).value = (rw[i - 1] || '').trim();
+    
     const kj = String(data.kejadian || '');
     document.querySelectorAll('#kejadianBox input').forEach(x => { x.checked = kj.includes(x.value); });
 
@@ -2553,9 +2409,9 @@ async function deleteHistoryItem(type, localId) {
 // TRACKING BATCH KOLONI
 // ============================================
 
-const BATCH_UMUR_WASPADA = 14; // hari: mulai dipantau
-const BATCH_UMUR_GANTI = 21;   // hari: siap diganti
-const BATCH_UMUR_MAX = 28;     // hari: lewat ini wajib ganti
+const BATCH_UMUR_WASPADA = 14; 
+const BATCH_UMUR_GANTI = 21;   
+const BATCH_UMUR_MAX = 28;     
 const AKHIR_PENYEBAB = [
   'Kabur',
   'Mati - kepanasan',
