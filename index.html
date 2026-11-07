@@ -159,6 +159,7 @@ body {
 }
 
 .bay-label { font-weight: 600; color: #2d5016; min-width: 50px; }
+.bay-row { margin-left: auto; margin-right: 8px; width: 64px; font-size: 12px; padding: 4px; border: 1px solid #ccc; border-radius: 6px; }
 
 .counter {
   display: flex; align-items: center; gap: 8px;
@@ -530,31 +531,6 @@ button.btn-delete:hover { background: #c82333; }
   cursor: pointer;
 }
 
-/* ===== LAPORAN & PRINT STYLE ===== */
-.report-paper {
-  background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 8px;
-}
-.report-header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-.report-header h2 { margin: 0; font-size: 18px; color: #000; }
-.report-header p { margin: 4px 0 0; font-size: 12px; color: #555; }
-.report-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px; }
-.report-table th, .report-table td { border: 1px solid #999; padding: 6px; text-align: left; }
-.report-table th { background: #eee; font-weight: bold; }
-.report-foto { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; }
-.report-ttd { display: flex; justify-content: space-between; margin-top: 30px; font-size: 12px; }
-.report-ttd div { text-align: center; width: 200px; }
-.report-ttd .line { margin-top: 50px; border-top: 1px solid #000; }
-
-@media print {
-  body { background: #fff; padding: 0; margin: 0; color: #000; }
-  .container { max-width: 100%; box-shadow: none; border: none; }
-  .no-print, .header, .tabs, .toast-container, #installBtn, .loading-overlay { display: none !important; }
-  .content { padding: 0; }
-  .tab-content { display: none !important; }
-  #tab-laporan { display: block !important; }
-  .report-paper { border: none; padding: 0; }
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-}
 </style>
 
 </head>
@@ -617,7 +593,6 @@ button.btn-delete:hover { background: #c82333; }
     <button class="tab-btn" data-tab="tab-batch">🐝 Batch</button>
     <button class="tab-btn" data-tab="tab-trend">📈 Trend</button>
     <button class="tab-btn" data-tab="tab-riwayat">Riwayat</button>
-    <button class="tab-btn" data-tab="tab-laporan">📄 Laporan</button>
   </div>
 
   <div class="content">
@@ -672,6 +647,12 @@ button.btn-delete:hover { background: #c82333; }
 
         <div class="bays-section">
           <h3>Jumlah Kunjungan per Bay</h3>
+          <button type="button" class="btn" style="width:100%;margin-bottom:10px;background:#eef3e8;color:#2d5016;" onclick="acakRow()">🎲 Acak row tiap bay</button>
+          <div id="kejadianBox" style="display:flex;flex-wrap:wrap;gap:12px;font-size:13px;margin-bottom:10px;">
+            <label><input type="checkbox" value="Habis semprot"> Habis semprot</label>
+            <label><input type="checkbox" value="Pruning"> Pruning</label>
+            <label><input type="checkbox" value="Koloni baru/pindah"> Koloni baru/pindah</label>
+          </div>
           <div id="baysList"></div>
         </div>
 
@@ -761,8 +742,10 @@ button.btn-delete:hover { background: #c82333; }
 
       <div id="btStatus"></div>
       
+       <!-- TAMBAHKAN KODE INI -->
       <h3 style="color:#c62828;margin-top:20px;margin-bottom:8px;">❌ Kotak Ditolak / Retur</h3>
       <div id="rejectedList" style="margin-bottom:20px;"></div>
+      <!-- SAMPAI SINI -->
 
       <details class="bt-box" id="btAkhirBox">
         <summary>➕ Catat koloni berakhir (mati / kabur / diganti)</summary>
@@ -952,29 +935,6 @@ button.btn-delete:hover { background: #c82333; }
 
     </div>
 
-    <!-- =====================================
-         LAPORAN MANAJEMEN
-    ===================================== -->
-    <div id="tab-laporan" class="tab-content">
-      
-      <!-- Panel Kontrol (Akan hilang saat dicetak) -->
-      <div class="no-print" style="background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 20px;">
-        <div class="form-group" style="margin-bottom: 10px;">
-          <label for="reportBatchSelect">Pilih Batch Kedatangan</label>
-          <select id="reportBatchSelect" onchange="renderReport()" style="font-weight:bold; color:#2d5016;"></select>
-        </div>
-        <button type="button" class="btn btn-submit" onclick="window.print()" style="width: 100%;">
-          🖨️ Cetak / Simpan sebagai PDF
-        </button>
-      </div>
-
-      <!-- Kertas Laporan -->
-      <div id="reportContent" class="report-paper">
-        <!-- Diisi otomatis oleh JavaScript renderReport() -->
-      </div>
-
-    </div>
-
   </div>
 
 </div>
@@ -984,6 +944,13 @@ button.btn-delete:hover { background: #c82333; }
 // ============================================
 // 🔧 KONFIGURASI AUTO-CONNECT
 // ============================================
+//
+// ⚠️ DEVELOPER: GANTI URL DI BAWAH INI dengan
+// URL Web App Apps Script Anda (yang berakhiran /exec).
+//
+// Setelah itu, user awam TIDAK PERLU isi URL lagi.
+// Cukup buka aplikasi → otomatis tersambung.
+//
 const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjpsdJ0-FmXrrGzF6LxzvahmO5NKJ9tfhaXXMOvJ-rkmk6djouLD3HnvpSj5tsW6cosg/exec';
 
 // ============================================
@@ -1001,6 +968,7 @@ let localHistory = {
 };
 
 let currentEditId = null;
+let editExtra = {}; // cid & waktu_selesai baris yang sedang diedit
 let currentEditType = null;
 let editOriginalKey = null; // kunci asli baris (tanggal+waktu+gh) saat mode edit
 
@@ -1024,16 +992,23 @@ function normalizeSuhu(val) {
 
 // ============================================
 // FIX JAM DARI SHEET
+// Sel jam di Sheets disimpan sebagai tanggal 30 Des 1899. Saat dibaca server
+// (zona Asia/Jakarta) jam jadi bergeser +7 jam 07 menit (offset LMT Batavia),
+// mis. 11:05 di sheet -> 18:12 di riwayat. Di sini kita kembalikan ke jam asli.
+// Otomatis: kalau respons server memuat timeFix, tidak ada koreksi.
 // ============================================
 const WAKTU_SHIFT_LEGACY_MIN = 7 * 60 + 7;
+// Server lama (belum di-deploy ulang) -> geser 7:07. Server baru mengirim timeFix:2 -> 0.
 let serverWaktuShiftMin = WAKTU_SHIFT_LEGACY_MIN;
 
 function pad2(n) { return String(n).padStart(2, '0'); }
+function nowHHMM() { const d = new Date(); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
 
 function fixSheetWaktu(val) {
   if (val === undefined || val === null || val === '') return '';
   const str = String(val).trim();
 
+  // Format ISO (jaga-jaga jika ada sisa data dari server versi lama)
   if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
     const d = new Date(str);
     if (isNaN(d)) return '';
@@ -1045,6 +1020,9 @@ function fixSheetWaktu(val) {
     return pad2(w.getUTCHours()) + ':' + pad2(w.getUTCMinutes());
   }
 
+  // Format "HH:mm" / "HH:mm:ss" 
+  // ⚠️ PERBAIKAN: Server (Apps Script) sudah mengirim jam yang benar (misal "13:07").
+  // Jadi jangan dikurangi 7:07 lagi, cukup rapikan formatnya saja.
   const m = str.match(/^(\d{1,2}):(\d{2})/);
   if (m) {
     return pad2(parseInt(m[1], 10)) + ':' + m[2];
@@ -1068,9 +1046,13 @@ function mapSheetRow(d) {
 // ============================================
 // AUTH (Auto-Connect)
 // ============================================
+
+// Paksa aplikasi selalu menggunakan URL terbaru dari kode (DEFAULT_SCRIPT_URL)
 let scriptUrl = DEFAULT_SCRIPT_URL;
+// Timpa URL lama di localStorage dengan yang baru
 localStorage.setItem('bee_script_url', DEFAULT_SCRIPT_URL);
 
+// Auto-connect: kecuali user pernah sengaja memutuskan koneksi
 let isAuthenticated = (localStorage.getItem('bee_auth') === 'false') ? false : true;
 
 // ============================================
@@ -1295,6 +1277,7 @@ function updateAuthStatus() {
     status.innerHTML = '✓ Tersambung otomatis ke Google Sheets';
     status.className = 'auth-status-text ok';
 
+    // Tombol jadi "Putuskan" (kalau user mau disconnect)
     authBtn.textContent = '✓ Tersambung';
     authBtn.className = 'hdr-btn hdr-btn-logout';
     authBtn.title = 'Klik untuk memutuskan koneksi';
@@ -1320,6 +1303,7 @@ function updateAuthStatus() {
 }
 
 function handleAuthClick() {
+  // Kalau sudah tersambung → tawaran putuskan
   if (isAuthenticated) {
     if (!confirm('Putuskan koneksi ke Google Sheets?\n\nData baru akan disimpan lokal sampai Anda menyambung kembali.')) {
       return;
@@ -1332,6 +1316,7 @@ function handleAuthClick() {
     return;
   }
 
+  // Kalau belum tersambung → langsung sambungkan (TANPA prompt URL)
   if (!scriptUrl) {
     showToast('URL Belum Disetel', 'Hubungi admin untuk setup aplikasi.', 'error', 5000);
     return;
@@ -1343,6 +1328,7 @@ function handleAuthClick() {
   updateAuthStatus();
   showToast('Tersambung! ✓', 'Berhasil connect. Auto-sync aktif.', 'success');
 
+  // Langsung sync
   setTimeout(() => autoSync(), 500);
 }
 
@@ -1473,6 +1459,8 @@ function loadLocalHistory() {
   if (!localHistory.akhir) localHistory.akhir = [];
   delete localHistory.mortalitas;
 
+  // Migrasi sekali: item dari sheet yang tersimpan sebelum fix jam dibuang,
+  // nanti diambil ulang dari sheet dengan jam yang benar.
   if (!localStorage.getItem('bee_waktu_fix_v1')) {
     ['kunjungan', 'qc'].forEach(t => {
       localHistory[t] = localHistory[t].filter(
@@ -1617,6 +1605,7 @@ async function autoSync() {
         const sheetKunjungan = (result.kunjungan || []).map(mapSheetRow);
         const sheetQc = (result.qc || []).map(mapSheetRow);
 
+        // --- PERBAIKAN: Hapus data lokal yang sudah ada di Sheet ---
         const mergeData = (local, sheet) => {
           const localOnly = (local || []).filter(
             l => !String(l._localId || '').startsWith('sheet_')
@@ -1644,7 +1633,6 @@ async function autoSync() {
         if (activeTab && activeTab.id === 'tab-trend') renderTrendDashboard();
         if (activeTab && activeTab.id === 'tab-riwayat') renderHistory();
         if (activeTab && activeTab.id === 'tab-batch') renderBatchTab();
-        if (activeTab && activeTab.id === 'tab-laporan') populateReportBatch();
       }
     } catch (e) { console.warn('Auto-pull gagal:', e); }
 
@@ -1675,6 +1663,7 @@ initDB()
 
     document.getElementById('tanggal').value = today;
     document.getElementById('tanggalQc').value = today;
+    document.getElementById('waktu').value = nowHHMM();
     document.getElementById('tanggalAk').value = today;
     renderBatchTab();
 
@@ -1694,20 +1683,26 @@ initDB()
 
     console.log('Database initialized');
 
+    // === AUTO-CONNECT: pastikan scriptUrl tersimpan ===
     if (scriptUrl) {
+      // Simpan ke localStorage agar persist
       localStorage.setItem('bee_script_url', scriptUrl);
       console.log('✅ Auto-connect URL:', scriptUrl);
 
+      // Kalau authenticated → langsung sync
       if (isAuthenticated && navigator.onLine) {
+        // Toast kecil konfirmasi auto-connect (hanya sekali per session)
         if (!sessionStorage.getItem('bee_auto_connect_toast_shown')) {
           sessionStorage.setItem('bee_auto_connect_toast_shown', 'true');
           showToast('Tersambung Otomatis ✓', 'Google Sheets siap digunakan.', 'success', 3000);
         }
 
+        // Delay sedikit agar tidak blocking init
         setTimeout(() => autoSync(), 2000);
       }
     }
 
+    // === AUTO UPDATE: cek versi ===
     checkVersion(true);
     startVersionCheckInterval();
   })
@@ -1734,7 +1729,6 @@ document.querySelector('.tabs').addEventListener('click', e => {
   if (tabName === 'tab-riwayat') renderHistory();
   if (tabName === 'tab-trend') renderTrendDashboard();
   if (tabName === 'tab-batch') renderBatchTab();
-  if (tabName === 'tab-laporan') populateReportBatch(); // <-- TAMBAHKAN INI
 });
 
 // ============================================
@@ -1750,6 +1744,7 @@ for (let i = 1; i <= 10; i++) {
   bayItem.className = 'bay-item';
   bayItem.innerHTML = `
     <span class="bay-label">Bay ${i}</span>
+    <select class="bay-row" id="row-bay${i}" title="Row yang dijalani"><option value="">row</option>${[1,2,3,4,5,6,7,8,9,10].map(n => `<option value="${n}">Row ${n}</option>`).join('')}</select>
     <div class="counter">
       <button type="button" onclick="decrementBay('bay${i}')">−</button>
       <div class="counter-value" id="value-bay${i}">0</div>
@@ -1759,6 +1754,8 @@ for (let i = 1; i <= 10; i++) {
   baysList.appendChild(bayItem);
 }
 
+function acakRow() { for (let i = 1; i <= 10; i++) document.getElementById('row-bay' + i).value = String(1 + Math.floor(Math.random() * 10)); }
+function newCid() { return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'c' + Date.now() + Math.random().toString(36).slice(2, 8); }
 function incrementBay(bayId) { bays[bayId]++; updateBayDisplay(bayId); }
 function decrementBay(bayId) { if (bays[bayId] > 0) bays[bayId]--; updateBayDisplay(bayId); }
 function updateBayDisplay(bayId) { document.getElementById(`value-${bayId}`).textContent = bays[bayId]; }
@@ -1776,6 +1773,10 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
     gh: document.getElementById('gh').value,
     suhu: document.getElementById('suhu').value,
     cuaca: document.getElementById('cuaca').value,
+    rows: Array.from({ length: 10 }, (_, i) => document.getElementById('row-bay' + (i + 1)).value).join(',').replace(/^,*$/, ''),
+    kejadian: [...document.querySelectorAll('#kejadianBox input:checked')].map(x => x.value).join(', '),
+    cid: (isEdit && editExtra.cid) ? editExtra.cid : newCid(),
+    waktu_selesai: isEdit ? (editExtra.waktu_selesai || '') : nowHHMM(),
     ...bays
   };
 
@@ -1788,6 +1789,12 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
     }
   }
 
+  if (!isEdit) {
+    const mnt = t => { const a = String(t || '0:0').split(':'); return (+a[0]) * 60 + (+a[1] || 0); };
+    const dup = (localHistory.kunjungan || []).find(x => x.tanggal === formData.tanggal && x.gh === formData.gh && Math.abs(mnt(x.waktu) - mnt(formData.waktu)) < 45);
+    if (dup && !confirm(`Sudah ada data ${formData.gh} jam ${dup.waktu} di tanggal ini. Tetap kirim sebagai sesi baru?`)) return;
+    if (getTotalPerItem(formData) === 0 && !confirm('Semua bay bernilai 0. Yakin kirim?')) return;
+  }
   const submitBtn = document.getElementById('submitBtnKunjungan');
   submitBtn.disabled = true;
   submitBtn.textContent = isEdit ? 'Mengupdate...' : 'Mengirim...';
@@ -1853,6 +1860,8 @@ function resetFormKunjungan() {
   document.getElementById('beeForm').reset();
   Object.keys(bays).forEach(bay => { bays[bay] = 0; updateBayDisplay(bay); });
   document.getElementById('tanggal').value = getLocalDate();
+  document.getElementById('waktu').value = nowHHMM();
+  editExtra = {};
   hideStatusKunjungan();
   currentEditId = null;
   currentEditType = null;
@@ -1940,6 +1949,7 @@ function qcClearFoto(i) {
   qcShowFoto(i);
 }
 
+// Salinan data untuk riwayat lokal: buang base64 (localStorage terbatas)
 function qcStripFoto(fd) {
   const c = { ...fd };
   for (let i = 1; i <= QC_MAX_KOTAK; i++) {
@@ -1968,6 +1978,7 @@ function renderQcKotak(gh, values) {
     const kond = values[`kotak${i}_kondisi`] || '';
     const sis = values[`kotak${i}_sisiran`];
     
+    // Ekstrak flags dan status tolak dari catatan lama
     let catVal = values[`kotak${i}_catatan`] || '';
     let cleanCat = catVal;
     let f1 = false, f2 = false, f3 = false, f4 = false, isRejected = false;
@@ -2039,7 +2050,6 @@ function renderQcKotak(gh, values) {
   for (let i = 1; i <= n; i++) qcShowFoto(i);
   updateQcSummary();
 }
-
 function updateQcSummary() {
   const n = QC_KOTAK_PER_GH[document.getElementById('ghQc').value] || 0;
   const c = { Bagus: 0, Cukup: 0, Jelek: 0 };
@@ -2105,9 +2115,11 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     const sis = (aktif && sEl && sEl.value !== '') ? (parseInt(sEl.value) || 0) : '';
     const no = aktif && nEl ? nEl.value.trim() : '';
     
+    // --- MULAI GANTI DARI SINI ---
     let cat = aktif && cEl ? cEl.value.trim() : '';
-    const foto = aktif ? (qcFotoState[i] || '') : '';
+    const foto = aktif ? (qcFotoState[i] || '') : ''; // <-- DIPINDAH KE SINI
     
+    // Gabungkan Quick Flags ke dalam Catatan
     if (aktif) {
       const flags = [];
       if (document.getElementById(`kotak${i}_f1`)?.checked) flags.push('Ratu Hilang');
@@ -2118,10 +2130,12 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
         cat = `[⚠️ ${flags.join(', ')}] ${cat}`.trim();
       }
      
+      // TAMBAHKAN LOGIKA INI UNTUK TOLAK/RETUR
       if (document.getElementById(`kotak${i}_tolak`)?.checked) {
         cat = `[❌ DITOLAK] ${cat}`.trim();
       }
     }
+
 
     if (aktif && (no || kond || sis !== '' || cat || foto)) {
       terisi++;
@@ -2133,7 +2147,8 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     formData[`kotak${i}_kondisi`] = kond;
     formData[`kotak${i}_sisiran`] = sis;
     formData[`kotak${i}_foto`] = foto;
-    formData[`kotak${i}_catatan`] = cat;
+    formData[`kotak${i}_catatan`] = cat; // Simpan catatan yang sudah digabung
+    // --- SAMPAI SINI ---
     
     if (kond) jml[kond]++;
     if (sis !== '') totalSisiran += sis;
@@ -2364,6 +2379,11 @@ function editHistory(type, localId) {
     document.getElementById('gh').value = data.gh || '';
     document.getElementById('suhu').value = normalizeSuhu(data.suhu);
     document.getElementById('cuaca').value = data.cuaca || '';
+    editExtra = { cid: data.cid || '', waktu_selesai: data.waktu_selesai || '' };
+    const rw = String(data.rows || '').split(',');
+    for (let i = 1; i <= 10; i++) document.getElementById('row-bay' + i).value = (rw[i - 1] || '').trim();
+    const kj = String(data.kejadian || '');
+    document.querySelectorAll('#kejadianBox input').forEach(x => { x.checked = kj.includes(x.value); });
 
     for (let i = 1; i <= 10; i++) {
       bays[`bay${i}`] = parseInt(data[`bay${i}`]) || 0;
@@ -2399,7 +2419,6 @@ function activateTab(tabName) {
   if (content) content.classList.add('active');
   if (tabName === 'tab-trend') renderTrendDashboard();
   if (tabName === 'tab-batch') renderBatchTab();
-  if (tabName === 'tab-laporan') populateReportBatch();
 }
 
 // ============================================
@@ -2515,6 +2534,7 @@ function qcBatchText(item) {
     if (no) parts.push(`K${i}: ${qcEsc(no)}`);
   }
   
+  // Gunakan cleanBatchName agar teks Batch yang jadi tanggal ikut rapi
   const batchName = item.no_batch ? cleanBatchName(item.no_batch) : '';
   const head = batchName ? `<b>Batch ${qcEsc(batchName)}</b><br>` : '';
   
@@ -2755,9 +2775,6 @@ function renderBatchTab() {
     rejBox.innerHTML = rejectedHtml.length ? rejectedHtml.join('') : '<div class="qc-hint">Tidak ada kotak yang ditolak. Semua aman.</div>';
   }
   // ------------------------------------
-
-  // TAMBAHKAN INI AGAR LAPORAN SELALU UPDATE
-  populateReportBatch();
 }
 
 // ---- Form "Akhiri batch" ----
@@ -2785,6 +2802,7 @@ function prefillBatchAk() {
     return;
   }
 
+  // Ambil semua batch (aktif dan lampau) untuk GH+Kotak ini
   const allB = buildBatches().filter(x => x.gh === gh && x.kotak === k)
     .sort((a, b) => (b.start || '').localeCompare(a.start || ''));
 
@@ -2795,16 +2813,18 @@ function prefillBatchAk() {
   });
   if(list) list.innerHTML = html;
 
+  // Auto-fill dengan batch yang masih aktif terbaru
   const active = allB.find(x => !x.end);
   if (active) {
     input.value = active.batch;
   } else if (allB.length > 0) {
-    input.value = allB[0].batch; 
+    input.value = allB[0].batch; // Kalau semua sudah selesai, ambil yang terakhir
   } else {
     input.value = '';
   }
 }
 
+// --- JANGAN HAPUS BAGIAN INI ---
 document.getElementById('penyebabAk').innerHTML =
   '<option value="">-- Pilih penyebab --</option>' + AKHIR_PENYEBAB.map(p => `<option value="${p}">${p}</option>`).join('');
 
@@ -2820,7 +2840,9 @@ document.getElementById('btStatus').addEventListener('click', e => {
   fillKotakAk();
   document.getElementById('kotakAk').value = btn.dataset.k;
   
+  // Panggil prefill agar datalist langsung terisi saat tombol "Akhiri" diklik
   prefillBatchAk(); 
+  // Timpa dengan batch dari tombol yang diklik (jika berbeda)
   document.getElementById('batchAk').value = btn.dataset.b; 
   
   document.getElementById('penyebabAk').focus();
@@ -2876,6 +2898,7 @@ document.getElementById('akhirForm').addEventListener('submit', async e => {
     showStatusAk('⚠️ Belum masuk Sheet: ' + friendlyErr(err) + ' (tersimpan lokal)', 'error');
   }
 
+  // ganti catatan lama untuk batch yang sama (hindari dobel)
   localHistory.akhir = (localHistory.akhir || []).filter(a => !(a.gh === formData.gh &&
     String(a.kotak) === String(formData.kotak) && String(a.no_batch) === String(formData.no_batch)));
   addLocalHistory('akhir', { ...formData }, synced);
@@ -2946,6 +2969,7 @@ async function fetchAllDataFromSheet() {
 
     const sheetQc = (result.qc || []).map(mapSheetRow);
 
+    // --- PERBAIKAN: Hapus data lokal yang sudah ada di Sheet ---
     const mergeData = (local, sheet) => {
       const localOnly = (local || []).filter(
         l => !String(l._localId || '').startsWith('sheet_')
@@ -2982,7 +3006,6 @@ async function fetchAllDataFromSheet() {
 
     const activeTab = document.querySelector('.tab-content.active');
     if (activeTab && activeTab.id === 'tab-trend') renderTrendDashboard();
-    if (activeTab && activeTab.id === 'tab-laporan') populateReportBatch();
 
     setTimeout(() => { syncStatus.className = 'status'; }, 5000);
 
@@ -3050,7 +3073,7 @@ function renderTrendDashboard() {
   });
 
   const sortedDates = Object.keys(groupedByDate).sort();
-  const chartData = [];
+  const chartData = [], sessN = [], dayTot = [];
   let grandTotal = 0;
   let maxVal = 0;
   let maxDate = '-';
@@ -3062,16 +3085,14 @@ function renderTrendDashboard() {
       if (metric === 'total') dailyTotal += getTotalPerItem(item);
       else dailyTotal += parseInt(item[metric]) || 0;
     });
-    chartData.push(dailyTotal);
+    chartData.push(+(dailyTotal / dayItems.length).toFixed(1)); sessN.push(dayItems.length); dayTot.push(dailyTotal);
     grandTotal += dailyTotal;
-    if (dailyTotal > maxVal) {
-      maxVal = dailyTotal;
-      maxDate = date;
-    }
+    const mean = dailyTotal / dayItems.length;
+    if (mean > maxVal) { maxVal = +mean.toFixed(1); maxDate = date; }
   });
 
-  const avgPerDay = sortedDates.length > 0 ? (grandTotal / sortedDates.length).toFixed(1) : 0;
   const totalSessions = filteredData.length;
+  const avgPerDay = totalSessions > 0 ? (grandTotal / totalSessions).toFixed(1) : 0;
 
   document.getElementById('trendSummary').innerHTML = `
     <div class="summary-card">
@@ -3080,14 +3101,14 @@ function renderTrendDashboard() {
       <div class="sub">Selama periode terpilih</div>
     </div>
     <div class="summary-card">
-      <div class="header">📈 Rata-rata / Hari</div>
+      <div class="header">📈 Rata-rata / Sesi</div>
       <div class="value">${avgPerDay}</div>
-      <div class="sub">Kunjungan per hari</div>
+      <div class="sub">Kunjungan per sesi</div>
     </div>
     <div class="summary-card">
       <div class="header">🏆 Tertinggi</div>
       <div class="value">${maxVal}</div>
-      <div class="sub">Pada ${maxDate}</div>
+      <div class="sub">Rata²/sesi · ${maxDate}</div>
     </div>
     <div class="summary-card">
       <div class="header">🕒 Sesi Pengamatan</div>
@@ -3096,7 +3117,16 @@ function renderTrendDashboard() {
     </div>
   `;
 
-  const metricLabel = metric === 'total' ? 'Total Kunjungan' : `Kunjungan ${metric.toUpperCase()}`;
+  const sessByDate = {}, totByDate = {};
+  sortedDates.forEach((d, i) => { sessByDate[d] = sessN[i]; totByDate[d] = dayTot[i]; });
+  let allDates = sortedDates;
+  if (sortedDates.length && sortedDates.every(d => /^\d{4}-\d{2}-\d{2}$/.test(d))) {
+    allDates = [];
+    let d = new Date(sortedDates[0] + 'T00:00:00Z'); const end = new Date(sortedDates[sortedDates.length - 1] + 'T00:00:00Z');
+    while (d <= end) { allDates.push(d.toISOString().slice(0, 10)); d = new Date(d.getTime() + 86400000); }
+  }
+  const allData = allDates.map(d => d in sessByDate ? chartData[sortedDates.indexOf(d)] : null);
+  const metricLabel = metric === 'total' ? 'Rata² Kunjungan/Sesi' : `Rata² Kunjungan/Sesi ${metric.toUpperCase()}`;
 
   const ctx = document.getElementById('trendChart').getContext('2d');
   if (trendChartInstance) trendChartInstance.destroy();
@@ -3104,10 +3134,10 @@ function renderTrendDashboard() {
   trendChartInstance = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: sortedDates,
+      labels: allDates,
       datasets: [{
         label: metricLabel,
-        data: chartData,
+        data: allData,
         borderColor: '#2d5016',
         backgroundColor: 'rgba(45, 80, 22, 0.1)',
         fill: true,
@@ -3132,7 +3162,7 @@ function renderTrendDashboard() {
       scales: {
         y: {
           beginAtZero: true,
-          title: { display: true, text: 'Jumlah Kunjungan', font: { weight: 'bold' } },
+          title: { display: true, text: 'Kunjungan / sesi', font: { weight: 'bold' } },
           grid: { color: '#f0f0f0' }
         },
         x: {
@@ -3143,6 +3173,24 @@ function renderTrendDashboard() {
     }
   });
 
+  const flo = allDates.map(dt => {
+    const v = (ghFilter ? [ghFilter] : Object.keys(FLOWERING_REF)).map(g => floweringPct(g, dt)).filter(x => x !== null);
+    return v.length ? +(v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : null;
+  });
+  if (flo.some(v => v !== null)) {
+    trendChartInstance.data.datasets.push({ label: 'Bunga mekar % (tim fertigasi)', data: flo, yAxisID: 'y2', borderColor: '#e11d48', borderDash: [5, 4], backgroundColor: 'transparent', stepped: true, pointRadius: 0, borderWidth: 2 });
+    trendChartInstance.options.scales.y2 = { position: 'right', beginAtZero: true, title: { display: true, text: 'Bunga mekar (%)', font: { weight: 'bold' } }, grid: { drawOnChartArea: false } };
+    trendChartInstance.options.plugins.legend = { display: true, position: 'bottom' };
+  }
+  const evByDate = {};
+  filteredData.forEach(it => { if (it.kejadian) evByDate[it.tanggal] = (evByDate[it.tanggal] ? evByDate[it.tanggal] + '; ' : '') + it.gh + ': ' + it.kejadian; });
+  if (Object.keys(evByDate).length) {
+    const top = Math.max(1, ...allData.filter(v => v !== null)) * 1.1;
+    trendChartInstance.data.datasets.push({ label: 'Kejadian (semprot/pruning/koloni)', data: allDates.map(d => evByDate[d] ? top : null), showLine: false, pointStyle: 'triangle', pointRadius: 8, backgroundColor: '#7c3aed', borderColor: '#7c3aed' });
+    trendChartInstance.options.plugins.legend = { display: true, position: 'bottom' };
+  }
+  trendChartInstance.options.plugins.tooltip = { callbacks: { label: c => c.dataset.label.startsWith('Kejadian') ? (evByDate[allDates[c.dataIndex]] || '') : (c.dataset.label + ': ' + c.formattedValue), afterLabel: c => (c.datasetIndex === 0 && sessByDate[allDates[c.dataIndex]]) ? `Sesi: ${sessByDate[allDates[c.dataIndex]]} · Total: ${totByDate[allDates[c.dataIndex]]}` : '' } };
+  trendChartInstance.update();
   renderBarChart(filteredData, ghFilter);
   renderWeatherDashboard(filteredData, ghFilter);
 }
@@ -3154,17 +3202,18 @@ function renderTrendDashboard() {
 function renderWeatherDashboard(filteredData, ghFilter) {
   const byWeather = {};
   WEATHER_ORDER.forEach(w => {
-    byWeather[w] = { sessions: 0, totalKunjungan: 0, totalSuhu: 0, suhuCount: 0 };
+    byWeather[w] = { sessions: 0, totalKunjungan: 0, totalSuhu: 0, suhuCount: 0, list: [] };
   });
 
   filteredData.forEach(item => {
     const w = (item.cuaca || '').toLowerCase().trim();
     if (!byWeather[w]) {
-      byWeather[w] = { sessions: 0, totalKunjungan: 0, totalSuhu: 0, suhuCount: 0 };
+      byWeather[w] = { sessions: 0, totalKunjungan: 0, totalSuhu: 0, suhuCount: 0, list: [] };
     }
     const total = getTotalPerItem(item);
     byWeather[w].sessions += 1;
     byWeather[w].totalKunjungan += total;
+    byWeather[w].list.push(total);
 
     const suhu = parseFloat(normalizeSuhu(item.suhu));
     if (!isNaN(suhu)) {
@@ -3283,15 +3332,43 @@ function renderWeatherDashboard(filteredData, ghFilter) {
     tableHtml += `
       <tr>
         <td class="w-${w}">${WEATHER_LABEL[w] || w}</td>
-        <td>${d.sessions}</td>
+        <td>${d.sessions}${d.sessions < 5 ? ' ⚠️' : ''}</td>
         <td>${d.totalKunjungan}</td>
-        <td><b>${avgPerSesi}</b></td>
+        <td><b>${avgPerSesi}</b> <small style="color:#888">±${sdOf(d.list)}</small></td>
         <td>${avgSuhu}</td>
       </tr>
     `;
   });
+  renderWeatherTime(filteredData);
   document.getElementById('weatherTableBody').innerHTML =
     tableHtml || `<tr><td colspan="5" style="text-align:center;color:#999;">Belum ada data</td></tr>`;
+}
+
+function sdOf(a) { if (a.length < 2) return '–'; const m = a.reduce((x, y) => x + y, 0) / a.length; return Math.sqrt(a.reduce((t, v) => t + (v - m) * (v - m), 0) / (a.length - 1)).toFixed(1); }
+
+// % tanaman fase flowering per periode (dari slide Monthly Meeting tim fertigasi, Okt 2026).
+// Format: [mulai, selesai, %]. Tambah baris baru tiap periode; nilai berlaku sampai periode berikutnya.
+const FLOWERING_REF = {
+  'GH 1': [['2026-08-17','2026-08-22',19],['2026-08-23','2026-08-29',18],['2026-08-30','2026-09-06',25],['2026-09-07','2026-09-12',17],['2026-09-14','2026-09-19',13],['2026-09-21','2026-09-26',14],['2026-09-27','2026-10-03',9],['2026-10-04','2026-10-10',7],['2026-10-12','2026-10-17',4],['2026-10-18','2026-10-24',6],['2026-10-25','2026-10-31',9.8]],
+  'GH 2': [['2026-09-21','2026-09-26',18],['2026-09-28','2026-10-03',18],['2026-10-04','2026-10-10',12],['2026-10-12','2026-10-17',12],['2026-10-18','2026-10-24',12],['2026-10-25','2026-10-31',18]]
+};
+function floweringPct(gh, date) {
+  const L = FLOWERING_REF[gh]; if (!L) return null;
+  let r = null;
+  for (let i = 0; i < L.length; i++) { if (L[i][0] <= date) { r = L[i]; if (i === L.length - 1 && date > L[i][1]) r = null; } }
+  return r ? r[2] : null;
+}
+
+function renderWeatherTime(data) {
+  const card = document.getElementById('weatherTableBody').closest('.chart-card');
+  let box = document.getElementById('weatherTimeBox');
+  if (!box) { box = document.createElement('div'); box.id = 'weatherTimeBox'; box.style.cssText = 'margin-top:14px;overflow-x:auto;'; card.appendChild(box); }
+  const B = ['≤10', '11–12', '13–14', '≥15'];
+  const bi = t => { const h = parseInt(String(t || '').split(':')[0], 10); return isNaN(h) ? -1 : h <= 10 ? 0 : h <= 12 ? 1 : h <= 14 ? 2 : 3; };
+  const g = {};
+  data.forEach(it => { const w = (it.cuaca || '').toLowerCase().trim(), b = bi(it.waktu); if (!w || b < 0) return; (g[w] = g[w] || [[], [], [], []])[b].push(getTotalPerItem(it)); });
+  const rows = WEATHER_ORDER.filter(w => g[w]).map(w => `<tr><td class="w-${w}">${WEATHER_LABEL[w] || w}</td>` + g[w].map(a => a.length ? `<td><b>${(a.reduce((x, y) => x + y, 0) / a.length).toFixed(1)}</b> <small style="color:#888">n=${a.length}</small></td>` : '<td>-</td>').join('') + '</tr>').join('');
+  box.innerHTML = '<div style="font-size:12px;font-weight:700;color:#2d5016;margin-bottom:8px;text-transform:uppercase;">🕒 Cuaca × Jam (rata²/sesi)</div><table class="weather-table"><thead><tr><th>Cuaca</th>' + B.map(x => `<th>${x}</th>`).join('') + '</tr></thead><tbody>' + (rows || '<tr><td colspan="5" style="text-align:center;color:#999;">Belum ada data</td></tr>') + '</tbody></table><div style="font-size:11px;color:#888;margin-top:6px;">⚠️ n &lt; 5 sesi: belum cukup untuk disimpulkan.</div>';
 }
 
 function renderBarChart(filteredData, ghFilter) {
@@ -3311,8 +3388,8 @@ function renderBarChart(filteredData, ghFilter) {
     data: {
       labels: Array.from({ length: 10 }, (_, i) => 'Bay ' + (i + 1)),
       datasets: [{
-        label: 'Total Kunjungan',
-        data: bayTotals,
+        label: 'Rata² / Sesi',
+        data: bayTotals.map(v => +(v / (filteredData.length || 1)).toFixed(1)),
         backgroundColor: '#4a7c2c',
         borderColor: '#2d5016',
         borderWidth: 1,
@@ -3324,7 +3401,7 @@ function renderBarChart(filteredData, ghFilter) {
       plugins: {
         title: {
           display: true,
-          text: `Distribusi Kunjungan per Bay - ${ghFilter || 'Semua GH'}`,
+          text: `Rata² Kunjungan per Bay per Sesi - ${ghFilter || 'Semua GH'}`,
           font: { weight: 'bold', size: 14, family: 'sans-serif' },
           color: '#2d5016'
         },
@@ -3333,164 +3410,13 @@ function renderBarChart(filteredData, ghFilter) {
       scales: {
         y: {
           beginAtZero: true,
-          title: { display: true, text: 'Total Kunjungan', font: { weight: 'bold' } },
+          title: { display: true, text: 'Kunjungan / sesi', font: { weight: 'bold' } },
           grid: { color: '#f0f0f0' }
         },
         x: { grid: { display: false } }
       }
     }
   });
-}
-
-// ============================================
-// LAPORAN MANAJEMEN
-// ============================================
-
-function populateReportBatch() {
-  const sel = document.getElementById('reportBatchSelect');
-  if (!sel) return;
-  
-  // Ambil semua no_batch unik dari data QC
-  const batches = [...new Set((localHistory.qc || []).map(r => r.no_batch).filter(Boolean))];
-  // Urutkan dari yang terbaru
-  batches.sort().reverse();
-  
-  if (batches.length === 0) {
-    sel.innerHTML = '<option value="">-- Belum ada data QC --</option>';
-    renderReport();
-    return;
-  }
-  
-  sel.innerHTML = batches.map(b => `<option value="${b}">${cleanBatchName(b)}</option>`).join('');
-  renderReport();
-}
-
-function renderReport() {
-  const batchNo = document.getElementById('reportBatchSelect').value;
-  const container = document.getElementById('reportContent');
-  if (!container) return;
-
-  if (!batchNo) {
-    container.innerHTML = '<p style="text-align:center; color:#999;">Belum ada data untuk dilaporkan.</p>';
-    return;
-  }
-
-  const rows = (localHistory.qc || []).filter(r => r.no_batch === batchNo);
-  if (rows.length === 0) {
-    container.innerHTML = '<p style="text-align:center; color:#999;">Data tidak ditemukan.</p>';
-    return;
-  }
-
-  // Ambil data dari kedatangan pertama di batch ini untuk info header
-  const mainRow = rows[0];
-  let totalDatang = 0;
-  let totalDitolak = 0;
-  let totalDiterima = 0;
-  let htmlKotak = '';
-
-  // Loop setiap baris (jika 1 batch datang 2 kali di hari berbeda)
-  rows.forEach(row => {
-    for (let i = 1; i <= QC_MAX_KOTAK; i++) {
-      const no = row[`kotak${i}_no`];
-      const kond = row[`kotak${i}_kondisi`];
-      if (!no && !kond) continue; // Skip kotak kosong
-
-      totalDatang++;
-      const cat = String(row[`kotak${i}_catatan`] || '');
-      const isReject = cat.includes('[❌ DITOLAK]');
-      if (isReject) totalDitolak++;
-      else totalDiterima++;
-
-      let cleanCat = cat.replace('[❌ DITOLAK]', '').replace(/\[⚠️.*?\]/g, '').trim() || '-';
-      const flags = cat.match(/\[⚠️ (.*?)\]/);
-      const flagText = flags ? `<br><span style="color:#c62828;font-size:9px;">⚠️ ${flags[1]}</span>` : '';
-      
-      const fotoUrl = qcFotoThumb(row[`kotak${i}_foto`]);
-      const fotoHtml = fotoUrl ? `<img src="${fotoUrl}" class="report-foto" crossorigin="anonymous">` : '-';
-
-      htmlKotak += `
-        <tr>
-          <td style="text-align:center;">${row.gh}<br>K-${i}</td>
-          <td><b>${qcEsc(no || '-')}</b></td>
-          <td>${qcEsc(kond || '-')}<br>${qcEsc(row[`kotak${i}_sisiran`] || 0)} sisiran</td>
-          <td>
-            ${isReject ? '<b style="color:#c62828;">DITOLAK</b>' : '<b style="color:#2e7d32;">DITERIMA</b>'}
-            ${flagText}
-          </td>
-          <td>${qcEsc(cleanCat)}</td>
-          <td style="text-align:center;">${fotoHtml}</td>
-        </tr>
-      `;
-    }
-  });
-
-  const today = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-
-  container.innerHTML = `
-    <div class="report-header">
-      <h2>PT AGRI WANGI BERRY</h2>
-      <p>Laporan Penerimaan & Quality Control (QC) Koloni Lebah</p>
-    </div>
-    
-    <table style="width:100%; font-size:12px; margin-bottom:15px; border-collapse:collapse;">
-      <tr>
-        <td style="width:120px; padding:4px 0;"><b>No Batch</b></td>
-        <td>: ${qcEsc(cleanBatchName(mainRow.no_batch))}</td>
-        <td style="width:120px; padding:4px 0;"><b>Tanggal Laporan</b></td>
-        <td>: ${today}</td>
-      </tr>
-      <tr>
-        <td style="padding:4px 0;"><b>Greenhouse</b></td>
-        <td>: ${qcEsc(mainRow.gh)}</td>
-        <td style="padding:4px 0;"><b>Pemasok</b></td>
-        <td>: ${qcEsc(mainRow.asal || '-')}</td>
-      </tr>
-    </table>
-
-    <div style="display:flex; gap:10px; margin-bottom:15px; text-align:center;">
-      <div style="flex:1; border:1px solid #999; padding:8px; background:#f9f9f9;">
-        <div style="font-size:10px; color:#666;">TOTAL DATANG</div>
-        <div style="font-size:20px; font-weight:bold;">${totalDatang} Kotak</div>
-      </div>
-      <div style="flex:1; border:1px solid #999; padding:8px; background:#e8f5e9;">
-        <div style="font-size:10px; color:#2e7d32;">DITERIMA (MASUK GH)</div>
-        <div style="font-size:20px; font-weight:bold; color:#2e7d32;">${totalDiterima} Kotak</div>
-      </div>
-      <div style="flex:1; border:1px solid #999; padding:8px; background:#ffebee;">
-        <div style="font-size:10px; color:#c62828;">DITOLAK / RETUR</div>
-        <div style="font-size:20px; font-weight:bold; color:#c62828;">${totalDitolak} Kotak</div>
-      </div>
-    </div>
-
-    <table class="report-table">
-      <thead>
-        <tr>
-          <th style="width:50px; text-align:center;">GH / Kotak</th>
-          <th style="width:80px;">No Koloni</th>
-          <th style="width:100px;">Kondisi</th>
-          <th style="width:90px;">Status QC</th>
-          <th>Catatan / Temuan</th>
-          <th style="width:70px; text-align:center;">Foto</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${htmlKotak}
-      </tbody>
-    </table>
-
-    <div class="report-ttd">
-      <div>
-        <p>Pemeriksa QC</p>
-        <div class="line"></div>
-        <p>(............................................)</p>
-      </div>
-      <div>
-        <p>Mengetahui, Manajemen</p>
-        <div class="line"></div>
-        <p>(............................................)</p>
-      </div>
-    </div>
-  `;
 }
 
 // ============================================
