@@ -1732,7 +1732,10 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
     gh: document.getElementById('gh').value,
     suhu: document.getElementById('suhu').value,
     cuaca: document.getElementById('cuaca').value,
-    rows: Array.from({ length: 10 }, (_, i) => document.getElementById('row-bay' + (i + 1)).value).join(',').replace(/^,*$/, ''),
+      rows: Array.from({ length: 10 }, (_, i) => {
+      const v = document.getElementById('row-bay' + (i + 1)).value;
+      return v ? `B${i+1}:${v}` : '';
+    }).filter(Boolean).join(', '),
     kejadian: [...document.querySelectorAll('#kejadianBox input:checked')].map(x => x.value).join(', '),
     cid: (isEdit && editExtra.cid) ? editExtra.cid : newCid(),
     waktu_selesai: isEdit ? (editExtra.waktu_selesai || '') : nowHHMM(),
