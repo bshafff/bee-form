@@ -1735,6 +1735,58 @@ document.querySelector('.tabs').addEventListener('click', e => {
 // KUNJUNGAN
 // ============================================
 
+// ============================================
+// STRUKTUR ROW PER BAY (fisik greenhouse)
+// GH 1: 89 row total. Bay 1-9 masing2 9 row, bay 10 hanya 8 row (82-89)
+// GH 2: 99 row total. Bay 1-8 masing2 9 row, bay 9-10 fisik digabung (73-90),
+//       dan bay 11 fisik jadi bay 10 di app (91-99)
+// ============================================
+const GH_BAY_ROWS = {
+  'GH 1': {
+    1:  [1,2,3,4,5,6,7,8,9],
+    2:  [10,11,12,13,14,15,16,17,18],
+    3:  [19,20,21,22,23,24,25,26,27],
+    4:  [28,29,30,31,32,33,34,35,36],
+    5:  [37,38,39,40,41,42,43,44,45],
+    6:  [46,47,48,49,50,51,52,53,54],
+    7:  [55,56,57,58,59,60,61,62,63],
+    8:  [64,65,66,67,68,69,70,71,72],
+    9:  [73,74,75,76,77,78,79,80,81],
+    10: [82,83,84,85,86,87,88,89]
+  },
+  'GH 2': {
+    1:  [1,2,3,4,5,6,7,8,9],
+    2:  [10,11,12,13,14,15,16,17,18],
+    3:  [19,20,21,22,23,24,25,26,27],
+    4:  [28,29,30,31,32,33,34,35,36],
+    5:  [37,38,39,40,41,42,43,44,45],
+    6:  [46,47,48,49,50,51,52,53,54],
+    7:  [55,56,57,58,59,60,61,62,63],
+    8:  [64,65,66,67,68,69,70,71,72],
+    9:  [73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90],
+    10: [91,92,93,94,95,96,97,98,99]
+  }
+};
+
+// Isi ulang dropdown row tiap bay sesuai GH yang dipilih
+function renderBayRowOptions(gh) {
+  const map = GH_BAY_ROWS[gh] || null;
+  for (let i = 1; i <= 10; i++) {
+    const sel = document.getElementById('row-bay' + i);
+    if (!sel) continue;
+    const prev = sel.value;
+    let opts = '<option value="">row</option>';
+    if (map && map[i]) {
+      opts += map[i].map(n => `<option value="${n}">Row ${n}</option>`).join('');
+    }
+    sel.innerHTML = opts;
+    // Pertahankan nilai lama kalau masih valid untuk GH yang dipilih
+    if (prev && map && map[i] && map[i].includes(parseInt(prev))) {
+      sel.value = prev;
+    }
+  }
+}
+
 const baysList = document.getElementById('baysList');
 const bays = {};
 
@@ -1744,7 +1796,7 @@ for (let i = 1; i <= 10; i++) {
   bayItem.className = 'bay-item';
   bayItem.innerHTML = `
     <span class="bay-label">Bay ${i}</span>
-    <select class="bay-row" id="row-bay${i}" title="Row yang dijalani"><option value="">row</option>${[1,2,3,4,5,6,7,8,9,10].map(n => `<option value="${n}">Row ${n}</option>`).join('')}</select>
+    <select class="bay-row" id="row-bay${i}" title="Row yang dijalani"><option value="">row</option></select>
     <div class="counter">
       <button type="button" onclick="decrementBay('bay${i}')">−</button>
       <div class="counter-value" id="value-bay${i}">0</div>
@@ -1754,7 +1806,25 @@ for (let i = 1; i <= 10; i++) {
   baysList.appendChild(bayItem);
 }
 
-function acakRow() { for (let i = 1; i <= 10; i++) document.getElementById('row-bay' + i).value = String(1 + Math.floor(Math.random() * 10)); }
+// Saat GH diganti → perbarui pilihan row per bay
+document.getElementById('gh').addEventListener('change', e => {
+  renderBayRowOptions(e.target.value);
+});
+
+function acakRow() {
+  const gh = document.getElementById('gh').value;
+  const map = GH_BAY_ROWS[gh];
+  for (let i = 1; i <= 10; i++) {
+    const sel = document.getElementById('row-bay' + i);
+    if (!sel) continue;
+    if (map && map[i] && map[i].length) {
+      const arr = map[i];
+      sel.value = String(arr[Math.floor(Math.random() * arr.length)]);
+    } else {
+      sel.value = '';
+    }
+  }
+}
 function newCid() { return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'c' + Date.now() + Math.random().toString(36).slice(2, 8); }
 function incrementBay(bayId) { bays[bayId]++; updateBayDisplay(bayId); }
 function decrementBay(bayId) { if (bays[bayId] > 0) bays[bayId]--; updateBayDisplay(bayId); }
@@ -1858,6 +1928,7 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
 
 function resetFormKunjungan() {
   document.getElementById('beeForm').reset();
+  renderBayRowOptions('');   // <-- reset dropdown row sesuai GH kosong
   Object.keys(bays).forEach(bay => { bays[bay] = 0; updateBayDisplay(bay); });
   document.getElementById('tanggal').value = getLocalDate();
   document.getElementById('waktu').value = nowHHMM();
@@ -2115,9 +2186,8 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     const sis = (aktif && sEl && sEl.value !== '') ? (parseInt(sEl.value) || 0) : '';
     const no = aktif && nEl ? nEl.value.trim() : '';
     
-    // --- MULAI GANTI DARI SINI ---
     let cat = aktif && cEl ? cEl.value.trim() : '';
-    const foto = aktif ? (qcFotoState[i] || '') : ''; // <-- DIPINDAH KE SINI
+    const foto = aktif ? (qcFotoState[i] || '') : '';
     
     // Gabungkan Quick Flags ke dalam Catatan
     if (aktif) {
@@ -2147,8 +2217,7 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     formData[`kotak${i}_kondisi`] = kond;
     formData[`kotak${i}_sisiran`] = sis;
     formData[`kotak${i}_foto`] = foto;
-    formData[`kotak${i}_catatan`] = cat; // Simpan catatan yang sudah digabung
-    // --- SAMPAI SINI ---
+    formData[`kotak${i}_catatan`] = cat;
     
     if (kond) jml[kond]++;
     if (sis !== '') totalSisiran += sis;
@@ -2377,6 +2446,7 @@ function editHistory(type, localId) {
     document.getElementById('tanggal').value = data.tanggal || getLocalDate();
     document.getElementById('waktu').value = data.waktu || '';
     document.getElementById('gh').value = data.gh || '';
+    renderBayRowOptions(data.gh || '');   // <-- isi ulang dropdown row sesuai GH
     document.getElementById('suhu').value = normalizeSuhu(data.suhu);
     document.getElementById('cuaca').value = data.cuaca || '';
     editExtra = { cid: data.cid || '', waktu_selesai: data.waktu_selesai || '' };
@@ -2508,7 +2578,7 @@ let serverWarned = false;
 function checkServerVersion(result, manual) {
   const ok = result && result.qcVersion >= 4;
   if (ok) {
-    serverWarned = false; // <--- TAMBAHKAN BARIS INI
+    serverWarned = false;
     return;
   }
   if (manual || !serverWarned) {
@@ -2534,7 +2604,6 @@ function qcBatchText(item) {
     if (no) parts.push(`K${i}: ${qcEsc(no)}`);
   }
   
-  // Gunakan cleanBatchName agar teks Batch yang jadi tanggal ikut rapi
   const batchName = item.no_batch ? cleanBatchName(item.no_batch) : '';
   const head = batchName ? `<b>Batch ${qcEsc(batchName)}</b><br>` : '';
   
@@ -2551,26 +2620,21 @@ function daysBetween(a, b) {
   return (isNaN(x) || isNaN(y)) ? null : Math.max(0, y - x);
 }
 
-// Fungsi untuk membersihkan teks batch jika berubah jadi format tanggal dari Google Sheets
 function cleanBatchName(val) {
   if (!val) return '';
   let str = String(val).trim();
-  // Jika mengandung format tanggal bawaan sistem (T00:00:00.000Z)
   if (str.includes('T00:00:00.000Z')) {
     const d = new Date(str);
     if (!isNaN(d)) {
       const y = d.getUTCFullYear();
       const m = String(d.getUTCMonth() + 1).padStart(2, '0');
       const day = String(d.getUTCDate()).padStart(2, '0');
-      // Kembalikan menjadi format YYYY-MM-DD (misal 2611-01-01)
       return `${y}-${m}-${day}`;
     }
   }
   return str;
 }
 
-// Satu baris QC = satu kedatangan (1 No Batch). Tiap kotak yang diisi = koloni baru yang menempati kotak itu.
-// Kotak yang tidak diisi tetap membawa batch lamanya. Tiap "penghuni kotak" dilacak umurnya.
 function batchOfRow(row) {
   const rawBatch = String(row.no_batch ?? '').trim();
   if (!rawBatch) {
@@ -2588,13 +2652,11 @@ function buildBatches() {
     for (let i = 1; i <= QC_MAX_KOTAK; i++) {
       const catatan = String(row[`kotak${i}_catatan`] || '');
       
-      // JIKA DITOLAK, LEWATI (Jangan dihitung sebagai koloni aktif)
       if (catatan.includes('[❌ DITOLAK]')) continue;
 
       const koloni = String(row[`kotak${i}_no`] ?? '').trim();
       const kond = row[`kotak${i}_kondisi`] || '';
       if (!koloni && !kond) continue;
-      // ... (biarkan sisa kodenya sama)
       const key = `${row.gh}|${i}|${batch}`;
       const b = map[key] || (map[key] = {
         key, gh: row.gh, kotak: i, batch, koloni: '', start: row.tanggal || '',
@@ -2628,7 +2690,6 @@ function buildBatches() {
 
   const list = Object.values(map);
 
-  // Per GH+kotak: penghuni lama yang tidak dicatat berakhir dianggap diganti saat penghuni baru datang.
   const groups = {};
   list.forEach(b => { (groups[`${b.gh}|${b.kotak}`] = groups[`${b.gh}|${b.kotak}`] || []).push(b); });
   Object.values(groups).forEach(g => {
@@ -2701,7 +2762,6 @@ function renderBatchTab() {
     sum.textContent = '✅ Semua kotak masih aman (umur < ' + BATCH_UMUR_GANTI + ' hari).';
   }
 
-  // Ringkasan per batch
   const byBatch = {};
   list.forEach(b => { (byBatch[b.batch] = byBatch[b.batch] || []).push(b); });
   const batchRows = Object.entries(byBatch).map(([batch, arr]) => {
@@ -2717,7 +2777,6 @@ function renderBatchTab() {
       <td>${r.aktif}</td><td>${r.avg !== null ? r.avg + ' / ' + r.maks + ' hr' : '-'}</td></tr>`).join('')
     : '<tr><td colspan="5" class="history-empty">Belum ada data batch.</td></tr>';
 
-  // Statistik koloni yang sudah berakhir
   const ended = list.filter(b => b.end && b.umur !== null);
   const stats = document.getElementById('btStats');
   if (ended.length) {
@@ -2749,7 +2808,6 @@ function renderBatchTab() {
     </tr>`;
   }).join('') : '<tr><td colspan="6" class="history-empty">Belum ada data. Isi No Batch & No Koloni di tab QC Koloni.</td></tr>';
 
-  // --- TAMPILKAN KOTAK YANG DITOLAK ---
   const rejectedHtml = [];
   (localHistory.qc || []).forEach(row => {
     for (let i = 1; i <= QC_MAX_KOTAK; i++) {
@@ -2774,7 +2832,6 @@ function renderBatchTab() {
   if (rejBox) {
     rejBox.innerHTML = rejectedHtml.length ? rejectedHtml.join('') : '<div class="qc-hint">Tidak ada kotak yang ditolak. Semua aman.</div>';
   }
-  // ------------------------------------
 }
 
 // ---- Form "Akhiri batch" ----
@@ -2802,7 +2859,6 @@ function prefillBatchAk() {
     return;
   }
 
-  // Ambil semua batch (aktif dan lampau) untuk GH+Kotak ini
   const allB = buildBatches().filter(x => x.gh === gh && x.kotak === k)
     .sort((a, b) => (b.start || '').localeCompare(a.start || ''));
 
@@ -2813,18 +2869,16 @@ function prefillBatchAk() {
   });
   if(list) list.innerHTML = html;
 
-  // Auto-fill dengan batch yang masih aktif terbaru
   const active = allB.find(x => !x.end);
   if (active) {
     input.value = active.batch;
   } else if (allB.length > 0) {
-    input.value = allB[0].batch; // Kalau semua sudah selesai, ambil yang terakhir
+    input.value = allB[0].batch;
   } else {
     input.value = '';
   }
 }
 
-// --- JANGAN HAPUS BAGIAN INI ---
 document.getElementById('penyebabAk').innerHTML =
   '<option value="">-- Pilih penyebab --</option>' + AKHIR_PENYEBAB.map(p => `<option value="${p}">${p}</option>`).join('');
 
@@ -2840,9 +2894,7 @@ document.getElementById('btStatus').addEventListener('click', e => {
   fillKotakAk();
   document.getElementById('kotakAk').value = btn.dataset.k;
   
-  // Panggil prefill agar datalist langsung terisi saat tombol "Akhiri" diklik
   prefillBatchAk(); 
-  // Timpa dengan batch dari tombol yang diklik (jika berbeda)
   document.getElementById('batchAk').value = btn.dataset.b; 
   
   document.getElementById('penyebabAk').focus();
@@ -2898,7 +2950,6 @@ document.getElementById('akhirForm').addEventListener('submit', async e => {
     showStatusAk('⚠️ Belum masuk Sheet: ' + friendlyErr(err) + ' (tersimpan lokal)', 'error');
   }
 
-  // ganti catatan lama untuk batch yang sama (hindari dobel)
   localHistory.akhir = (localHistory.akhir || []).filter(a => !(a.gh === formData.gh &&
     String(a.kotak) === String(formData.kotak) && String(a.no_batch) === String(formData.no_batch)));
   addLocalHistory('akhir', { ...formData }, synced);
@@ -2969,7 +3020,6 @@ async function fetchAllDataFromSheet() {
 
     const sheetQc = (result.qc || []).map(mapSheetRow);
 
-    // --- PERBAIKAN: Hapus data lokal yang sudah ada di Sheet ---
     const mergeData = (local, sheet) => {
       const localOnly = (local || []).filter(
         l => !String(l._localId || '').startsWith('sheet_')
@@ -3346,8 +3396,6 @@ function renderWeatherDashboard(filteredData, ghFilter) {
 
 function sdOf(a) { if (a.length < 2) return '–'; const m = a.reduce((x, y) => x + y, 0) / a.length; return Math.sqrt(a.reduce((t, v) => t + (v - m) * (v - m), 0) / (a.length - 1)).toFixed(1); }
 
-// % tanaman fase flowering per periode (dari slide Monthly Meeting tim fertigasi, Okt 2026).
-// Format: [mulai, selesai, %]. Tambah baris baru tiap periode; nilai berlaku sampai periode berikutnya.
 const FLOWERING_REF = {
   'GH 1': [['2026-08-17','2026-08-22',19],['2026-08-23','2026-08-29',18],['2026-08-30','2026-09-06',25],['2026-09-07','2026-09-12',17],['2026-09-14','2026-09-19',13],['2026-09-21','2026-09-26',14],['2026-09-27','2026-10-03',9],['2026-10-04','2026-10-10',7],['2026-10-12','2026-10-17',4],['2026-10-18','2026-10-24',6],['2026-10-25','2026-10-31',9.8]],
   'GH 2': [['2026-09-21','2026-09-26',18],['2026-09-28','2026-10-03',18],['2026-10-04','2026-10-10',12],['2026-10-12','2026-10-17',12],['2026-10-18','2026-10-24',12],['2026-10-25','2026-10-31',18]]
@@ -3478,5 +3526,4 @@ window.addEventListener('appinstalled', () => {
 </script>
 
 </body>
-
 </html>
