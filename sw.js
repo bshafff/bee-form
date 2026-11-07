@@ -3,7 +3,7 @@
 // VERSION 9 - skip version.json + cache Chart.js
 // ============================================
 
-const CACHE_NAME = 'bee-form-v30';
+const CACHE_NAME = 'bee-form-v31';
 
 const urlsToCache = [
   './',
