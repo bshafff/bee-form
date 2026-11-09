@@ -896,6 +896,13 @@ button.btn-delete:hover { background: #c82333; }
         </div>
       </div>
 
+      <div class="chart-card">
+        <div class="chart-container">
+          <canvas id="hourChart"></canvas>
+        </div>
+        <div id="hourPeakNote" style="font-size:12px;color:#2d5016;margin-top:8px;text-align:center;"></div>
+      </div>
+
     </div>
 
     <!-- =====================================
@@ -2962,6 +2969,7 @@ async function fetchAllDataFromSheet() {
 
 let trendChartInstance = null;
 let barChartInstance = null;
+let hourChartInstance = null;
 let weatherChartInstance = null;
 
 const WEATHER_ORDER = ['cerah', 'berawan', 'mendung', 'hujan', 'gerimis'];
@@ -3130,6 +3138,7 @@ function renderTrendDashboard() {
   trendChartInstance.options.plugins.tooltip = { callbacks: { label: c => c.dataset.label.startsWith('Kejadian') ? (evByDate[allDates[c.dataIndex]] || '') : (c.dataset.label + ': ' + c.formattedValue), afterLabel: c => (c.datasetIndex === 0 && sessByDate[allDates[c.dataIndex]]) ? `Sesi: ${sessByDate[allDates[c.dataIndex]]} · Total: ${totByDate[allDates[c.dataIndex]]}` : '' } };
   trendChartInstance.update();
   renderBarChart(filteredData, ghFilter);
+  renderHourChart(filteredData, ghFilter, metric);
   renderWeatherDashboard(filteredData, ghFilter);
 }
 
@@ -3305,6 +3314,67 @@ function renderWeatherTime(data) {
   data.forEach(it => { const w = (it.cuaca || '').toLowerCase().trim(), b = bi(it.waktu); if (!w || b < 0) return; (g[w] = g[w] || [[], [], [], []])[b].push(getTotalPerItem(it)); });
   const rows = WEATHER_ORDER.filter(w => g[w]).map(w => `<tr><td class="w-${w}">${WEATHER_LABEL[w] || w}</td>` + g[w].map(a => a.length ? `<td><b>${(a.reduce((x, y) => x + y, 0) / a.length).toFixed(1)}</b> <small style="color:#888">n=${a.length}</small></td>` : '<td>-</td>').join('') + '</tr>').join('');
   box.innerHTML = '<div style="font-size:12px;font-weight:700;color:#2d5016;margin-bottom:8px;text-transform:uppercase;">🕒 Cuaca × Jam (rata²/sesi)</div><table class="weather-table"><thead><tr><th>Cuaca</th>' + B.map(x => `<th>${x}</th>`).join('') + '</tr></thead><tbody>' + (rows || '<tr><td colspan="5" style="text-align:center;color:#999;">Belum ada data</td></tr>') + '</tbody></table><div style="font-size:11px;color:#888;margin-top:6px;">⚠️ n &lt; 5 sesi: belum cukup untuk disimpulkan.</div>';
+}
+
+function renderHourChart(filteredData, ghFilter, metric) {
+  const val = it => metric === 'total' ? getTotalPerItem(it) : (parseInt(it[metric]) || 0);
+  const byHour = {};
+  filteredData.forEach(it => {
+    const h = parseInt(String(it.waktu || '').split(':')[0], 10);
+    if (isNaN(h) || h < 0 || h > 23) return;
+    (byHour[h] = byHour[h] || []).push(val(it));
+  });
+  const hrs = Object.keys(byHour).map(Number).sort((a, b) => a - b);
+  const note = document.getElementById('hourPeakNote');
+  if (hourChartInstance) { hourChartInstance.destroy(); hourChartInstance = null; }
+  if (!hrs.length) { note.textContent = 'Belum ada data jam kunjungan.'; return; }
+
+  const labels = [], avgs = [], ns = [];
+  for (let h = hrs[0]; h <= hrs[hrs.length - 1]; h++) {
+    const a = byHour[h];
+    labels.push(String(h).padStart(2, '0') + '–' + String((h + 1) % 24).padStart(2, '0'));
+    ns.push(a ? a.length : 0);
+    avgs.push(a ? +(a.reduce((x, y) => x + y, 0) / a.length).toFixed(1) : null);
+  }
+  const maxAvg = Math.max(...avgs.filter(v => v !== null));
+  const peakIdx = avgs.indexOf(maxAvg);
+  const colors = avgs.map((v, i) => i === peakIdx ? '#f59e0b' : (ns[i] < 5 ? 'rgba(74,124,44,0.45)' : '#4a7c2c'));
+  const metricLabel = metric === 'total' ? 'Kunjungan' : metric.toUpperCase().replace('BAY', 'Bay ');
+
+  note.innerHTML = `🔥 Paling aktif: <b>jam ${labels[peakIdx]}</b> (rata² ${maxAvg}/sesi, n=${ns[peakIdx]} sesi)` +
+    (ns.some(n => n > 0 && n < 5) ? '<br><span style="color:#888;">Bar pudar: n &lt; 5 sesi, belum cukup untuk disimpulkan.</span>' : '');
+
+  hourChartInstance = new Chart(document.getElementById('hourChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Rata² ' + metricLabel + ' / Sesi',
+        data: avgs,
+        backgroundColor: colors,
+        borderColor: '#2d5016',
+        borderWidth: 1,
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        title: {
+          display: true,
+          text: `Rata² ${metricLabel} per Jam - ${ghFilter || 'Semua GH'}`,
+          font: { weight: 'bold', size: 14, family: 'sans-serif' },
+          color: '#2d5016'
+        },
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => `Rata²: ${c.formattedValue} / sesi`, afterLabel: c => `Jumlah sesi: ${ns[c.dataIndex]}` } }
+      },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: 'Kunjungan / sesi', font: { weight: 'bold' } }, grid: { color: '#f0f0f0' } },
+        x: { title: { display: true, text: 'Jam', font: { weight: 'bold' } }, grid: { display: false } }
+      }
+    }
+  });
 }
 
 function renderBarChart(filteredData, ghFilter) {
