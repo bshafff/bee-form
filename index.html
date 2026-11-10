@@ -535,6 +535,33 @@ button.btn-delete:hover { background: #c82333; }
   cursor: pointer;
 }
 
+/* ===== CEK KOLONI (populasi + gula) ===== */
+.cek-item { padding: 12px; background: #f9f9f9; border-radius: 8px; margin-bottom: 10px; border: 1px solid #e0e0e0; border-left: 5px solid #bbb; }
+.cek-item .cek-title { font-weight: 600; color: #2d5016; margin-bottom: 8px; font-size: 14px; }
+.cek-item .cek-sub { font-weight: 400; color: #777; font-size: 12px; }
+.cek-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cek-row + .cek-row { margin-top: 8px; }
+.cek-pop-input { width: 84px; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+.cek-pct { color: #666; font-weight: 600; font-size: 13px; }
+.cek-quick { padding: 6px 9px; border: 1px solid #c8d6b9; background: #fff; color: #2d5016; border-radius: 14px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.cek-gula { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #8d6e00; cursor: pointer; }
+.cek-gula input { width: 18px; height: 18px; accent-color: #f9a825; }
+.cek-item .cek-cat { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; }
+.cek-flags label { font-size: 11px; }
+.cek-flags input[type="checkbox"] { accent-color: #2d5016; }
+.cek-late { color: #c62828; font-weight: 700; }
+.cek-trend-up { color: #2e7d32; font-weight: 700; }
+.cek-trend-down { color: #c62828; font-weight: 700; }
+.cek-chip { display: inline-block; margin: 2px 3px 0 0; padding: 1px 7px; border-radius: 10px; background: #fff3e0; color: #bf360c; font-size: 11px; font-weight: 600; }
+.cek-hint-list { font-size: 12px; color: #555; line-height: 1.5; }
+.cek-hint-list div { margin-bottom: 2px; }
+.cek-pop-ok { color: #2e7d32; font-weight: 700; }
+.cek-pop-warn { color: #ef6c00; font-weight: 700; }
+.cek-pop-bad { color: #c62828; font-weight: 700; }
+.cek-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.cek-settings label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 4px; }
+.cek-settings input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+
 </style>
 
 </head>
@@ -595,6 +622,7 @@ button.btn-delete:hover { background: #c82333; }
     <button class="tab-btn active" data-tab="tab-kunjungan">Kunjungan</button>
     <button class="tab-btn" data-tab="tab-qc">QC Koloni</button>
     <button class="tab-btn" data-tab="tab-batch">🐝 Batch</button>
+    <button class="tab-btn" data-tab="tab-cek">🍯 Cek</button>
     <button class="tab-btn" data-tab="tab-trend">📈 Trend</button>
     <button class="tab-btn" data-tab="tab-riwayat">Riwayat</button>
   </div>
@@ -813,6 +841,121 @@ button.btn-delete:hover { background: #c82333; }
     </div>
 
     <!-- =====================================
+         CEK KOLONI: POPULASI % + JADWAL GULA
+    ===================================== -->
+    <div id="tab-cek" class="tab-content">
+
+      <div id="cekSummary" class="bt-summary ok"></div>
+      <div id="cekGulaSummary" class="bt-summary ok"></div>
+
+      <div id="cekStatus"></div>
+
+      <details class="bt-box" id="cekFormBox" open>
+        <summary>➕ Catat cek koloni &amp; gula</summary>
+
+        <div id="editIndicatorCek" class="edit-indicator" style="margin-top:12px;">
+          ✏️ Mode Edit — sedang mengedit data
+        </div>
+
+        <form id="cekForm">
+          <div class="form-group">
+            <label for="tanggalCek">Tanggal</label>
+            <input type="date" id="tanggalCek" required>
+          </div>
+
+          <div class="row-inputs">
+            <div class="form-group">
+              <label for="waktuCek">Waktu</label>
+              <input type="time" id="waktuCek" required>
+            </div>
+            <div class="form-group">
+              <label for="ghCek">Greenhouse</label>
+              <select id="ghCek" required>
+                <option value="">-- Pilih GH --</option>
+                <option value="GH 1">GH 1 (6 kotak)</option>
+                <option value="GH 2">GH 2 (5 kotak)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="bays-section">
+            <h3>Cek per Kotak</h3>
+            <div class="qc-hint">Populasi 100% = sekuat saat koloni datang. Isi hanya kotak yang dicek / diberi gula, sisanya biarkan kosong.</div>
+            <div id="cekKotakList"><div class="qc-hint">Pilih GH dulu untuk menampilkan kotak.</div></div>
+          </div>
+
+          <div class="form-group">
+            <label for="catatanCek">Catatan umum (opsional)</label>
+            <input type="text" id="catatanCek" placeholder="mis. suhu siang 36°C, bunga sedikit">
+          </div>
+
+          <div class="actions">
+            <button type="button" class="btn btn-reset" onclick="resetFormCek()">Reset</button>
+            <button type="submit" class="btn btn-submit" id="submitBtnCek">Kirim</button>
+          </div>
+
+          <div id="statusCek" class="status"></div>
+        </form>
+      </details>
+
+      <details class="bt-box">
+        <summary>⚙️ Pengaturan jadwal gula &amp; ambang populasi</summary>
+        <div class="cek-settings">
+          <div><label for="setGulaHari">Gula tiap … hari</label><input type="number" id="setGulaHari" min="1" max="30" inputmode="numeric"></div>
+          <div><label for="setCekHari">Cek maks tiap … hari</label><input type="number" id="setCekHari" min="1" max="30" inputmode="numeric"></div>
+          <div><label for="setWaspada">Waspada jika populasi ≤ (%)</label><input type="number" id="setWaspada" min="1" max="100" inputmode="numeric"></div>
+          <div><label for="setGanti">Ganti jika populasi ≤ (%)</label><input type="number" id="setGanti" min="1" max="100" inputmode="numeric"></div>
+        </div>
+        <div class="qc-hint">Tersimpan di perangkat ini. Angka awal hanya perkiraan, sesuaikan dengan kebiasaan di kebun.</div>
+        <div class="actions" style="margin-top:8px;">
+          <button type="button" class="btn btn-submit" onclick="cekSaveSettings()">Simpan pengaturan</button>
+        </div>
+      </details>
+
+      <h3 style="color:#2d5016;margin:18px 0 6px;">📉 Tren Populasi per Kotak</h3>
+      <div class="filter-bar" style="margin-bottom:8px;">
+        <div class="filter-group">
+          <label>Greenhouse</label>
+          <select id="cekGhFilter" onchange="renderCekCharts()">
+            <option value="GH 1">GH 1</option>
+            <option value="GH 2">GH 2</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-container"><canvas id="cekChart"></canvas></div>
+        <div id="cekChartNote" class="qc-hint" style="text-align:center;"></div>
+      </div>
+
+      <h3 style="color:#2d5016;margin:18px 0 6px;">📅 Rekap Mingguan per GH</h3>
+      <div class="qc-hint" style="padding-top:0;">Kalau populasi dan kunjungan turun bersamaan, itu petunjuk awal polinasi kurang. Cocokkan dengan hasil panen / buah petot.</div>
+      <div style="overflow-x:auto;margin-bottom:16px;">
+        <table class="history-table">
+          <thead><tr><th>Minggu</th><th>GH</th><th>Populasi rata²</th><th>Hari gula</th><th>Kunjungan/sesi</th></tr></thead>
+          <tbody id="cekWeekBody"></tbody>
+        </table>
+      </div>
+
+      <h3 style="color:#2d5016;margin:18px 0 6px;">🔎 Petunjuk Koloni yang Sudah Berakhir</h3>
+      <div class="qc-hint" style="padding-top:0;">Dihitung dari data cek, gula, dan kunjungan sebelum koloni berakhir. Ini petunjuk, bukan kepastian penyebab.</div>
+      <div style="overflow-x:auto;margin-bottom:16px;">
+        <table class="history-table">
+          <thead><tr><th>Koloni</th><th>Umur</th><th>Berakhir</th><th>Petunjuk</th></tr></thead>
+          <tbody id="cekDiagBody"></tbody>
+        </table>
+      </div>
+
+      <h3 style="color:#2d5016;margin:18px 0 6px;">🗒️ Riwayat Cek</h3>
+      <div style="overflow-x:auto;">
+        <table class="history-table">
+          <thead><tr><th>Tanggal</th><th>GH</th><th>Isi</th><th style="text-align:center;">Aksi</th></tr></thead>
+          <tbody id="cekHistoryBody"></tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- =====================================
          TREND DASHBOARD
     ===================================== -->
     <div id="tab-trend" class="tab-content">
@@ -952,7 +1095,7 @@ button.btn-delete:hover { background: #c82333; }
 // ============================================
 // 🔧 KONFIGURASI AUTO-CONNECT
 // ============================================
-const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby2desKbdj6Fj9X4CJ5IZeqZa9zfbTBEp8IvqjRb8VXyuUskdkZXyOVYdDgfmNJMpX-bg/exec';
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxJcn9zgd1mLq8-m1pXyPEmZDYd1M-R1AoZF_WrGaIhIm4F92ahXjHpupZk4icROt9W4A/exec';
 
 // ============================================
 // STATE
@@ -965,7 +1108,8 @@ const storeName = 'formQueue';
 let localHistory = {
   kunjungan: [],
   qc: [],
-  akhir: []
+  akhir: [],
+  cek: []
 };
 
 let currentEditId = null;
@@ -1352,6 +1496,7 @@ async function syncQueuedData() {
 
   for (const item of queued) {
     try {
+      if (item.type === 'cek' && (await ensureServerVersion()) < 5) throw new Error('Apps Script belum v5');
       const res = await fetch(scriptUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
@@ -1387,6 +1532,7 @@ function loadLocalHistory() {
   if (!localHistory.kunjungan) localHistory.kunjungan = [];
   if (!localHistory.qc) localHistory.qc = [];
   if (!localHistory.akhir) localHistory.akhir = [];
+  if (!localHistory.cek) localHistory.cek = [];
   delete localHistory.mortalitas;
 
   if (!localStorage.getItem('bee_waktu_fix_v1')) {
@@ -1501,6 +1647,7 @@ async function autoSync() {
 
     for (const item of queued) {
       try {
+        if (item.type === 'cek' && (await ensureServerVersion()) < 5) continue; // Apps Script lama: jangan kirim, nanti salah masuk sheet
         const res = await fetch(scriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
@@ -1543,6 +1690,7 @@ async function autoSync() {
         localHistory.kunjungan = mergeData(localHistory.kunjungan, sheetKunjungan);
         localHistory.qc = mergeData(localHistory.qc, sheetQc);
         mergeAkhirFromServer(result);
+        mergeCekFromServer(result);
         saveLocalHistory();
         checkServerVersion(result, false);
 
@@ -1550,6 +1698,7 @@ async function autoSync() {
         if (activeTab && activeTab.id === 'tab-trend') renderTrendDashboard();
         if (activeTab && activeTab.id === 'tab-riwayat') renderHistory();
         if (activeTab && activeTab.id === 'tab-batch') renderBatchTab();
+        if (activeTab && activeTab.id === 'tab-cek') renderCekTab();
       }
     } catch (e) { }
 
@@ -1627,6 +1776,7 @@ document.querySelector('.tabs').addEventListener('click', e => {
   if (tabName === 'tab-riwayat') renderHistory();
   if (tabName === 'tab-trend') renderTrendDashboard();
   if (tabName === 'tab-batch') renderBatchTab();
+  if (tabName === 'tab-cek') renderCekTab();
 });
 
 // ============================================
@@ -2384,6 +2534,7 @@ function activateTab(tabName) {
   if (content) content.classList.add('active');
   if (tabName === 'tab-trend') renderTrendDashboard();
   if (tabName === 'tab-batch') renderBatchTab();
+  if (tabName === 'tab-cek') renderCekTab();
 }
 
 // ============================================
@@ -2470,15 +2621,17 @@ function friendlyErr(e) {
 }
 
 let serverWarned = false;
+let serverApiVersion = 0;
 function checkServerVersion(result, manual) {
-  const ok = result && result.qcVersion >= 4;
+  serverApiVersion = Number(result && result.qcVersion) || 0;
+  const ok = serverApiVersion >= 5;
   if (ok) {
     serverWarned = false;
     return;
   }
   if (manual || !serverWarned) {
     serverWarned = true;
-    showToast('Apps Script Versi Lama ⚠️', 'Deploy ulang Apps Script (New version) supaya QC & Batch masuk ke Sheet.', 'error', 8000);
+    showToast('Apps Script Versi Lama ⚠️', 'Update Apps Script ke v5 (tambah Cek.gs) lalu deploy New version supaya Cek Koloni masuk ke Sheet.', 'error', 8000);
   }
 }
 
@@ -2935,6 +3088,7 @@ async function fetchAllDataFromSheet() {
     localHistory.kunjungan = mergeData(localHistory.kunjungan, sheetKunjungan);
     localHistory.qc = mergeData(localHistory.qc, sheetQc);
     mergeAkhirFromServer(result);
+        mergeCekFromServer(result);
     saveLocalHistory();
     checkServerVersion(result, true);
 
@@ -2951,6 +3105,7 @@ async function fetchAllDataFromSheet() {
 
     const activeTab = document.querySelector('.tab-content.active');
     if (activeTab && activeTab.id === 'tab-trend') renderTrendDashboard();
+    if (activeTab && activeTab.id === 'tab-cek') renderCekTab();
 
     setTimeout(() => { syncStatus.className = 'status'; }, 5000);
 
@@ -3424,6 +3579,633 @@ function renderBarChart(filteredData, ghFilter) {
     }
   });
 }
+
+// ============================================
+// CEK KOLONI: POPULASI (%) + JADWAL GULA
+// ============================================
+
+const CEK_FLAGS = ['Ratu terlihat', 'Ada telur/larva', 'Ulat lilin', 'Pakan/gula habis', 'Kepanasan', 'Terpapar semprot', 'Bergerombol di luar kotak'];
+const CEK_FLAGS_BURUK = ['Ulat lilin', 'Pakan/gula habis', 'Kepanasan', 'Terpapar semprot', 'Bergerombol di luar kotak'];
+const CEK_POP_QUICK = [100, 75, 50, 25, 10];
+const CEK_SUHU_PANAS = 34;            // batas suhu (°C) yang dicatat sebagai petunjuk di analisis koloni berakhir
+const CEK_TURUN_POIN = 20;            // penurunan populasi (poin) antar cek yang dianggap mencolok
+const CEK_DEFAULTS = { gulaHari: 3, cekHari: 3, waspada: 60, ganti: 40 };
+
+let cekEditId = null;
+let cekEditExtra = {};
+let cekEditKey = null;
+let cekChartInstance = null;
+
+function cekSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('bee_cek_settings') || '{}');
+    return { ...CEK_DEFAULTS, ...s };
+  } catch (e) { return { ...CEK_DEFAULTS }; }
+}
+
+function cekLoadSettingsUI() {
+  const s = cekSettings();
+  document.getElementById('setGulaHari').value = s.gulaHari;
+  document.getElementById('setCekHari').value = s.cekHari;
+  document.getElementById('setWaspada').value = s.waspada;
+  document.getElementById('setGanti').value = s.ganti;
+}
+
+function cekSaveSettings() {
+  const num = (id, def, min, max) => {
+    const n = parseInt(document.getElementById(id).value, 10);
+    return (isNaN(n) || n < min || n > max) ? def : n;
+  };
+  const s = {
+    gulaHari: num('setGulaHari', CEK_DEFAULTS.gulaHari, 1, 30),
+    cekHari: num('setCekHari', CEK_DEFAULTS.cekHari, 1, 30),
+    waspada: num('setWaspada', CEK_DEFAULTS.waspada, 1, 100),
+    ganti: num('setGanti', CEK_DEFAULTS.ganti, 1, 100)
+  };
+  if (s.ganti > s.waspada) s.ganti = s.waspada;
+  localStorage.setItem('bee_cek_settings', JSON.stringify(s));
+  cekLoadSettingsUI();
+  renderCekTab();
+  showToast('Pengaturan Tersimpan ✓', 'Jadwal gula & ambang populasi diperbarui.', 'success', 2500);
+}
+
+function cekPop(v) {
+  if (v === '' || v === null || v === undefined) return null;
+  const n = parseFloat(String(v).replace(',', '.'));
+  return isNaN(n) ? null : Math.max(0, Math.min(100, Math.round(n)));
+}
+function cekIsGula(v) { return /^(ya|y|1|true)$/i.test(String(v === undefined || v === null ? '' : v).trim()); }
+function cekIso(n) { return new Date(n * 86400000).toISOString().slice(0, 10); }
+function cekShort(str) { const m = String(str || '').match(/^\d{4}-(\d{2})-(\d{2})/); return m ? m[2] + '/' + m[1] : (str || '-'); }
+function cekAgo(d) { return d === 0 ? 'hari ini' : d + ' hr lalu'; }
+function cekWeekStart(str) { const n = dayNum(str); return isNaN(n) ? NaN : n - ((n + 3) % 7); } // Senin (hari ke-0 = Kamis)
+function cekPopClass(p, set) { return p === null ? '' : (p <= set.ganti ? 'cek-pop-bad' : (p <= set.waspada ? 'cek-pop-warn' : 'cek-pop-ok')); }
+
+// ---- Server: pastikan Apps Script sudah v5 sebelum kirim data cek ----
+async function ensureServerVersion() {
+  if (serverApiVersion >= 5) return serverApiVersion;
+  try {
+    const res = await fetch(scriptUrl);
+    const j = await res.json();
+    serverApiVersion = Number(j.qcVersion) || 0;
+  } catch (e) { /* biarkan 0 */ }
+  return serverApiVersion;
+}
+
+async function cekPost(payload) {
+  const res = await fetch(scriptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+async function cekDropQueued(cid) {
+  if (!cid) return;
+  try {
+    const q = await getQueuedData();
+    for (const item of q) {
+      if (item.type === 'cek' && item.data && item.data.cid === cid && item.data.action !== 'delete-row') {
+        await deleteFromQueue(item.id);
+      }
+    }
+  } catch (e) { console.error(e); }
+}
+
+function mergeCekFromServer(result) {
+  if (!result || !Array.isArray(result.cek_koloni)) return;
+  const sheet = result.cek_koloni.map(mapSheetRow);
+  const localOnly = (localHistory.cek || []).filter(l => !String(l._localId || '').startsWith('sheet_'));
+  const unsynced = localOnly.filter(loc => !sheet.some(sh =>
+    sh.tanggal === loc.tanggal && sh.waktu === loc.waktu && sh.gh === loc.gh));
+  localHistory.cek = [...sheet, ...unsynced];
+}
+
+// ---- Data cek: satu entri per kotak ----
+function cekFlat() {
+  const out = [];
+  const key = r => (r.tanggal || '') + ' ' + (r.waktu || '');
+  [...(localHistory.cek || [])].sort((a, b) => key(a).localeCompare(key(b))).forEach(r => {
+    for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+      const pop = cekPop(r['kotak' + i + '_pop']);
+      const gula = cekIsGula(r['kotak' + i + '_gula']);
+      const tanda = String(r['kotak' + i + '_tanda'] || '').split(',').map(s => s.trim()).filter(Boolean);
+      const catatan = String(r['kotak' + i + '_catatan'] || '').trim();
+      if (pop === null && !gula && !tanda.length && !catatan) continue;
+      out.push({ gh: r.gh, kotak: i, tanggal: r.tanggal, waktu: r.waktu, pop, gula, tanda, catatan });
+    }
+  });
+  return out;
+}
+
+function cekState(flat, batches, gh, k, set, todayStr) {
+  const b = batches.find(x => x.gh === gh && x.kotak === k && x.isLatest) || null;
+  const kosong = !!(b && b.end);
+  const aktif = (b && !b.end) ? b : null;
+  let es = flat.filter(e => e.gh === gh && e.kotak === k);
+  if (b && b.start) es = es.filter(e => e.tanggal >= b.start);
+
+  const pops = es.filter(e => e.pop !== null);
+  const lastPop = pops.length ? pops[pops.length - 1] : null;
+  const prevPop = pops.length > 1 ? pops[pops.length - 2] : null;
+  const delta = (lastPop && prevPop) ? lastPop.pop - prevPop.pop : null;
+  const deltaHari = (lastPop && prevPop) ? daysBetween(prevPop.tanggal, lastPop.tanggal) : null;
+
+  const gulas = es.filter(e => e.gula);
+  const lastGula = gulas.length ? gulas[gulas.length - 1] : null;
+  const gulaHari = lastGula ? daysBetween(lastGula.tanggal, todayStr) : null;
+
+  const lastCek = es.length ? es[es.length - 1] : null;
+  const cekHari = lastCek ? daysBetween(lastCek.tanggal, todayStr) : null;
+
+  const umur = (aktif && aktif.umur !== null) ? aktif.umur : (es.length ? daysBetween(es[0].tanggal, todayStr) : null);
+
+  const todayN = dayNum(todayStr);
+  const buruk = [];
+  es.filter(e => dayNum(e.tanggal) >= todayN - 7).forEach(e => e.tanda.forEach(t => {
+    if (CEK_FLAGS_BURUK.includes(t) && !buruk.includes(t)) buruk.push(t);
+  }));
+
+  let gulaDue = false, gulaTelat = 0;
+  if (!kosong) {
+    if (gulaHari === null) { if (umur !== null && umur >= set.gulaHari) { gulaDue = true; gulaTelat = umur - set.gulaHari; } }
+    else if (gulaHari >= set.gulaHari) { gulaDue = true; gulaTelat = gulaHari - set.gulaHari; }
+  }
+
+  return { gh, kotak: k, b, aktif, kosong, es, lastPop, delta, deltaHari, lastGula, gulaHari, lastCek, cekHari, umur, buruk, gulaDue, gulaTelat };
+}
+
+// ---- Render tab utama ----
+function renderCekTab() {
+  const box = document.getElementById('cekStatus');
+  if (!box) return;
+  const set = cekSettings();
+  const flat = cekFlat();
+  const batches = buildBatches();
+  const todayStr = getLocalDate();
+
+  const perhatian = [];
+  const perluGula = [];
+  let html = '';
+
+  Object.keys(QC_KOTAK_PER_GH).forEach(gh => {
+    html += `<div class="bt-gh-title">${gh}</div><div class="bt-grid">`;
+    for (let k = 1; k <= QC_KOTAK_PER_GH[gh]; k++) {
+      const s = cekState(flat, batches, gh, k, set, todayStr);
+
+      if (s.kosong) {
+        html += `<div class="bt-card bt-empty"><div class="bt-top"><b>Kotak ${k}</b><span class="bt-days" style="color:#c62828;">KOSONG</span></div>
+          <div>Batch ${qcEsc(s.b.batch)} sudah berakhir</div><div class="bt-note" style="color:#c62828;">Isi koloni baru di tab QC</div></div>`;
+        continue;
+      }
+
+      const alasan = [];
+      if (s.lastPop) {
+        if (s.lastPop.pop <= set.ganti) alasan.push(`populasi ${s.lastPop.pop}% (di bawah ambang ganti)`);
+        else if (s.lastPop.pop <= set.waspada) alasan.push(`populasi ${s.lastPop.pop}%`);
+      }
+      if (s.delta !== null && s.delta <= -CEK_TURUN_POIN) alasan.push(`turun ${-s.delta} poin dalam ${s.deltaHari} hr`);
+      if (s.cekHari === null) { if (s.aktif && s.umur !== null && s.umur >= set.cekHari) alasan.push('belum pernah dicek'); }
+      else if (s.cekHari > set.cekHari) alasan.push(`belum dicek ${s.cekHari} hr`);
+      if (s.buruk.length) alasan.push(s.buruk.join(', ').toLowerCase());
+      if (alasan.length) perhatian.push(`<b>${gh} K${k}</b>: ${alasan.join('; ')}`);
+      if (s.gulaDue) perluGula.push(`${gh} K${k} (${s.gulaHari === null ? 'belum pernah' : (s.gulaTelat === 0 ? 'jadwal hari ini' : 'telat ' + s.gulaTelat + ' hr')})`);
+
+      let cls = 'bt-green', popTxt = 'Belum ada %';
+      if (s.lastPop) {
+        const p = s.lastPop.pop;
+        cls = p <= set.ganti ? 'bt-red' : (p <= set.waspada ? 'bt-orange' : 'bt-green');
+        const tr = s.delta === null ? '' : (s.delta > 0 ? ` <span class="cek-trend-up">▲${s.delta}</span>` : (s.delta < 0 ? ` <span class="cek-trend-down">▼${-s.delta}</span>` : ''));
+        popTxt = `${p}%${tr}`;
+      } else { cls = ''; }
+
+      let gulaTxt;
+      if (s.gulaHari === null) gulaTxt = '<span class="cek-late">belum ada catatan gula</span>';
+      else {
+        const sisa = set.gulaHari - s.gulaHari;
+        if (sisa > 0) gulaTxt = `${cekAgo(s.gulaHari)} · berikut ${sisa} hr lagi`;
+        else if (sisa === 0) gulaTxt = `${cekAgo(s.gulaHari)} · <b>jadwal hari ini</b>`;
+        else gulaTxt = `<span class="cek-late">telat ${-sisa} hr</span> (${cekAgo(s.gulaHari)})`;
+      }
+
+      const batchLine = s.aktif ? `Batch <b>${qcEsc(s.aktif.batch)}</b>${s.umur !== null ? ' · hari ke-' + s.umur : ''}` : '<span style="color:#888;">Belum ada batch di tab QC</span>';
+      const cekTxt = s.lastCek ? `${cekShort(s.lastCek.tanggal)} (${cekAgo(s.cekHari)})` : 'belum pernah';
+      const chips = s.buruk.map(t => `<span class="cek-chip">${qcEsc(t)}</span>`).join('');
+
+      html += `<div class="bt-card ${cls}">
+        <div class="bt-top"><b>Kotak ${k}${s.aktif && s.aktif.koloni ? ' · ' + qcEsc(s.aktif.koloni) : ''}</b><span class="bt-days">${popTxt}</span></div>
+        <div>${batchLine}</div>
+        <div>🍯 ${gulaTxt}</div>
+        <div>Cek: ${cekTxt}</div>
+        ${chips ? '<div>' + chips + '</div>' : ''}
+        <button type="button" class="bt-btn" data-gh="${gh}" data-k="${k}">Catat cek</button>
+      </div>`;
+    }
+    html += '</div>';
+  });
+  box.innerHTML = html;
+
+  const sum = document.getElementById('cekSummary');
+  if (perhatian.length) {
+    sum.className = 'bt-summary warn';
+    sum.innerHTML = '⚠️ Perlu perhatian:<br><span style="font-weight:500;font-size:13px;">' + perhatian.join('<br>') + '</span>';
+  } else if (flat.length) {
+    sum.className = 'bt-summary ok';
+    sum.textContent = '✅ Populasi & cek semua kotak masih dalam batas.';
+  } else {
+    sum.className = 'bt-summary ok';
+    sum.textContent = 'Belum ada data cek. Catat cek pertama di bawah.';
+  }
+
+  const gs = document.getElementById('cekGulaSummary');
+  if (perluGula.length) {
+    gs.className = 'bt-summary warn';
+    gs.innerHTML = '🍯 Perlu gula: ' + perluGula.join(', ');
+  } else {
+    gs.className = 'bt-summary ok';
+    gs.textContent = '🍯 Jadwal gula aman (tiap ' + set.gulaHari + ' hari).';
+  }
+
+  renderCekCharts(flat);
+  renderCekWeekly(flat, set);
+  renderCekDiag(flat, batches, set);
+  renderCekHistory(set);
+}
+
+// ---- Grafik tren populasi ----
+function renderCekCharts(flatArg) {
+  const canvas = document.getElementById('cekChart');
+  const note = document.getElementById('cekChartNote');
+  if (!canvas) return;
+  const flat = flatArg || cekFlat();
+  const set = cekSettings();
+  const gh = document.getElementById('cekGhFilter').value;
+  const es = flat.filter(e => e.gh === gh && e.pop !== null);
+
+  if (cekChartInstance) { cekChartInstance.destroy(); cekChartInstance = null; }
+  if (typeof Chart === 'undefined') { note.textContent = 'Grafik belum bisa dimuat (Chart.js belum tersedia).'; return; }
+  if (!es.length) { canvas.style.display = 'none'; note.textContent = 'Belum ada data % populasi untuk ' + gh + '.'; return; }
+  canvas.style.display = 'block';
+  note.textContent = '';
+
+  const dates = [...new Set(es.map(e => e.tanggal))].sort();
+  const colors = ['#2d5016', '#1565c0', '#ef6c00', '#6a1b9a', '#00838f', '#ad1457'];
+  const datasets = [];
+  for (let k = 1; k <= QC_KOTAK_PER_GH[gh]; k++) {
+    const data = dates.map(d => {
+      const x = es.filter(e => e.kotak === k && e.tanggal === d);
+      return x.length ? x[x.length - 1].pop : null;
+    });
+    if (data.some(v => v !== null)) {
+      datasets.push({ label: 'K' + k, data, borderColor: colors[k - 1], backgroundColor: colors[k - 1], tension: 0.25, spanGaps: true, pointRadius: 3, borderWidth: 2 });
+    }
+  }
+  datasets.push({ label: 'Waspada', data: dates.map(() => set.waspada), borderColor: '#f9a825', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5, fill: false });
+  datasets.push({ label: 'Ganti', data: dates.map(() => set.ganti), borderColor: '#c62828', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5, fill: false });
+
+  cekChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: { labels: dates.map(cekShort), datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { y: { min: 0, max: 100, title: { display: true, text: 'Populasi (%)' } } },
+      plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Populasi koloni ' + gh } }
+    }
+  });
+}
+
+// ---- Rekap mingguan ----
+function renderCekWeekly(flat, set) {
+  const body = document.getElementById('cekWeekBody');
+  const ws0 = cekWeekStart(getLocalDate());
+  const rows = [];
+  for (let w = 0; w < 6; w++) {
+    const wsN = ws0 - 7 * w, weN = wsN + 6;
+    const inW = d => { const n = dayNum(d); return n >= wsN && n <= weN; };
+    Object.keys(QC_KOTAK_PER_GH).forEach(gh => {
+      const es = flat.filter(e => e.gh === gh && inW(e.tanggal));
+      const pops = es.filter(e => e.pop !== null).map(e => e.pop);
+      const gulaDates = new Set(es.filter(e => e.gula).map(e => e.tanggal));
+      const kj = (localHistory.kunjungan || []).filter(r => r.gh === gh && inW(r.tanggal));
+      if (!pops.length && !gulaDates.size && !kj.length) return;
+      const avgPop = pops.length ? Math.round(pops.reduce((t, v) => t + v, 0) / pops.length) : null;
+      const kjTotal = kj.reduce((t, r) => t + getTotalPerItem(r), 0);
+      rows.push(`<tr>
+        <td>${cekShort(cekIso(wsN))}–${cekShort(cekIso(weN))}</td>
+        <td>${gh}</td>
+        <td>${avgPop !== null ? `<span class="${cekPopClass(avgPop, set)}">${avgPop}%</span>` : '-'}</td>
+        <td>${gulaDates.size || '-'}</td>
+        <td>${kj.length ? (kjTotal / kj.length).toFixed(1) + ' <span style="color:#888;">(' + kj.length + ' sesi)</span>' : '-'}</td>
+      </tr>`);
+    });
+  }
+  body.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="5" class="history-empty">Belum ada data 6 minggu terakhir.</td></tr>';
+}
+
+// ---- Petunjuk koloni berakhir ----
+function cekDiagnose(b, flat, set) {
+  const out = [];
+  const es = flat.filter(e => e.gh === b.gh && e.kotak === b.kotak && e.tanggal >= b.start && e.tanggal <= b.end);
+  const pops = es.filter(e => e.pop !== null);
+  if (pops.length) {
+    const last = pops[pops.length - 1];
+    const peak = pops.reduce((m, e) => e.pop > m.pop ? e : m, pops[0]);
+    out.push(`Populasi terakhir ${last.pop}% (${daysBetween(last.tanggal, b.end)} hr sebelum berakhir)`);
+    if (peak.pop - last.pop >= CEK_TURUN_POIN) out.push(`Turun dari ${peak.pop}% (${cekShort(peak.tanggal)})`);
+  } else {
+    out.push('<span style="color:#888;">Tidak ada data % populasi</span>');
+  }
+
+  const gulas = es.filter(e => e.gula);
+  if (gulas.length) {
+    const d = daysBetween(gulas[gulas.length - 1].tanggal, b.end);
+    out.push(`Gula terakhir ${d} hr sebelum berakhir${d > set.gulaHari ? ' <span class="cek-late">(lewat jadwal)</span>' : ''}`);
+  } else {
+    out.push('<span class="cek-late">Tidak ada catatan gula</span>');
+  }
+
+  const endN = dayNum(b.end);
+  const kj = (localHistory.kunjungan || []).filter(r => r.gh === b.gh && dayNum(r.tanggal) >= endN - 3 && dayNum(r.tanggal) <= endN);
+  const sem = kj.filter(r => String(r.kejadian || '').includes('Habis semprot')).map(r => r.tanggal).sort();
+  if (sem.length) out.push(`Habis semprot ${daysBetween(sem[sem.length - 1], b.end)} hr sebelumnya`);
+  const temps = kj.filter(r => dayNum(r.tanggal) >= endN - 2).map(r => normalizeSuhu(r.suhu)).filter(x => x !== '');
+  if (temps.length && Math.max(...temps) >= CEK_SUHU_PANAS) out.push(`Suhu maks ${Math.max(...temps)}°C (≥${CEK_SUHU_PANAS}°C)`);
+
+  const buruk = [];
+  es.filter(e => dayNum(e.tanggal) >= endN - 7).forEach(e => e.tanda.forEach(t => {
+    if (CEK_FLAGS_BURUK.includes(t) && !buruk.includes(t)) buruk.push(t);
+  }));
+  const chips = buruk.map(t => `<span class="cek-chip">${qcEsc(t)}</span>`).join('');
+
+  return out.map(x => `<div>${x}</div>`).join('') + (chips ? `<div>${chips}</div>` : '');
+}
+
+function renderCekDiag(flat, batches, set) {
+  const body = document.getElementById('cekDiagBody');
+  const ended = batches.filter(b => b.end && b.start)
+    .sort((a, b) => (b.end || '').localeCompare(a.end || '')).slice(0, 12);
+  body.innerHTML = ended.length ? ended.map(b => `<tr>
+      <td><b>${b.gh}</b> K${b.kotak}<br>${qcEsc(b.batch)}${b.koloni ? '<br>' + qcEsc(b.koloni) : ''}</td>
+      <td>${b.umur !== null ? b.umur + ' hr' : '-'}</td>
+      <td>${qcEsc(b.penyebab || 'Selesai')}<br><span style="color:#888;">${cekShort(b.end)}</span></td>
+      <td class="cek-hint-list">${cekDiagnose(b, flat, set)}</td>
+    </tr>`).join('') : '<tr><td colspan="4" class="history-empty">Belum ada koloni yang berakhir.</td></tr>';
+}
+
+// ---- Riwayat ----
+function renderCekHistory(set) {
+  const body = document.getElementById('cekHistoryBody');
+  const rows = [...(localHistory.cek || [])].sort((a, b) =>
+    ((b.tanggal || '') + (b.waktu || '')).localeCompare((a.tanggal || '') + (a.waktu || ''))).slice(0, 15);
+  body.innerHTML = rows.length ? rows.map(r => {
+    const parts = [];
+    for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+      const pop = cekPop(r['kotak' + i + '_pop']);
+      const gula = cekIsGula(r['kotak' + i + '_gula']);
+      const tanda = String(r['kotak' + i + '_tanda'] || '').split(',').map(s => s.trim()).filter(t => CEK_FLAGS_BURUK.includes(t));
+      const cat = String(r['kotak' + i + '_catatan'] || '').trim();
+      if (pop === null && !gula && !tanda.length && !cat) continue;
+      parts.push(`K${i}${pop !== null ? ' <span class="' + cekPopClass(pop, set) + '">' + pop + '%</span>' : ''}${gula ? ' 🍯' : ''}${tanda.length ? ' ⚠️' : ''}`);
+    }
+    const badge = r._syncedToSheet
+      ? '<span style="color:#2e7d32;font-size:9px;font-weight:700;">● SHEET</span>'
+      : '<span style="color:#e65100;font-size:9px;font-weight:700;">● LOCAL</span>';
+    return `<tr>
+      <td>${qcEsc(r.tanggal || '-')}<br>${qcEsc(r.waktu || '')}<br>${badge}</td>
+      <td>${qcEsc(r.gh || '-')}</td>
+      <td style="font-size:12px;line-height:1.6;">${parts.join(' · ') || '-'}</td>
+      <td style="text-align:center;white-space:nowrap;">
+        <button class="history-btn history-btn-edit" onclick="cekEdit('${r._localId}')">✏️</button>
+        <button class="history-btn history-btn-delete" onclick="cekDelete('${r._localId}')">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="4" class="history-empty">Belum ada riwayat cek.</td></tr>';
+}
+
+// ---- Form ----
+function renderCekKotak(gh, values) {
+  const box = document.getElementById('cekKotakList');
+  const n = QC_KOTAK_PER_GH[gh] || 0;
+  if (!n) { box.innerHTML = '<div class="qc-hint">Pilih GH dulu untuk menampilkan kotak.</div>'; return; }
+  const batches = buildBatches();
+  const v = values || {};
+  let html = '';
+  for (let i = 1; i <= n; i++) {
+    const b = batches.find(x => x.gh === gh && x.kotak === i && x.isLatest && !x.end);
+    const sub = b ? `Batch ${qcEsc(b.batch)}${b.koloni ? ' · ' + qcEsc(b.koloni) : ''}${b.umur !== null ? ' · hari ke-' + b.umur : ''}` : '';
+    const pop = cekPop(v['kotak' + i + '_pop']);
+    const gula = cekIsGula(v['kotak' + i + '_gula']);
+    const tanda = String(v['kotak' + i + '_tanda'] || '').split(',').map(s => s.trim());
+    html += `<div class="cek-item" data-k="${i}">
+      <div class="cek-title">Kotak ${i} <span class="cek-sub">${sub}</span></div>
+      <div class="cek-row">
+        <input type="number" class="cek-pop-input" id="cek-pop-${i}" min="0" max="100" step="5" inputmode="numeric" placeholder="–" value="${pop === null ? '' : pop}">
+        <span class="cek-pct">%</span>
+        ${CEK_POP_QUICK.map(q => `<button type="button" class="cek-quick" data-k="${i}" data-v="${q}">${q}</button>`).join('')}
+      </div>
+      <div class="cek-row"><label class="cek-gula"><input type="checkbox" id="cek-gula-${i}" ${gula ? 'checked' : ''}> 🍯 Dikasih gula</label></div>
+      <div class="qc-flags cek-flags" id="cek-flags-${i}">${CEK_FLAGS.map(f => `<label><input type="checkbox" value="${qcEsc(f)}" ${tanda.includes(f) ? 'checked' : ''}> ${qcEsc(f)}</label>`).join('')}</div>
+      <input type="text" class="cek-cat" id="cek-cat-${i}" placeholder="Catatan kotak ${i} (opsional)" value="${qcEsc(v['kotak' + i + '_catatan'] || '')}">
+    </div>`;
+  }
+  box.innerHTML = html;
+}
+
+function collectCek(gh) {
+  const n = QC_KOTAK_PER_GH[gh] || 0;
+  const fields = {};
+  let filled = 0;
+  for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+    let pop = '', gula = '', tanda = '', cat = '';
+    if (i <= n) {
+      const p = cekPop(document.getElementById('cek-pop-' + i).value.trim());
+      pop = p === null ? '' : p;
+      gula = document.getElementById('cek-gula-' + i).checked ? 'Ya' : '';
+      tanda = [...document.querySelectorAll('#cek-flags-' + i + ' input:checked')].map(x => x.value).join(', ');
+      cat = document.getElementById('cek-cat-' + i).value.trim();
+    }
+    fields['kotak' + i + '_pop'] = pop;
+    fields['kotak' + i + '_gula'] = gula;
+    fields['kotak' + i + '_tanda'] = tanda;
+    fields['kotak' + i + '_catatan'] = cat;
+    if (pop !== '' || gula || tanda || cat) filled++;
+  }
+  return { fields, filled };
+}
+
+function showStatusCek(msg, type) {
+  const el = document.getElementById('statusCek');
+  el.textContent = msg;
+  el.className = 'status ' + type;
+}
+
+function resetFormCek() {
+  document.getElementById('cekForm').reset();
+  document.getElementById('tanggalCek').value = getLocalDate();
+  document.getElementById('waktuCek').value = nowHHMM();
+  cekEditId = null; cekEditExtra = {}; cekEditKey = null;
+  document.getElementById('editIndicatorCek').classList.remove('show');
+  const btn = document.getElementById('submitBtnCek');
+  btn.textContent = 'Kirim';
+  btn.disabled = false;
+  document.getElementById('statusCek').className = 'status';
+  renderCekKotak('');
+}
+
+function cekPrefill(gh, k) {
+  resetFormCek();
+  document.getElementById('cekFormBox').open = true;
+  document.getElementById('ghCek').value = gh;
+  renderCekKotak(gh);
+  document.getElementById('cekFormBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const inp = document.getElementById('cek-pop-' + k);
+  if (inp) setTimeout(() => inp.focus({ preventScroll: true }), 350);
+}
+
+function cekEdit(localId) {
+  const d = (localHistory.cek || []).find(x => x._localId === localId);
+  if (!d) return;
+  cekEditId = localId;
+  cekEditKey = { tanggal: d.tanggal || '', waktu: (d._waktuRaw !== undefined ? d._waktuRaw : d.waktu) || '', gh: d.gh || '' };
+  cekEditExtra = { cid: d.cid || '' };
+  document.getElementById('cekFormBox').open = true;
+  document.getElementById('tanggalCek').value = d.tanggal || getLocalDate();
+  document.getElementById('waktuCek').value = d.waktu || '';
+  document.getElementById('ghCek').value = d.gh || '';
+  document.getElementById('catatanCek').value = d.catatan || '';
+  renderCekKotak(d.gh || '', d);
+  document.getElementById('editIndicatorCek').classList.add('show');
+  document.getElementById('submitBtnCek').textContent = 'Update Data';
+  document.getElementById('cekFormBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showToast('Mode Edit ✏️', 'Ubah data lalu klik Update.', 'info', 2500);
+}
+
+async function cekDelete(localId) {
+  const d = (localHistory.cek || []).find(x => x._localId === localId);
+  if (!d) return;
+  if (!confirm(`Hapus cek tanggal ${d.tanggal} ${d.waktu || ''} (${d.gh})?`)) return;
+
+  if (!d._syncedToSheet) {
+    await cekDropQueued(d.cid);
+    deleteLocalHistory('cek', localId);
+    updateQueueBadge();
+    renderCekTab();
+    showToast('Data Dihapus 🗑️', 'Data lokal dihapus.', 'success', 3000);
+    return;
+  }
+
+  if (!isAuthenticated || !scriptUrl || !navigator.onLine) {
+    showToast('Perlu Online', 'Data ini sudah ada di Sheet. Hapus saat online supaya tidak muncul lagi.', 'error', 5000);
+    return;
+  }
+
+  showLoadingOverlay('Menghapus data dari Google Sheet...');
+  try {
+    if ((await ensureServerVersion()) < 5) throw new Error('Apps Script di server masih versi lama (belum deploy v5).');
+    const result = await cekPost({
+      sheet: 'cek_koloni', action: 'delete-row',
+      tanggal: d.tanggal, waktu: (d._waktuRaw !== undefined ? d._waktuRaw : d.waktu), gh: d.gh
+    });
+    if (result.status === 'error') throw new Error(result.message || 'Gagal menghapus.');
+    deleteLocalHistory('cek', localId);
+    hideLoadingOverlay();
+    renderCekTab();
+    showToast('Data Dihapus 🗑️', result.status === 'not_found' ? 'Sudah tidak ada di Sheet.' : 'Cek berhasil dihapus.', 'success', 3500);
+  } catch (err) {
+    hideLoadingOverlay();
+    showToast('Gagal Hapus', friendlyErr(err), 'error', 5000);
+  }
+}
+
+document.getElementById('ghCek').addEventListener('change', e => renderCekKotak(e.target.value));
+
+document.getElementById('cekKotakList').addEventListener('click', e => {
+  const q = e.target.closest('.cek-quick');
+  if (!q) return;
+  document.getElementById('cek-pop-' + q.dataset.k).value = q.dataset.v;
+});
+
+document.getElementById('cekStatus').addEventListener('click', e => {
+  const btn = e.target.closest('.bt-btn');
+  if (!btn) return;
+  cekPrefill(btn.dataset.gh, parseInt(btn.dataset.k, 10));
+});
+
+document.getElementById('cekForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const gh = document.getElementById('ghCek').value;
+  const tanggal = document.getElementById('tanggalCek').value;
+  const waktu = document.getElementById('waktuCek').value;
+  if (!gh) { showStatusCek('Pilih greenhouse dulu.', 'error'); return; }
+
+  const { fields, filled } = collectCek(gh);
+  if (!filled) { showStatusCek('Isi minimal satu kotak (populasi, gula, tanda, atau catatan).', 'error'); return; }
+
+  const isEdit = !!cekEditId;
+  const clash = (localHistory.cek || []).some(x => x._localId !== cekEditId && x.tanggal === tanggal && x.waktu === waktu && x.gh === gh);
+  if (clash) { showStatusCek(`Sudah ada cek ${gh} jam ${waktu} di tanggal ini. Ubah jamnya, atau edit data yang lama.`, 'error'); return; }
+
+  const existing = isEdit ? (localHistory.cek || []).find(x => x._localId === cekEditId) : null;
+  const formData = {
+    sheet: 'cek_koloni',
+    action: (isEdit && existing && existing._syncedToSheet) ? 'update' : 'submit',
+    tanggal, waktu, gh,
+    catatan: document.getElementById('catatanCek').value.trim(),
+    cid: (isEdit && cekEditExtra.cid) ? cekEditExtra.cid : newCid(),
+    ...fields
+  };
+  if (isEdit && cekEditKey) {
+    formData.oldTanggal = cekEditKey.tanggal;
+    formData.oldWaktu = cekEditKey.waktu;
+    formData.oldGh = cekEditKey.gh;
+  }
+  if (isEdit && existing && !existing._syncedToSheet) await cekDropQueued(formData.cid);
+
+  const btn = document.getElementById('submitBtnCek');
+  btn.disabled = true;
+  showStatusCek(isEdit ? 'Mengupdate...' : 'Menyimpan...', 'loading');
+
+  let synced = false;
+  try {
+    if (isAuthenticated && scriptUrl && navigator.onLine) {
+      if ((await ensureServerVersion()) < 5) throw new Error('Apps Script di server masih versi lama (belum deploy v5).');
+      let result = await cekPost(formData);
+      if (formData.action === 'update' && result.status === 'not_found') {
+        formData.action = 'submit';
+        result = await cekPost(formData);
+      }
+      if (result.status === 'error') throw new Error(result.message || 'Gagal');
+      if (result.sheet !== 'cek_koloni') throw new Error('Apps Script di server masih versi lama (belum deploy v5).');
+      synced = true;
+      showStatusCek(isEdit ? '✓ Cek berhasil diupdate!' : '✓ Cek tersimpan di Sheet.', 'success');
+      showToast(isEdit ? 'Update Berhasil! ✏️' : 'Cek Tersimpan! ✓', 'Data cek koloni masuk ke Sheet.', 'success', 3500);
+    } else {
+      await saveToQueue(formData, 'cek');
+      showStatusCek('📥 Tersimpan lokal. Auto-sync akan kirim otomatis.', 'info');
+    }
+  } catch (err) {
+    console.error(err);
+    await saveToQueue(formData, 'cek');
+    showStatusCek('⚠️ Belum masuk Sheet: ' + friendlyErr(err) + ' (tersimpan lokal)', 'error');
+  }
+
+  const rec = { ...formData };
+  delete rec.oldTanggal; delete rec.oldWaktu; delete rec.oldGh;
+  if (isEdit) updateLocalHistory('cek', cekEditId, rec, synced);
+  else addLocalHistory('cek', rec, synced);
+
+  updateQueueBadge();
+  const keepMsg = document.getElementById('statusCek').textContent;
+  const keepCls = document.getElementById('statusCek').className;
+  resetFormCek();
+  showStatusCek(keepMsg, keepCls.replace('status ', ''));
+  renderCekTab();
+});
+
+cekLoadSettingsUI();
+resetFormCek();
 
 // ============================================
 // SERVICE WORKER
