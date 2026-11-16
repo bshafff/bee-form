@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0",
+  "version": "1.5.0",
   "released": "2026-11-16",
-  "notes": "QC & riwayat: banyak foto per kotak. Cek Koloni: tambah foto & video (bisa lebih dari satu)."
+  "notes": "Peta Zona/Bay default di Cek, GH 2 mendukung 6 kotak, dan penambahan Bay 11 di Kunjungan."
 }
