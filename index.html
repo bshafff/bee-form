@@ -562,6 +562,28 @@ button.btn-delete:hover { background: #c82333; }
 .cek-settings label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 4px; }
 .cek-settings input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
 
+
+/* ===== MEDIA MULTI (foto/video) ===== */
+.mdx { margin-top: 8px; }
+.mdx-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.mdx-count { font-size: 12px; color: #777; }
+.mdx-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.mdx-grid:empty { display: none; }
+.mdx-t { position: relative; width: 64px; height: 64px; border-radius: 6px; overflow: hidden; border: 1px solid #ddd; background: #eee; cursor: pointer; }
+.mdx-t img, .mdx-t video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mdx-t.video { background: #263238; }
+.mdx-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); color: #fff; font-size: 18px; text-shadow: 0 0 4px rgba(0,0,0,.7); pointer-events: none; }
+.mdx-x { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border: none; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; font-size: 11px; line-height: 20px; padding: 0; cursor: pointer; }
+.mdx-badge { display: inline-block; padding: 1px 6px; border-radius: 10px; background: #e8f5e9; color: #1b5e20; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.mdx-badge.off { background: #f1f1f1; color: #777; cursor: default; }
+.mdx-lb { position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; }
+.mdx-lb-box { width: 100%; max-width: 560px; height: 70vh; display: flex; align-items: center; justify-content: center; }
+.mdx-lb-box img, .mdx-lb-box video { max-width: 100%; max-height: 100%; border-radius: 6px; }
+.mdx-lb-box iframe { width: 100%; height: 100%; border: 0; border-radius: 6px; background: #000; }
+.mdx-lb-bar { display: flex; align-items: center; gap: 14px; margin-top: 12px; color: #fff; font-size: 14px; }
+.mdx-lb-bar button { background: rgba(255,255,255,.18); color: #fff; border: none; border-radius: 20px; padding: 8px 16px; font-size: 16px; cursor: pointer; }
+.mdx-lb-x { position: absolute; top: 12px; right: 14px; background: rgba(255,255,255,.18); color: #fff; border: none; border-radius: 50%; width: 36px; height: 36px; font-size: 18px; cursor: pointer; }
+
 </style>
 
 </head>
@@ -1095,7 +1117,7 @@ button.btn-delete:hover { background: #c82333; }
 // ============================================
 // 🔧 KONFIGURASI AUTO-CONNECT
 // ============================================
-const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxJcn9zgd1mLq8-m1pXyPEmZDYd1M-R1AoZF_WrGaIhIm4F92ahXjHpupZk4icROt9W4A/exec';
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyaxc9hOMj1A9uXvsMmB2JrGWB1u_lCpBtsRobJ377caHYY3I6Mp-VlLZiwvIwmrqHVfA/exec';
 
 // ============================================
 // STATE
@@ -1497,6 +1519,7 @@ async function syncQueuedData() {
   for (const item of queued) {
     try {
       if (item.type === 'cek' && (await ensureServerVersion()) < 5) throw new Error('Apps Script belum v5');
+      if (mediaNeedsNewApi(item.data) && !(await mediaApiOk())) throw new Error(MEDIA_API_ERR);
       const res = await fetch(scriptUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
@@ -2014,24 +2037,278 @@ function qcEsc(v) {
     .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-const qcFotoState = {}; 
+// ============================================
+// MEDIA (FOTO / VIDEO) MULTI — dipakai QC & Cek
+// ============================================
+const MEDIA_MAX_FOTO = 8;        // per kotak
+const MEDIA_MAX_VIDEO = 3;       // per kotak
+const MEDIA_MAX_VIDEO_MB = 15;   // per file video
+const MEDIA_MAX_TOTAL_MB = 35;   // total satu kali kirim
+const MEDIA_MIN_API = 6;         // versi Apps Script yang paham foto jamak + video
+const mediaState = { qc: {}, cek: {} };
 
-function qcFotoThumb(val) {
-  if (!val) return '';
-  if (val.startsWith('data:')) return val;
-  const m = val.match(/\/d\/([\w-]+)/) || val.match(/[?&]id=([\w-]+)/);
-  return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w200` : '';
+function mediaParse(v) {
+  if (Array.isArray(v)) return v.map(x => String(x || '').trim()).filter(Boolean);
+  if (v === undefined || v === null) return [];
+  return String(v).split(/[\s,|]+/).filter(Boolean);
 }
 
-function qcShowFoto(i) {
-  const val = qcFotoState[i] || '';
-  const img = document.getElementById(`kotak${i}_prev`);
-  const x = document.getElementById(`kotak${i}_fotox`);
-  const lbl = document.getElementById(`kotak${i}_fotolbl`);
-  if (!img) return;
-  const src = qcFotoThumb(val);
-  if (src) { img.src = src; img.classList.add('show'); x.classList.add('show'); lbl.firstChild.nodeValue = '📷 Ganti foto'; }
-  else { img.removeAttribute('src'); img.classList.remove('show'); x.classList.remove('show'); lbl.firstChild.nodeValue = '📷 Foto'; }
+function mediaInit(ns, values) {
+  values = values || {};
+  const old = mediaState[ns] || {};
+  Object.values(old).forEach(o => ['image', 'video'].forEach(k => (o[k] || []).forEach(m => m.obj && URL.revokeObjectURL(m.obj))));
+  mediaState[ns] = {};
+  for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+    const only = key => mediaParse(values[`kotak${i}_${key}`]).filter(u => /^https?:/.test(u)).map(src => ({ src }));
+    mediaState[ns][i] = { image: only('foto'), video: only('video') };
+  }
+}
+
+function mediaDriveId(u) {
+  const m = String(u).match(/\/d\/([\w-]+)/) || String(u).match(/[?&]id=([\w-]+)/);
+  return m ? m[1] : '';
+}
+
+function mediaThumb(m, kind) {
+  if (m.src.startsWith('data:')) return kind === 'image' ? m.src : '';
+  const id = mediaDriveId(m.src);
+  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w240` : '';
+}
+
+function mediaReadFile(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('Gagal membaca file'));
+    r.readAsDataURL(file);
+  });
+}
+
+function mediaGridHtml(ns, i) {
+  const st = mediaState[ns][i];
+  const tile = (m, kind, idx) => {
+    const th = mediaThumb(m, kind);
+    let inner = '';
+    if (kind === 'video' && m.obj) inner = `<video src="${m.obj}#t=0.1" muted playsinline preload="metadata"></video>`;
+    else if (th) inner = `<img src="${qcEsc(th)}" alt="" loading="lazy">`;
+    const play = kind === 'video' ? '<span class="mdx-play">▶</span>' : '';
+    return `<div class="mdx-t ${kind}" onclick="mediaViewForm('${ns}',${i},'${kind}',${idx})">${inner}${play}` +
+           `<button type="button" class="mdx-x" onclick="event.stopPropagation();mediaRemove('${ns}',${i},'${kind}',${idx})">✕</button></div>`;
+  };
+  return st.image.map((m, x) => tile(m, 'image', x)).join('') + st.video.map((m, x) => tile(m, 'video', x)).join('');
+}
+
+function mediaCountText(ns, i) {
+  const st = mediaState[ns][i];
+  const parts = [];
+  if (st.image.length) parts.push(`📷 ${st.image.length}`);
+  if (st.video.length) parts.push(`🎬 ${st.video.length}`);
+  return parts.join(' · ');
+}
+
+function mediaBlockHtml(ns, i, withVideo) {
+  return `<div class="mdx" id="${ns}-mdx-${i}">
+    <div class="mdx-bar">
+      <label class="qc-foto-btn">📷 Tambah foto<input type="file" accept="image/*" multiple hidden onchange="mediaPick('${ns}',${i},'image',this)"></label>
+      ${withVideo ? `<label class="qc-foto-btn">🎬 Tambah video<input type="file" accept="video/*" multiple hidden onchange="mediaPick('${ns}',${i},'video',this)"></label>` : ''}
+      <span class="mdx-count" id="${ns}-mdx-count-${i}">${mediaCountText(ns, i)}</span>
+    </div>
+    <div class="mdx-grid" id="${ns}-mdx-grid-${i}">${mediaGridHtml(ns, i)}</div>
+  </div>`;
+}
+
+function mediaRefresh(ns, i) {
+  const g = document.getElementById(`${ns}-mdx-grid-${i}`);
+  const c = document.getElementById(`${ns}-mdx-count-${i}`);
+  if (g) g.innerHTML = mediaGridHtml(ns, i);
+  if (c) c.textContent = mediaCountText(ns, i);
+}
+
+async function mediaPick(ns, i, kind, input) {
+  const files = [...(input.files || [])];
+  input.value = '';
+  if (!files.length) return;
+  const list = mediaState[ns][i][kind];
+  const max = kind === 'image' ? MEDIA_MAX_FOTO : MEDIA_MAX_VIDEO;
+  let gagal = 0, besar = 0, penuh = false;
+  for (const file of files) {
+    if (list.length >= max) { penuh = true; break; }
+    try {
+      if (kind === 'image') {
+        list.push({ src: await qcCompressImage(file) });
+      } else {
+        if (file.size > MEDIA_MAX_VIDEO_MB * 1024 * 1024) { besar++; continue; }
+        list.push({ src: await mediaReadFile(file), obj: URL.createObjectURL(file) });
+      }
+    } catch (err) { gagal++; }
+    mediaRefresh(ns, i);
+  }
+  mediaRefresh(ns, i);
+  if (penuh) showToast('Sudah Maksimal', `Maksimal ${max} ${kind === 'image' ? 'foto' : 'video'} per kotak.`, 'info', 3000);
+  if (besar) showToast('Video Terlalu Besar', `Maksimal ${MEDIA_MAX_VIDEO_MB} MB per video. Rekam lebih pendek / kualitas lebih rendah.`, 'error', 5000);
+  if (gagal) showToast('Gagal Baca File', `${gagal} file tidak bisa dibaca.`, 'error', 3500);
+}
+
+function mediaRemove(ns, i, kind, idx) {
+  const list = mediaState[ns][i][kind];
+  const m = list[idx];
+  if (!m) return;
+  if (m.obj) URL.revokeObjectURL(m.obj);
+  list.splice(idx, 1);
+  mediaRefresh(ns, i);
+}
+
+// ---- Payload / riwayat ----
+function mediaPayload(ns, i, kind) {
+  const arr = mediaState[ns][i][kind].map(m => m.src);
+  return arr.length === 0 ? '' : (arr.length === 1 ? arr[0] : arr);
+}
+
+function mediaItemsOf(v) { return Array.isArray(v) ? v : (v ? [v] : []); }
+
+function mediaStrip(fd) {
+  const c = { ...fd };
+  Object.keys(c).forEach(k => {
+    if (!/^kotak\d_(foto|video)$/.test(k)) return;
+    const v = c[k];
+    if (Array.isArray(v)) c[k] = v.map(x => String(x).startsWith('data:') ? 'local' : x).join('\n');
+    else if (typeof v === 'string' && v.startsWith('data:')) c[k] = 'local';
+  });
+  return c;
+}
+function qcStripFoto(fd) { return mediaStrip(fd); }
+
+function mediaHasNew(fd) {
+  return Object.keys(fd).some(k => /^kotak\d_(foto|video)$/.test(k) && mediaItemsOf(fd[k]).some(x => String(x).startsWith('data:')));
+}
+
+function mediaTotalMB(fd) {
+  let n = 0;
+  Object.keys(fd).forEach(k => {
+    if (/^kotak\d_(foto|video)$/.test(k)) mediaItemsOf(fd[k]).forEach(x => { if (String(x).startsWith('data:')) n += String(x).length; });
+  });
+  return n / 1048576;
+}
+
+// Apps Script lama (< v6) tidak paham foto jamak / video → jangan kirim, simpan di antrean saja
+function mediaNeedsNewApi(fd) {
+  return Object.keys(fd || {}).some(k => {
+    if (!/^kotak\d_(foto|video)$/.test(k)) return false;
+    const v = fd[k];
+    if (!v || (Array.isArray(v) && !v.length)) return false;
+    if (fd.sheet === 'cek_koloni') return true;
+    return /_video$/.test(k) || Array.isArray(v);
+  });
+}
+
+async function mediaApiOk() {
+  if (serverApiVersion >= MEDIA_MIN_API) return true;
+  try {
+    const res = await fetch(scriptUrl);
+    const j = await res.json();
+    serverApiVersion = Number(j.qcVersion) || 0;
+  } catch (e) { /* biarkan */ }
+  return serverApiVersion >= MEDIA_MIN_API;
+}
+const MEDIA_API_ERR = 'Apps Script belum versi 6 (foto jamak & video). Update script lalu deploy New version.';
+
+// ---- Hitung & lihat di riwayat ----
+function mediaCounts(rec) {
+  let img = 0, vid = 0;
+  for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+    img += mediaParse(rec[`kotak${i}_foto`]).length;
+    vid += mediaParse(rec[`kotak${i}_video`]).length;
+  }
+  return { img, vid };
+}
+
+function mediaRecordItems(rec) {
+  const out = [];
+  for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+    mediaParse(rec[`kotak${i}_foto`]).filter(u => /^https?:/.test(u)).forEach(src => out.push({ kind: 'image', src, label: `Kotak ${i}` }));
+    mediaParse(rec[`kotak${i}_video`]).filter(u => /^https?:/.test(u)).forEach(src => out.push({ kind: 'video', src, label: `Kotak ${i}` }));
+  }
+  return out;
+}
+
+function mediaBadge(type, rec) {
+  const c = mediaCounts(rec);
+  if (!c.img && !c.vid) return '';
+  const txt = (c.img ? '📷' + c.img : '') + (c.vid ? ' 🎬' + c.vid : '');
+  return mediaRecordItems(rec).length
+    ? `<span class="mdx-badge" onclick="mediaViewRecord('${type}','${rec._localId}')">${txt.trim()}</span>`
+    : `<span class="mdx-badge off" title="Belum terkirim ke Sheet">${txt.trim()}</span>`;
+}
+
+function mediaViewRecord(type, localId) {
+  const rec = (localHistory[type] || []).find(d => d._localId === localId);
+  if (!rec) return;
+  const items = mediaRecordItems(rec);
+  if (items.length) mediaOpen(items, 0);
+}
+
+function mediaViewForm(ns, i, kind, idx) {
+  const st = mediaState[ns][i];
+  const items = [
+    ...st.image.map(m => ({ kind: 'image', src: m.src, obj: m.obj, label: `Kotak ${i}` })),
+    ...st.video.map(m => ({ kind: 'video', src: m.src, obj: m.obj, label: `Kotak ${i}` }))
+  ];
+  const start = kind === 'image' ? idx : st.image.length + idx;
+  if (items.length) mediaOpen(items, start);
+}
+
+// ---- Lightbox ----
+let mediaLb = null;
+function mediaOpen(items, idx) {
+  mediaLb = { items, idx };
+  let el = document.getElementById('mdxLightbox');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'mdxLightbox';
+    el.className = 'mdx-lb';
+    el.onclick = mediaClose;
+    document.body.appendChild(el);
+  }
+  mediaLbRender();
+}
+
+function mediaLbRender() {
+  const el = document.getElementById('mdxLightbox');
+  if (!el || !mediaLb) return;
+  const { items, idx } = mediaLb;
+  const m = items[idx];
+  let body = '';
+  if (m.kind === 'image') {
+    const id = mediaDriveId(m.src);
+    const src = m.src.startsWith('data:') ? m.src : (id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1600` : m.src);
+    body = `<img src="${qcEsc(src)}" alt="">`;
+  } else if (m.obj) {
+    body = `<video src="${m.obj}" controls autoplay playsinline></video>`;
+  } else {
+    const id = mediaDriveId(m.src);
+    body = id ? `<iframe src="https://drive.google.com/file/d/${id}/preview" allow="autoplay" allowfullscreen></iframe>`
+              : `<a href="${qcEsc(m.src)}" target="_blank" rel="noopener" style="color:#fff;">Buka video ↗</a>`;
+  }
+  el.innerHTML = `<button class="mdx-lb-x" onclick="event.stopPropagation();mediaClose()">✕</button>
+    <div class="mdx-lb-box" onclick="event.stopPropagation()">${body}</div>
+    <div class="mdx-lb-bar" onclick="event.stopPropagation()">
+      <button onclick="mediaLbStep(-1)" ${items.length < 2 ? 'disabled style="opacity:.3"' : ''}>‹</button>
+      <span>${idx + 1} / ${items.length}${m.label ? ' · ' + qcEsc(m.label) : ''}</span>
+      <button onclick="mediaLbStep(1)" ${items.length < 2 ? 'disabled style="opacity:.3"' : ''}>›</button>
+    </div>`;
+}
+
+function mediaLbStep(d) {
+  if (!mediaLb) return;
+  const n = mediaLb.items.length;
+  mediaLb.idx = (mediaLb.idx + d + n) % n;
+  mediaLbRender();
+}
+
+function mediaClose() {
+  const el = document.getElementById('mdxLightbox');
+  if (el) el.remove();
+  mediaLb = null;
 }
 
 function qcCompressImage(file, maxDim = 1000, quality = 0.7) {
@@ -2052,40 +2329,11 @@ function qcCompressImage(file, maxDim = 1000, quality = 0.7) {
   });
 }
 
-async function qcPickFoto(i, input) {
-  const file = input.files && input.files[0];
-  if (!file) return;
-  try {
-    qcFotoState[i] = await qcCompressImage(file);
-    qcShowFoto(i);
-  } catch (err) {
-    showToast('Foto Gagal', err.message, 'error', 3000);
-  }
-  input.value = '';
-}
-
-function qcClearFoto(i) {
-  qcFotoState[i] = '';
-  qcShowFoto(i);
-}
-
-function qcStripFoto(fd) {
-  const c = { ...fd };
-  for (let i = 1; i <= QC_MAX_KOTAK; i++) {
-    const k = `kotak${i}_foto`;
-    if (typeof c[k] === 'string' && c[k].startsWith('data:')) c[k] = 'local';
-  }
-  return c;
-}
-
 function renderQcKotak(gh, values) {
   const list = document.getElementById('qcKotakList');
   const n = QC_KOTAK_PER_GH[gh] || 0;
   values = values || {};
-  for (let i = 1; i <= QC_MAX_KOTAK; i++) {
-    const f = values[`kotak${i}_foto`];
-    qcFotoState[i] = (typeof f === 'string' && f.startsWith('http')) ? f : '';
-  }
+  mediaInit('qc', values);
   if (n === 0) {
     list.innerHTML = '<div class="qc-hint">Pilih GH dulu untuk menampilkan kotak.</div>';
     updateQcSummary();
@@ -2150,12 +2398,7 @@ function renderQcKotak(gh, values) {
           </label>
         </div>
 
-        <div class="qc-row">
-          <label class="qc-foto-btn" id="kotak${i}_fotolbl">📷 Foto<input type="file" accept="image/*" hidden
-                 onchange="qcPickFoto(${i}, this)"></label>
-          <img class="qc-prev" id="kotak${i}_prev" alt="">
-          <button type="button" class="qc-foto-x" id="kotak${i}_fotox" onclick="qcClearFoto(${i})">✕</button>
-        </div>
+        <div class="qc-row">${mediaBlockHtml('qc', i, false)}</div>
         <div class="qc-row">
           <input type="text" class="qc-cat" id="kotak${i}_catatan" placeholder="Catatan kotak (opsional)"
                  value="${qcEsc(cleanCat)}">
@@ -2163,7 +2406,6 @@ function renderQcKotak(gh, values) {
       </div>`;
   }
   list.innerHTML = html;
-  for (let i = 1; i <= n; i++) qcShowFoto(i);
   updateQcSummary();
 }
 function updateQcSummary() {
@@ -2187,9 +2429,9 @@ document.getElementById('qcKotakList').addEventListener('input', updateQcSummary
 
 function qcSummaryText(item) {
   const c = { Bagus: 0, Cukup: 0, Jelek: 0 };
-  let total = 0, any = false, foto = 0, hasWarn = false;
+  let total = 0, any = false, hasWarn = false;
+  const mb = mediaBadge('qc', item);
   for (let i = 1; i <= QC_MAX_KOTAK; i++) {
-    if (item[`kotak${i}_foto`]) foto++;
     if (String(item[`kotak${i}_catatan`] || '').includes('[⚠️')) hasWarn = true;
     
     const k = item[`kotak${i}_kondisi`];
@@ -2197,7 +2439,7 @@ function qcSummaryText(item) {
     total += parseInt(item[`kotak${i}_sisiran`]) || 0;
   }
   const warnIcon = hasWarn ? ' <span style="color:#dc3545;font-size:14px;" title="Ada peringatan masalah">⚠️</span>' : '';
-  return any ? `B${c.Bagus} C${c.Cukup} J${c.Jelek}<br>${total} sisiran${foto ? ' · 📷' + foto : ''}${warnIcon}` : '-';
+  return any ? `B${c.Bagus} C${c.Cukup} J${c.Jelek}<br>${total} sisiran${mb ? ' · ' + mb : ''}${warnIcon}` : '-';
 }
 
 document.getElementById('qcForm').addEventListener('submit', async e => {
@@ -2232,7 +2474,7 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     const no = aktif && nEl ? nEl.value.trim() : '';
     
     let cat = aktif && cEl ? cEl.value.trim() : '';
-    const foto = aktif ? (qcFotoState[i] || '') : '';
+    const foto = aktif ? mediaPayload('qc', i, 'image') : '';
     
     if (aktif) {
       const flags = [];
@@ -2283,13 +2525,20 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
   const submitBtn = document.getElementById('submitBtnQc');
   submitBtn.disabled = true;
   submitBtn.textContent = isEdit ? 'Mengupdate...' : 'Mengirim...';
-  const adaFoto = Object.keys(formData).some(k => /^kotak\d_foto$/.test(k) && String(formData[k]).startsWith('data:'));
+  if (mediaTotalMB(formData) > MEDIA_MAX_TOTAL_MB) {
+    showStatusQc(`Foto terlalu besar (${mediaTotalMB(formData).toFixed(0)} MB). Kurangi jumlah foto / kirim bertahap (maks ${MEDIA_MAX_TOTAL_MB} MB).`, 'error');
+    submitBtn.disabled = false;
+    submitBtn.textContent = isEdit ? 'Update Data' : 'Kirim';
+    return;
+  }
+  const adaFoto = mediaHasNew(formData);
   showStatusQc(adaFoto ? 'Mengunggah foto & data...' : (isEdit ? 'Mengupdate data...' : 'Mengirim data...'), 'loading');
 
   try {
     let isSuccessSync = false;
 
     if (isAuthenticated && scriptUrl && navigator.onLine) {
+      if (mediaNeedsNewApi(formData) && !(await mediaApiOk())) throw new Error(MEDIA_API_ERR);
       const res = await fetch(scriptUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
@@ -3975,7 +4224,7 @@ function renderCekHistory(set) {
     return `<tr>
       <td>${qcEsc(r.tanggal || '-')}<br>${qcEsc(r.waktu || '')}<br>${badge}</td>
       <td>${qcEsc(r.gh || '-')}</td>
-      <td style="font-size:12px;line-height:1.6;">${parts.join(' · ') || '-'}</td>
+      <td style="font-size:12px;line-height:1.6;">${parts.join(' · ') || '-'}${mediaBadge('cek', r) ? '<br>' + mediaBadge('cek', r) : ''}</td>
       <td style="text-align:center;white-space:nowrap;">
         <button class="history-btn history-btn-edit" onclick="cekEdit('${r._localId}')">✏️</button>
         <button class="history-btn history-btn-delete" onclick="cekDelete('${r._localId}')">🗑️</button>
@@ -3988,6 +4237,7 @@ function renderCekHistory(set) {
 function renderCekKotak(gh, values) {
   const box = document.getElementById('cekKotakList');
   const n = QC_KOTAK_PER_GH[gh] || 0;
+  mediaInit('cek', values);
   if (!n) { box.innerHTML = '<div class="qc-hint">Pilih GH dulu untuk menampilkan kotak.</div>'; return; }
   const batches = buildBatches();
   const v = values || {};
@@ -4007,7 +4257,8 @@ function renderCekKotak(gh, values) {
       </div>
       <div class="cek-row"><label class="cek-gula"><input type="checkbox" id="cek-gula-${i}" ${gula ? 'checked' : ''}> 🍯 Dikasih gula</label></div>
       <div class="qc-flags cek-flags" id="cek-flags-${i}">${CEK_FLAGS.map(f => `<label><input type="checkbox" value="${qcEsc(f)}" ${tanda.includes(f) ? 'checked' : ''}> ${qcEsc(f)}</label>`).join('')}</div>
-      <input type="text" class="cek-cat" id="cek-cat-${i}" placeholder="Catatan kotak ${i} (opsional)" value="${qcEsc(v['kotak' + i + '_catatan'] || '')}">
+      ${mediaBlockHtml('cek', i, true)}
+      <input type="text" class="cek-cat" id="cek-cat-${i}" style="margin-top:8px;" placeholder="Catatan kotak ${i} (opsional)" value="${qcEsc(v['kotak' + i + '_catatan'] || '')}">
     </div>`;
   }
   box.innerHTML = html;
@@ -4030,7 +4281,11 @@ function collectCek(gh) {
     fields['kotak' + i + '_gula'] = gula;
     fields['kotak' + i + '_tanda'] = tanda;
     fields['kotak' + i + '_catatan'] = cat;
-    if (pop !== '' || gula || tanda || cat) filled++;
+    const foto = i <= n ? mediaPayload('cek', i, 'image') : '';
+    const video = i <= n ? mediaPayload('cek', i, 'video') : '';
+    fields['kotak' + i + '_foto'] = foto;
+    fields['kotak' + i + '_video'] = video;
+    if (pop !== '' || gula || tanda || cat || foto || video) filled++;
   }
   return { fields, filled };
 }
@@ -4141,7 +4396,11 @@ document.getElementById('cekForm').addEventListener('submit', async e => {
   if (!gh) { showStatusCek('Pilih greenhouse dulu.', 'error'); return; }
 
   const { fields, filled } = collectCek(gh);
-  if (!filled) { showStatusCek('Isi minimal satu kotak (populasi, gula, tanda, atau catatan).', 'error'); return; }
+  if (!filled) { showStatusCek('Isi minimal satu kotak (populasi, gula, tanda, catatan, foto, atau video).', 'error'); return; }
+  if (mediaTotalMB(fields) > MEDIA_MAX_TOTAL_MB) {
+    showStatusCek(`Foto/video terlalu besar (${mediaTotalMB(fields).toFixed(0)} MB). Kurangi atau kirim bertahap (maks ${MEDIA_MAX_TOTAL_MB} MB).`, 'error');
+    return;
+  }
 
   const isEdit = !!cekEditId;
   const clash = (localHistory.cek || []).some(x => x._localId !== cekEditId && x.tanggal === tanggal && x.waktu === waktu && x.gh === gh);
@@ -4171,6 +4430,8 @@ document.getElementById('cekForm').addEventListener('submit', async e => {
   try {
     if (isAuthenticated && scriptUrl && navigator.onLine) {
       if ((await ensureServerVersion()) < 5) throw new Error('Apps Script di server masih versi lama (belum deploy v5).');
+      if (mediaNeedsNewApi(formData) && !(await mediaApiOk())) throw new Error(MEDIA_API_ERR);
+      showStatusCek(mediaHasNew(formData) ? 'Mengunggah foto/video & data...' : (isEdit ? 'Mengupdate...' : 'Menyimpan...'), 'loading');
       let result = await cekPost(formData);
       if (formData.action === 'update' && result.status === 'not_found') {
         formData.action = 'submit';
@@ -4191,7 +4452,7 @@ document.getElementById('cekForm').addEventListener('submit', async e => {
     showStatusCek('⚠️ Belum masuk Sheet: ' + friendlyErr(err) + ' (tersimpan lokal)', 'error');
   }
 
-  const rec = { ...formData };
+  const rec = mediaStrip(formData);
   delete rec.oldTanggal; delete rec.oldWaktu; delete rec.oldGh;
   if (isEdit) updateLocalHistory('cek', cekEditId, rec, synced);
   else addLocalHistory('cek', rec, synced);
