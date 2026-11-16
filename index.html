@@ -1,85 +1,272 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
+
 <meta charset="UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <meta name="theme-color" content="#2d5016">
+
 <title>Form Kunjungan Lebah - GH 1</title>
+
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icon-192.png">
+
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Kunjungan Lebah">
 <meta name="mobile-web-app-capable" content="yes">
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+
 <style>
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: linear-gradient(135deg, #2d5016 0%, #4a7c2c 100%); min-height: 100vh; padding: 16px; color: #333; }
-.container { max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15); overflow: hidden; }
-.header { background: linear-gradient(135deg, #2d5016 0%, #4a7c2c 100%); color: white; padding: 20px; text-align: center; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: linear-gradient(135deg, #2d5016 0%, #4a7c2c 100%);
+  min-height: 100vh;
+  padding: 16px;
+  color: #333;
+}
+
+.container {
+  max-width: 500px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.header {
+  background: linear-gradient(135deg, #2d5016 0%, #4a7c2c 100%);
+  color: white;
+  padding: 20px;
+  text-align: center;
+}
+
 .header h1 { font-size: 20px; margin-bottom: 4px; }
 .header p { font-size: 12px; opacity: 0.9; }
-.connection-status { margin-top: 12px; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; text-align: center; }
+
+.connection-status {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
 .connection-status.online { background: rgba(76,175,80,0.3); color: #fff; }
 .connection-status.offline { background: rgba(244,67,54,0.3); color: #fff; }
-.auth-bar { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
-.hdr-btn { padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; border: none; display: inline-flex; align-items: center; gap: 4px; position: relative; }
+
+.auth-bar {
+  display: flex; gap: 8px; justify-content: center;
+  flex-wrap: wrap; margin-top: 12px;
+}
+
+.hdr-btn {
+  padding: 8px 14px; border-radius: 8px; cursor: pointer;
+  font-size: 12px; font-weight: 700; border: none;
+  display: inline-flex; align-items: center; gap: 4px; position: relative;
+}
 .hdr-btn-connect { background: #fff; color: #2d5016; }
-.hdr-btn-sync { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.35); }
+.hdr-btn-sync {
+  background: rgba(255,255,255,0.2); color: #fff;
+  border: 1px solid rgba(255,255,255,0.35);
+}
 .hdr-btn-logout { background: #fee2e2; color: #dc2626; }
+
 .auth-status-text { font-size: 11px; opacity: 0.95; margin-top: 6px; }
 .auth-status-text.ok { color: #bbf7d0; }
-.badge-count { background: #dc3545; color: white; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; display: inline-block; }
-.btn-update { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.35); padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
-.btn-update.available { background: #facc15 !important; color: #422006 !important; border-color: #eab308 !important; font-weight: 800 !important; animation: pulseUpdate 1.5s infinite; }
+
+.badge-count {
+  background: #dc3545; color: white; font-size: 10px; font-weight: 800;
+  padding: 2px 6px; border-radius: 10px; min-width: 18px;
+  text-align: center; display: inline-block;
+}
+
+/* ===== Tombol Update di header ===== */
+.btn-update {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.35);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.btn-update.available {
+  background: #facc15 !important;
+  color: #422006 !important;
+  border-color: #eab308 !important;
+  font-weight: 800 !important;
+  animation: pulseUpdate 1.5s infinite;
+}
 .btn-update:disabled { opacity: 0.6; cursor: wait; }
-@keyframes pulseUpdate { 0%, 100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.7); } 50% { box-shadow: 0 0 0 10px rgba(250, 204, 21, 0); } }
-.app-version { font-size: 10px; opacity: 0.7; margin-top: 6px; color: #fff; }
+@keyframes pulseUpdate {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.7); }
+  50% { box-shadow: 0 0 0 10px rgba(250, 204, 21, 0); }
+}
+.app-version {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-top: 6px;
+  color: #fff;
+}
+
 .content { padding: 20px; }
+
 .form-group { margin-bottom: 20px; }
-.form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #2d5016; font-size: 14px; }
-.form-group input, .form-group select { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; font-family: inherit; transition: border-color 0.3s; }
-.form-group input:focus, .form-group select:focus { outline: none; border-color: #2d5016; box-shadow: 0 0 0 3px rgba(45,80,22,0.1); }
+.form-group label {
+  display: block; font-weight: 600; margin-bottom: 8px;
+  color: #2d5016; font-size: 14px;
+}
+.form-group input,
+.form-group select {
+  width: 100%; padding: 12px; border: 2px solid #e0e0e0;
+  border-radius: 8px; font-size: 16px; font-family: inherit;
+  transition: border-color 0.3s;
+}
+.form-group input:focus,
+.form-group select:focus {
+  outline: none; border-color: #2d5016;
+  box-shadow: 0 0 0 3px rgba(45,80,22,0.1);
+}
+
 .row-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.bays-section { margin-top: 20px; padding-top: 20px; border-top: 2px solid #e0e0e0; }
-.bays-section h3 { color: #2d5016; font-size: 16px; margin-bottom: 16px; text-align: center; }
-.bay-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #f9f9f9; border-radius: 8px; margin-bottom: 10px; border: 1px solid #e0e0e0; }
+
+.bays-section {
+  margin-top: 20px; padding-top: 20px;
+  border-top: 2px solid #e0e0e0;
+}
+.bays-section h3 {
+  color: #2d5016; font-size: 16px;
+  margin-bottom: 16px; text-align: center;
+}
+
+.bay-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px; background: #f9f9f9; border-radius: 8px;
+  margin-bottom: 10px; border: 1px solid #e0e0e0;
+}
+
 .bay-label { font-weight: 600; color: #2d5016; flex: 1; }
-.counter { display: flex; align-items: center; gap: 8px; background: white; border-radius: 6px; border: 1px solid #ddd; padding: 4px; }
-.counter button { width: 32px; height: 32px; border: none; background: #2d5016; color: white; font-size: 18px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+
+.bay-row { 
+  margin-left: auto; margin-right: 12px; width: 80px; font-size: 13px; padding: 6px; 
+  border: 1px solid #ccc; border-radius: 6px; background: white; font-weight: 600; color: #2d5016;
+}
+
+.counter {
+  display: flex; align-items: center; gap: 8px;
+  background: white; border-radius: 6px;
+  border: 1px solid #ddd; padding: 4px;
+}
+.counter button {
+  width: 32px; height: 32px; border: none;
+  background: #2d5016; color: white; font-size: 18px;
+  cursor: pointer; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: bold;
+}
 .counter button:active { background: #1f3810; transform: scale(0.95); }
-.counter-value { min-width: 40px; text-align: center; font-weight: 600; color: #2d5016; font-size: 16px; }
-.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 2px solid #e0e0e0; }
+.counter button:hover { background: #3d6b1e; }
+
+.counter-value {
+  min-width: 40px; text-align: center; font-weight: 600;
+  color: #2d5016; font-size: 16px;
+}
+
+.actions {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin-top: 24px; padding-top: 20px;
+  border-top: 2px solid #e0e0e0;
+}
 .actions button:nth-child(3) { grid-column: 1 / -1; }
-button.btn { padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+button.btn {
+  padding: 12px; border: none; border-radius: 8px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+}
 button.btn-submit { background: #2d5016; color: white; }
+button.btn-submit:hover { background: #1f3810; }
+button.btn-submit:disabled { background: #999; cursor: not-allowed; }
+button.btn-submit.loading { background: #6b8e4e; cursor: wait; }
 button.btn-reset { background: #f0f0f0; color: #666; }
-button.btn-delete { background: #dc3545; color: white; grid-column: 1 / -1; }
-.status { padding: 12px; border-radius: 8px; text-align: center; font-size: 14px; margin-top: 12px; display: none; font-weight: 600; }
+button.btn-reset:hover { background: #e0e0e0; }
+button.btn-delete {
+  background: #dc3545; color: white; grid-column: 1 / -1;
+}
+button.btn-delete:hover { background: #c82333; }
+
+.status {
+  padding: 12px; border-radius: 8px; text-align: center;
+  font-size: 14px; margin-top: 12px; display: none; font-weight: 600;
+}
 .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; display: block; }
 .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; display: block; }
 .status.info { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; display: block; }
 .status.loading { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; display: block; }
-.tabs { display: flex; border-bottom: 2px solid #e0e0e0; background: white; overflow-x: auto; }
-.tab-btn { flex: 1; min-width: 70px; padding: 14px 6px; border: none; background: transparent; color: #666; font-weight: 600; cursor: pointer; font-size: 11px; position: relative; white-space: nowrap; }
+
+.tabs {
+  display: flex; border-bottom: 2px solid #e0e0e0;
+  background: white; overflow-x: auto;
+}
+.tab-btn {
+  flex: 1; min-width: 70px; padding: 14px 6px; border: none;
+  background: transparent; color: #666; font-weight: 600;
+  cursor: pointer; font-size: 11px; position: relative;
+  white-space: nowrap;
+}
 .tab-btn.active { color: #2d5016; }
-.tab-btn.active::after { content: ''; position: absolute; bottom: -2px; left: 0; right: 0; height: 2px; background: #2d5016; }
+.tab-btn.active::after {
+  content: ''; position: absolute; bottom: -2px;
+  left: 0; right: 0; height: 2px; background: #2d5016;
+}
+
 .tab-content { display: none; }
 .tab-content.active { display: block; }
-.qc-item { padding: 12px; background: #f9f9f9; border-radius: 8px; margin-bottom: 10px; border: 1px solid #e0e0e0; }
+
+.qc-item {
+  padding: 12px; background: #f9f9f9; border-radius: 8px;
+  margin-bottom: 10px; border: 1px solid #e0e0e0;
+}
 .qc-item .qc-title { font-weight: 600; color: #2d5016; margin-bottom: 8px; }
 .qc-item .qc-row { display: flex; gap: 8px; align-items: center; }
 .qc-item select { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
 .qc-item .qc-sisiran { display: flex; align-items: center; gap: 6px; }
-.qc-item .qc-sisiran input { width: 64px; padding: 8px; border: 1px solid #ddd; border-radius: 6px; text-align: center; font-weight: 600; }
-.qc-item .qc-no { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+.qc-item .qc-sisiran input {
+  width: 64px; padding: 8px; border: 1px solid #ddd;
+  border-radius: 6px; text-align: center; font-weight: 600;
+}
+.qc-item .qc-sisiran span { color: #666; font-size: 13px; font-weight: 600; }
+.qc-item.k-bagus { border-left: 5px solid #2e7d32; }
+.qc-item.k-cukup { border-left: 5px solid #f9a825; }
+.qc-item.k-jelek { border-left: 5px solid #c62828; }
+.qc-item .qc-no {
+  width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;
+}
 .qc-item .qc-row + .qc-row { margin-top: 8px; }
-.qc-foto-btn { display: inline-block; padding: 8px 12px; background: #fff; border: 1px dashed #2d5016; color: #2d5016; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.qc-foto-btn {
+  display: inline-block; padding: 8px 12px; background: #fff; border: 1px dashed #2d5016;
+  color: #2d5016; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.qc-prev { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; display: none; }
+.qc-prev.show { display: block; }
 .qc-foto-x { display: none; border: none; background: #eee; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; }
 .qc-foto-x.show { display: inline-block; }
 .qc-item .qc-cat { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; }
 .bt-summary { padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 600; margin-bottom: 14px; }
 .bt-summary.ok { background: #e8f5e9; color: #1b5e20; }
+.bt-summary.warn { background: #fff3e0; color: #bf360c; border: 1px solid #ffcc80; }
 .bt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
 @media (max-width: 380px) { .bt-grid { grid-template-columns: 1fr; } }
 .bt-gh-title { font-weight: 700; color: #2d5016; margin: 6px 0 8px; font-size: 15px; }
@@ -93,56 +280,262 @@ button.btn-delete { background: #dc3545; color: white; grid-column: 1 / -1; }
 .bt-top b { color: #2d5016; }
 .bt-days { font-weight: 700; font-size: 12px; }
 .bt-note { margin-top: 4px; font-weight: 600; }
+.bt-btn { margin-top: 8px; padding: 6px 10px; border: 1px solid #2d5016; background: #fff; color: #2d5016; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .bt-box { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
 .bt-box summary { font-weight: 700; color: #2d5016; cursor: pointer; }
+.bt-box .form-group { margin-top: 12px; margin-bottom: 12px; }
 .bt-stats { font-size: 13px; color: #444; margin: 8px 0 10px; line-height: 1.5; }
 .qc-hint { color: #888; font-size: 13px; padding: 8px 0; }
 .qc-summary { font-size: 13px; font-weight: 600; color: #2d5016; padding: 4px 2px; }
-.history-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; background: #fff; border-radius: 8px; overflow: hidden; }
-.history-table th, .history-table td { padding: 8px 6px; border: 1px solid #e0e0e0; text-align: left; }
-.history-table th { background: #f1f5f9; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; }
-.history-btn { padding: 4px 8px; border-radius: 6px; border: none; font-weight: 700; font-size: 0.7rem; cursor: pointer; margin-right: 2px; }
+.kotak-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px; background: #f9f9f9; border-radius: 8px;
+  margin-bottom: 10px; border: 1px solid #e0e0e0;
+}
+.kotak-label { font-weight: 600; color: #2d5016; min-width: 100px; }
+.kotak-input-group { display: flex; align-items: center; gap: 8px; }
+.kotak-input-group input {
+  width: 70px; padding: 8px; border: 1px solid #ddd;
+  border-radius: 6px; text-align: center; font-weight: 600;
+}
+.kotak-input-group .unit { color: #666; font-size: 14px; font-weight: 600; }
+
+.history-table {
+  width: 100%; border-collapse: collapse; font-size: 0.75rem;
+  background: #fff; border-radius: 8px; overflow: hidden;
+}
+.history-table th,
+.history-table td {
+  padding: 8px 6px; border: 1px solid #e0e0e0; text-align: left;
+}
+.history-table th {
+  background: #f1f5f9; font-weight: 700; font-size: 0.7rem;
+  text-transform: uppercase;
+}
+.history-table tr:hover { background: #f9fafb; }
+
+.history-btn {
+  padding: 4px 8px; border-radius: 6px; border: none;
+  font-weight: 700; font-size: 0.7rem; cursor: pointer;
+  margin-right: 2px;
+}
 .history-btn-edit { background: #e0f2fe; color: #0369a1; }
 .history-btn-delete { background: #fee2e2; color: #dc2626; }
+
 .history-empty { text-align: center; padding: 20px; color: #999; font-size: 0.85rem; }
-.sync-btn { background: #2d5016; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
-.history-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; flex-wrap: wrap; }
-.history-toolbar select { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.8rem; font-weight: 600; }
-.edit-indicator { display: none; background: #fff3e0; color: #e65100; padding: 10px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; margin-bottom: 12px; border-left: 4px solid #e65100; }
+
+.sync-btn {
+  background: #2d5016; color: white; border: none;
+  padding: 8px 16px; border-radius: 8px; font-weight: 600;
+  font-size: 0.8rem; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.sync-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.history-toolbar {
+  display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 12px;
+  gap: 8px; flex-wrap: wrap;
+}
+.history-toolbar select {
+  padding: 6px 10px; border: 1px solid #ddd;
+  border-radius: 6px; font-size: 0.8rem; font-weight: 600;
+}
+
+.edit-indicator {
+  display: none; background: #fff3e0; color: #e65100;
+  padding: 10px 12px; border-radius: 8px;
+  font-size: 0.8rem; font-weight: 700; margin-bottom: 12px;
+  border-left: 4px solid #e65100;
+}
 .edit-indicator.show { display: block; }
-.toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 99999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; width: calc(100% - 32px); max-width: 460px; }
-.toast { background: white; border-radius: 12px; padding: 14px 18px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 600; color: #333; border-left: 5px solid #2d5016; }
-.toast-icon { font-size: 22px; flex-shrink: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+
+/* ================================
+   TOAST
+================================ */
+.toast-container {
+  position: fixed; top: 20px; left: 50%;
+  transform: translateX(-50%); z-index: 99999;
+  display: flex; flex-direction: column; gap: 10px;
+  pointer-events: none; width: calc(100% - 32px);
+  max-width: 460px;
+}
+.toast {
+  background: white; border-radius: 12px; padding: 14px 18px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  display: flex; align-items: center; gap: 12px;
+  font-size: 14px; font-weight: 600; color: #333;
+  border-left: 5px solid #2d5016;
+}
+.toast-icon {
+  font-size: 22px; flex-shrink: 0; width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+}
 .toast-body { flex: 1; }
 .toast-title { font-weight: 800; font-size: 14px; margin-bottom: 2px; }
 .toast-message { font-size: 12px; font-weight: 500; opacity: 0.8; }
-.toast.success { border-left-color: #2e7d32; } .toast.success .toast-icon { background: #e8f5e9; color: #2e7d32; }
-.toast.error { border-left-color: #dc3545; } .toast.error .toast-icon { background: #fee2e2; color: #dc3545; }
-.toast.info { border-left-color: #0284c7; } .toast.info .toast-icon { background: #e0f2fe; color: #0284c7; }
-.toast.loading { border-left-color: #e65100; } .toast.loading .toast-icon { background: #fff3e0; color: #e65100; }
-.toast.update { border-left-color: #eab308; } .toast.update .toast-icon { background: #fef9c3; color: #a16207; }
-.loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 99998; }
+.toast.success { border-left-color: #2e7d32; }
+.toast.success .toast-icon { background: #e8f5e9; color: #2e7d32; }
+.toast.error { border-left-color: #dc3545; }
+.toast.error .toast-icon { background: #fee2e2; color: #dc3545; }
+.toast.info { border-left-color: #0284c7; }
+.toast.info .toast-icon { background: #e0f2fe; color: #0284c7; }
+.toast.loading { border-left-color: #e65100; }
+.toast.loading .toast-icon { background: #fff3e0; color: #e65100; }
+.toast.update { border-left-color: #eab308; }
+.toast.update .toast-icon { background: #fef9c3; color: #a16207; }
+
+.loading-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  display: none; align-items: center; justify-content: center;
+  z-index: 99998;
+}
 .loading-overlay.show { display: flex; }
-.loading-box { background: white; border-radius: 16px; padding: 28px 36px; text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
-.loading-spinner { width: 48px; height: 48px; border: 4px solid #e0e0e0; border-top-color: #2d5016; border-radius: 50%; margin: 0 auto 16px; animation: spin 0.9s linear infinite; }
+.loading-box {
+  background: white; border-radius: 16px; padding: 28px 36px;
+  text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+}
+.loading-spinner {
+  width: 48px; height: 48px; border: 4px solid #e0e0e0;
+  border-top-color: #2d5016; border-radius: 50%;
+  margin: 0 auto 16px; animation: spin 0.9s linear infinite;
+}
+.loading-text { font-weight: 700; color: #2d5016; font-size: 14px; }
+
 @keyframes spin { to { transform: rotate(360deg); } }
-.filter-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; background: #f9f9f9; padding: 12px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 16px; }
+
+/* ================================
+   TREND DASHBOARD
+================================ */
+.filter-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  background: #f9f9f9;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  margin-bottom: 16px;
+}
+
 .filter-group { display: flex; flex-direction: column; gap: 4px; }
-.filter-group label { font-size: 10px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.3px; }
-.filter-group input, .filter-group select { padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; font-family: inherit; background: white; font-weight: 600; color: #2d5016; }
-.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
-.summary-card { background: white; border: 1px solid #e0e0e0; border-radius: 10px; padding: 12px; border-left: 5px solid #2d5016; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
-.summary-card .header { font-size: 10px; font-weight: 700; color: #666; display: flex; align-items: center; gap: 4px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.3px; }
-.summary-card .value { font-size: 20px; font-weight: 800; color: #2d5016; line-height: 1.1; }
-.summary-card .sub { font-size: 10px; color: #888; margin-top: 4px; }
-.chart-card { background: white; border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); margin-bottom: 12px; }
+.filter-group label {
+  font-size: 10px; font-weight: 700; color: #666;
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+.filter-group input,
+.filter-group select {
+  padding: 8px; border: 1px solid #ddd; border-radius: 6px;
+  font-size: 13px; font-family: inherit; background: white;
+  font-weight: 600; color: #2d5016;
+}
+.filter-group input:focus,
+.filter-group select:focus {
+  outline: none; border-color: #2d5016;
+  box-shadow: 0 0 0 2px rgba(45,80,22,0.1);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.summary-card {
+  background: white; border: 1px solid #e0e0e0;
+  border-radius: 10px; padding: 12px;
+  border-left: 5px solid #2d5016;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.summary-card .header {
+  font-size: 10px; font-weight: 700; color: #666;
+  display: flex; align-items: center; gap: 4px;
+  margin-bottom: 6px; text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.summary-card .value {
+  font-size: 20px; font-weight: 800;
+  color: #2d5016; line-height: 1.1;
+}
+.summary-card .sub {
+  font-size: 10px; color: #888; margin-top: 4px;
+}
+.summary-card.weather-cerah { border-left-color: #f59e0b; }
+.summary-card.weather-berawan { border-left-color: #64748b; }
+.summary-card.weather-mendung { border-left-color: #475569; }
+.summary-card.weather-hujan { border-left-color: #0284c7; }
+.summary-card.weather-gerimis { border-left-color: #0891b2; }
+
+.chart-card {
+  background: white; border: 1px solid #e0e0e0;
+  border-radius: 10px; padding: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  margin-bottom: 12px;
+}
 .chart-container { position: relative; height: 320px; width: 100%; }
-.weather-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; background: #fff; border-radius: 8px; overflow: hidden; margin-top: 8px; }
-.weather-table th, .weather-table td { padding: 8px 10px; border: 1px solid #e0e0e0; text-align: left; }
-.weather-table th { background: #f1f5f9; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; }
-.qc-flags { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; padding: 8px; background: #fff; border: 1px solid #eee; border-radius: 6px; }
-.qc-flags label { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #555; cursor: pointer; }
-.qc-flags input[type="checkbox"] { width: 16px; height: 16px; accent-color: #dc3545; cursor: pointer; }
+
+.auto-sync-indicator {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; padding: 3px 8px; border-radius: 999px;
+  background: rgba(255,255,255,0.15); color: #fff;
+  margin-top: 6px;
+}
+.auto-sync-indicator.active {
+  background: rgba(76,175,80,0.35);
+}
+
+.weather-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 0.75rem; background: #fff;
+  border-radius: 8px; overflow: hidden;
+  margin-top: 8px;
+}
+.weather-table th,
+.weather-table td {
+  padding: 8px 10px; border: 1px solid #e0e0e0;
+  text-align: left;
+}
+.weather-table th {
+  background: #f1f5f9; font-weight: 700;
+  font-size: 0.7rem; text-transform: uppercase;
+}
+.weather-table tr:hover { background: #f9fafb; }
+.weather-table .w-cerah { color: #f59e0b; font-weight: 700; }
+.weather-table .w-berawan { color: #64748b; font-weight: 700; }
+.weather-table .w-mendung { color: #475569; font-weight: 700; }
+.weather-table .w-hujan { color: #0284c7; font-weight: 700; }
+.weather-table .w-gerimis { color: #0891b2; font-weight: 700; }
+
+/* ===== QUICK FLAGS QC ===== */
+.qc-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 6px;
+}
+.qc-flags label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+  cursor: pointer;
+}
+.qc-flags input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #dc3545;
+  cursor: pointer;
+}
+
+/* ===== CEK KOLONI (populasi + gula) ===== */
 .cek-item { padding: 12px; background: #f9f9f9; border-radius: 8px; margin-bottom: 10px; border: 1px solid #e0e0e0; border-left: 5px solid #bbb; }
 .cek-item .cek-title { font-weight: 600; color: #2d5016; margin-bottom: 8px; font-size: 14px; }
 .cek-item .cek-sub { font-weight: 400; color: #777; font-size: 12px; }
@@ -154,32 +547,97 @@ button.btn-delete { background: #dc3545; color: white; grid-column: 1 / -1; }
 .cek-gula { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #8d6e00; cursor: pointer; }
 .cek-gula input { width: 18px; height: 18px; accent-color: #f9a825; }
 .cek-item .cek-cat { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; }
+.cek-flags label { font-size: 11px; }
+.cek-flags input[type="checkbox"] { accent-color: #2d5016; }
+.cek-late { color: #c62828; font-weight: 700; }
+.cek-trend-up { color: #2e7d32; font-weight: 700; }
+.cek-trend-down { color: #c62828; font-weight: 700; }
+.cek-chip { display: inline-block; margin: 2px 3px 0 0; padding: 1px 7px; border-radius: 10px; background: #fff3e0; color: #bf360c; font-size: 11px; font-weight: 600; }
+.cek-hint-list { font-size: 12px; color: #555; line-height: 1.5; }
+.cek-hint-list div { margin-bottom: 2px; }
+.cek-pop-ok { color: #2e7d32; font-weight: 700; }
+.cek-pop-warn { color: #ef6c00; font-weight: 700; }
+.cek-pop-bad { color: #c62828; font-weight: 700; }
 .cek-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
 .cek-settings label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 4px; }
 .cek-settings input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
-.auto-sync-indicator { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,0.15); color: #fff; margin-top: 6px; }
-.auto-sync-indicator.active { background: rgba(76,175,80,0.35); }
+
+
+/* ===== MEDIA MULTI (foto/video) ===== */
+.mdx { margin-top: 8px; }
+.mdx-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.mdx-count { font-size: 12px; color: #777; }
+.mdx-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.mdx-grid:empty { display: none; }
+.mdx-t { position: relative; width: 64px; height: 64px; border-radius: 6px; overflow: hidden; border: 1px solid #ddd; background: #eee; cursor: pointer; }
+.mdx-t img, .mdx-t video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mdx-t.video { background: #263238; }
+.mdx-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); color: #fff; font-size: 18px; text-shadow: 0 0 4px rgba(0,0,0,.7); pointer-events: none; }
+.mdx-x { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border: none; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; font-size: 11px; line-height: 20px; padding: 0; cursor: pointer; }
+.mdx-badge { display: inline-block; padding: 1px 6px; border-radius: 10px; background: #e8f5e9; color: #1b5e20; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.mdx-badge.off { background: #f1f1f1; color: #777; cursor: default; }
+.mdx-lb { position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; }
+.mdx-lb-box { width: 100%; max-width: 560px; height: 70vh; display: flex; align-items: center; justify-content: center; }
+.mdx-lb-box img, .mdx-lb-box video { max-width: 100%; max-height: 100%; border-radius: 6px; }
+.mdx-lb-box iframe { width: 100%; height: 100%; border: 0; border-radius: 6px; background: #000; }
+.mdx-lb-bar { display: flex; align-items: center; gap: 14px; margin-top: 12px; color: #fff; font-size: 14px; }
+.mdx-lb-bar button { background: rgba(255,255,255,.18); color: #fff; border: none; border-radius: 20px; padding: 8px 16px; font-size: 16px; cursor: pointer; }
+.mdx-lb-x { position: absolute; top: 12px; right: 14px; background: rgba(255,255,255,.18); color: #fff; border: none; border-radius: 50%; width: 36px; height: 36px; font-size: 18px; cursor: pointer; }
+
 </style>
+
 </head>
+
 <body>
 
 <div class="toast-container" id="toastContainer"></div>
-<div class="loading-overlay" id="loadingOverlay"><div class="loading-box"><div class="loading-spinner"></div><div class="loading-text" id="loadingText">Memproses...</div></div></div>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-box">
+    <div class="loading-spinner"></div>
+    <div class="loading-text" id="loadingText">Memproses...</div>
+  </div>
+</div>
 
 <div class="container">
+
   <div class="header">
+
     <h1>🐝 Kunjungan Lebah</h1>
     <p>PT. Agri Wangi Berry - Pantau Rate Polinasi</p>
-    <div id="connectionStatus" class="connection-status online"><span id="statusText">🟢 Online</span></div>
-    <div id="autoSyncStatus" class="auto-sync-indicator">⏱️ Auto-sync: menunggu</div>
-    <div class="auth-bar">
-      <button class="hdr-btn hdr-btn-sync" id="pushBtn" onclick="syncQueuedData()" style="display:none">⬆️ Sync <span class="badge-count" id="queueBadge" style="display:none">0</span></button>
-      <button class="hdr-btn hdr-btn-sync" id="pullBtn" onclick="fetchAllDataFromSheet()" style="display:none">⬇️ Muat</button>
-      <button class="hdr-btn hdr-btn-connect" id="authBtn" onclick="handleAuthClick()">☁️ Menyambung...</button>
-      <button class="btn-update" id="updateBtn" onclick="manualUpdate()" title="Periksa update">🔄 Update</button>
+
+    <div id="connectionStatus" class="connection-status online">
+      <span id="statusText">🟢 Online</span>
     </div>
+
+    <div id="autoSyncStatus" class="auto-sync-indicator">
+      ⏱️ Auto-sync: menunggu
+    </div>
+
+    <div class="auth-bar">
+
+      <button class="hdr-btn hdr-btn-sync" id="pushBtn" onclick="syncQueuedData()" style="display:none">
+        ⬆️ Sync
+        <span class="badge-count" id="queueBadge" style="display:none">0</span>
+      </button>
+
+      <button class="hdr-btn hdr-btn-sync" id="pullBtn" onclick="fetchAllDataFromSheet()" style="display:none">
+        ⬇️ Muat
+      </button>
+
+      <button class="hdr-btn hdr-btn-connect" id="authBtn" onclick="handleAuthClick()">
+        ☁️ Menyambung...
+      </button>
+
+      <button class="btn-update" id="updateBtn" onclick="manualUpdate()" title="Periksa update">
+        🔄 Update
+      </button>
+
+    </div>
+
     <div class="auth-status-text" id="authStatus"></div>
     <div class="app-version" id="app-version-label"></div>
+
   </div>
 
   <div class="tabs">
@@ -187,21 +645,60 @@ button.btn-delete { background: #dc3545; color: white; grid-column: 1 / -1; }
     <button class="tab-btn" data-tab="tab-qc">QC Koloni</button>
     <button class="tab-btn" data-tab="tab-batch">🐝 Batch</button>
     <button class="tab-btn" data-tab="tab-cek">🍯 Cek</button>
+    <button class="tab-btn" data-tab="tab-trend">📈 Trend</button>
     <button class="tab-btn" data-tab="tab-riwayat">Riwayat</button>
   </div>
 
   <div class="content">
-    <!-- KUNJUNGAN -->
+
+    <!-- =====================================
+         KUNJUNGAN
+    ===================================== -->
     <div id="tab-kunjungan" class="tab-content active">
-      <div id="editIndicatorKunjungan" class="edit-indicator">✏️ Mode Edit — sedang mengedit data</div>
+
+      <div id="editIndicatorKunjungan" class="edit-indicator">
+        ✏️ Mode Edit — sedang mengedit data
+      </div>
+
       <form id="beeForm">
-        <div class="form-group"><label for="tanggal">Tanggal</label><input type="date" id="tanggal" required></div>
-        <div class="row-inputs">
-          <div class="form-group"><label for="waktu">Waktu</label><input type="time" id="waktu" required></div>
-          <div class="form-group"><label for="gh">Greenhouse</label><select id="gh" required><option value="">-- Pilih GH --</option><option value="GH 1">GH 1</option><option value="GH 2">GH 2</option></select></div>
+
+        <div class="form-group">
+          <label for="tanggal">Tanggal</label>
+          <input type="date" id="tanggal" required>
         </div>
-        <div class="form-group"><label for="suhu">Suhu (°C)</label><input type="number" id="suhu" step="0.1" min="-10" max="60" placeholder="Contoh: 28.5" required></div>
-        <div class="form-group"><label for="cuaca">Cuaca</label><select id="cuaca" required><option value="">-- Pilih Cuaca --</option><option value="cerah">Cerah</option><option value="berawan">Berawan</option><option value="mendung">Mendung</option><option value="hujan">Hujan</option><option value="gerimis">Gerimis</option></select></div>
+
+        <div class="row-inputs">
+          <div class="form-group">
+            <label for="waktu">Waktu</label>
+            <input type="time" id="waktu" required>
+          </div>
+          <div class="form-group">
+            <label for="gh">Greenhouse</label>
+            <select id="gh" required>
+              <option value="">-- Pilih GH --</option>
+              <option value="GH 1">GH 1</option>
+              <option value="GH 2">GH 2</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="suhu">Suhu (°C)</label>
+          <input type="number" id="suhu" step="0.1" min="-10" max="60" placeholder="Contoh: 28.5" required>
+        </div>
+
+        <div class="form-group">
+          <label for="cuaca">Cuaca</label>
+          <select id="cuaca" required>
+            <option value="">-- Pilih Cuaca --</option>
+            <option value="cerah">Cerah</option>
+            <option value="berawan">Berawan</option>
+            <option value="mendung">Mendung</option>
+            <option value="hujan">Hujan</option>
+            <option value="gerimis">Gerimis</option>
+          </select>
+        </div>
+
         <div class="bays-section">
           <h3>Jumlah Kunjungan per Bay</h3>
           <div id="kejadianBox" style="display:flex;flex-wrap:wrap;gap:12px;font-size:13px;margin-bottom:10px;">
@@ -211,154 +708,859 @@ button.btn-delete { background: #dc3545; color: white; grid-column: 1 / -1; }
           </div>
           <div id="baysList"></div>
         </div>
+
         <div class="actions">
           <button type="button" class="btn btn-reset" onclick="resetFormKunjungan()">Reset</button>
           <button type="submit" class="btn btn-submit" id="submitBtnKunjungan">Kirim</button>
           <button type="button" class="btn btn-delete" onclick="deleteDataKunjungan()">Hapus Terakhir</button>
         </div>
+
         <div id="status" class="status"></div>
+
       </form>
+
     </div>
 
-    <!-- QC KOLONI -->
+    <!-- =====================================
+         QC KOLONI BARU DATANG
+    ===================================== -->
     <div id="tab-qc" class="tab-content">
-      <div id="editIndicatorQc" class="edit-indicator">✏️ Mode Edit — sedang mengedit data</div>
+
+      <div id="editIndicatorQc" class="edit-indicator">
+        ✏️ Mode Edit — sedang mengedit data
+      </div>
+
       <form id="qcForm">
-        <div class="form-group"><label for="tanggalQc">Tanggal Datang</label><input type="date" id="tanggalQc" required></div>
-        <div class="row-inputs">
-          <div class="form-group"><label for="waktuQc">Waktu</label><input type="time" id="waktuQc" required></div>
-          <div class="form-group"><label for="ghQc">Greenhouse</label><select id="ghQc" required><option value="">-- Pilih GH --</option><option value="GH 1">GH 1 (6 kotak)</option><option value="GH 2">GH 2 (6 kotak)</option></select></div>
+
+        <div class="form-group">
+          <label for="tanggalQc">Tanggal Datang</label>
+          <input type="date" id="tanggalQc" required>
         </div>
-        <div class="form-group"><label for="asalQc">Asal Koloni (opsional)</label><input type="text" id="asalQc" placeholder="mis. nama pemasok / lokasi"></div>
-        <div class="form-group"><label for="batchQc">No Batch (per kedatangan)</label><input type="text" id="batchQc" placeholder="mis. B-12" required></div>
+
+        <div class="row-inputs">
+          <div class="form-group">
+            <label for="waktuQc">Waktu</label>
+            <input type="time" id="waktuQc" required>
+          </div>
+          <div class="form-group">
+            <label for="ghQc">Greenhouse</label>
+            <select id="ghQc" required>
+              <option value="">-- Pilih GH --</option>
+              <option value="GH 1">GH 1 (6 kotak)</option>
+              <option value="GH 2">GH 2 (6 kotak)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="asalQc">Asal Koloni (opsional)</label>
+          <input type="text" id="asalQc" placeholder="mis. nama pemasok / lokasi">
+        </div>
+
+        <div class="form-group">
+          <label for="batchQc">No Batch (per kedatangan)</label>
+          <input type="text" id="batchQc" placeholder="mis. B-12" required>
+        </div>
+
         <div class="bays-section">
           <h3>QC per Kotak</h3>
           <div class="qc-hint">Isi hanya kotak yang diganti/datang baru. Kotak yang dikosongkan tetap memakai batch lamanya.</div>
           <div id="qcKotakList"><div class="qc-hint">Pilih GH dulu untuk menampilkan kotak.</div></div>
+          <div id="qcSummary" class="qc-summary"></div>
         </div>
-        <div class="form-group"><label for="catatanQc">Catatan (opsional)</label><input type="text" id="catatanQc" placeholder="mis. 1 kotak ratu tidak terlihat"></div>
+
+        <div class="form-group">
+          <label for="catatanQc">Catatan (opsional)</label>
+          <input type="text" id="catatanQc" placeholder="mis. 1 kotak ratu tidak terlihat">
+        </div>
+
         <div class="actions">
           <button type="button" class="btn btn-reset" onclick="resetFormQc()">Reset</button>
           <button type="submit" class="btn btn-submit" id="submitBtnQc">Kirim</button>
           <button type="button" class="btn btn-delete" onclick="deleteDataQc()">Hapus Terakhir</button>
         </div>
+
         <div id="statusQc" class="status"></div>
+
       </form>
+
     </div>
 
-    <!-- BATCH -->
+    <!-- =====================================
+         TRACKING BATCH KOLONI
+    ===================================== -->
     <div id="tab-batch" class="tab-content">
+
       <div id="btSummary" class="bt-summary ok"></div>
+
       <div id="btStatus"></div>
+      
       <h3 style="color:#c62828;margin-top:20px;margin-bottom:8px;">❌ Kotak Ditolak / Retur</h3>
       <div id="rejectedList" style="margin-bottom:20px;"></div>
+
       <details class="bt-box" id="btAkhirBox">
         <summary>➕ Catat koloni berakhir (mati / kabur / diganti)</summary>
         <form id="akhirForm">
-          <div class="form-group"><label for="tanggalAk">Tanggal Berakhir</label><input type="date" id="tanggalAk" required></div>
-          <div class="row-inputs">
-            <div class="form-group"><label for="ghAk">Greenhouse</label><select id="ghAk" required><option value="">-- GH --</option><option value="GH 1">GH 1</option><option value="GH 2">GH 2</option></select></div>
-            <div class="form-group"><label for="kotakAk">Kotak</label><select id="kotakAk" required><option value="">-- Kotak --</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></div>
+          <div class="form-group">
+            <label for="tanggalAk">Tanggal Berakhir</label>
+            <input type="date" id="tanggalAk" required>
           </div>
-          <div class="form-group"><label for="batchAk">No Batch</label><input type="text" id="batchAk" placeholder="otomatis terisi dari kotak yang dipilih" required></div>
-          <div class="form-group"><label for="penyebabAk">Penyebab</label><select id="penyebabAk" required><option value="Mati">Mati</option><option value="Kabur">Kabur</option><option value="Diganti">Diganti</option><option value="Retur">Retur</option></select></div>
-          <div class="form-group"><label for="catatanAk">Catatan (opsional)</label><input type="text" id="catatanAk" placeholder="mis. habis semprot perimeter, suhu 38°C"></div>
-          <div class="actions"><button type="submit" class="btn btn-submit" id="submitBtnAk">Simpan</button></div>
+          <div class="row-inputs">
+            <div class="form-group">
+              <label for="ghAk">Greenhouse</label>
+              <select id="ghAk" required>
+                <option value="">-- GH --</option>
+                <option value="GH 1">GH 1</option>
+                <option value="GH 2">GH 2</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="kotakAk">Kotak</label>
+              <select id="kotakAk" required><option value="">-- Kotak --</option></select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="batchAk">No Batch</label>
+            <input type="text" id="batchAk" list="batchAkList" placeholder="otomatis terisi dari kotak yang dipilih" required>
+            <datalist id="batchAkList"></datalist>
+          </div>
+          <div class="form-group">
+            <label for="penyebabAk">Penyebab</label>
+            <select id="penyebabAk" required></select>
+          </div>
+          <div class="form-group">
+            <label for="catatanAk">Catatan (opsional)</label>
+            <input type="text" id="catatanAk" placeholder="mis. habis semprot perimeter, suhu 38°C">
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-submit" id="submitBtnAk">Simpan</button>
+          </div>
           <div id="statusAk" class="status"></div>
         </form>
       </details>
+
+      <h3 style="color:#2d5016;margin-bottom:6px;">Ringkasan per Batch</h3>
+      <div style="overflow-x:auto;margin-bottom:16px;">
+        <table class="history-table">
+          <thead><tr><th>Batch</th><th>Datang</th><th>Koloni</th><th>Masih aktif</th><th>Umur rata/maks</th></tr></thead>
+          <tbody id="btBatchBody"></tbody>
+        </table>
+      </div>
+
       <h3 style="color:#2d5016;margin-bottom:6px;">Riwayat per Kotak</h3>
+      <div id="btStats" class="bt-stats"></div>
       <div style="overflow-x:auto;">
         <table class="history-table">
-          <thead><tr><th>Batch</th><th>GH / Kotak</th><th>Mulai</th><th>Umur</th><th>Status</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>Batch</th><th>GH / Kotak</th><th>Mulai</th><th>Umur</th><th>Status</th><th></th>
+            </tr>
+          </thead>
           <tbody id="btHistoryBody"></tbody>
         </table>
       </div>
+
     </div>
 
-    <!-- CEK KOLONI -->
+    <!-- =====================================
+         CEK KOLONI: POPULASI % + JADWAL GULA
+    ===================================== -->
     <div id="tab-cek" class="tab-content">
+
       <div id="cekSummary" class="bt-summary ok"></div>
+      <div id="cekGulaSummary" class="bt-summary ok"></div>
+
       <div id="cekStatus"></div>
+
       <details class="bt-box" id="cekFormBox" open>
         <summary>➕ Catat cek koloni &amp; gula</summary>
-        <div id="editIndicatorCek" class="edit-indicator" style="margin-top:12px;">✏️ Mode Edit</div>
+
+        <div id="editIndicatorCek" class="edit-indicator" style="margin-top:12px;">
+          ✏️ Mode Edit — sedang mengedit data
+        </div>
+
         <form id="cekForm">
-          <div class="form-group"><label for="tanggalCek">Tanggal</label><input type="date" id="tanggalCek" required></div>
-          <div class="row-inputs">
-            <div class="form-group"><label for="waktuCek">Waktu</label><input type="time" id="waktuCek" required></div>
-            <div class="form-group"><label for="ghCek">Greenhouse</label><select id="ghCek" required onchange="renderCekKotakList()"><option value="">-- Pilih GH --</option><option value="GH 1">GH 1</option><option value="GH 2">GH 2</option></select></div>
+          <div class="form-group">
+            <label for="tanggalCek">Tanggal</label>
+            <input type="date" id="tanggalCek" required>
           </div>
+
+          <div class="row-inputs">
+            <div class="form-group">
+              <label for="waktuCek">Waktu</label>
+              <input type="time" id="waktuCek" required>
+            </div>
+            <div class="form-group">
+              <label for="ghCek">Greenhouse</label>
+              <select id="ghCek" required onchange="renderCekKotakList()">
+                <option value="">-- Pilih GH --</option>
+                <option value="GH 1">GH 1 (6 kotak)</option>
+                <option value="GH 2">GH 2 (6 kotak)</option>
+              </select>
+            </div>
+          </div>
+
           <div class="bays-section">
             <h3>Cek per Kotak</h3>
             <div class="qc-hint">Populasi 100% = sekuat saat koloni datang. Isi Zona & Bay lalu klik "Set Default" agar tidak perlu ketik ulang besok.</div>
             <div id="cekKotakList"><div class="qc-hint">Pilih GH dulu untuk menampilkan kotak.</div></div>
           </div>
-          <div class="form-group"><label for="catatanCek">Catatan umum (opsional)</label><input type="text" id="catatanCek" placeholder="mis. suhu siang 36°C, bunga sedikit"></div>
+
+          <div class="form-group">
+            <label for="catatanCek">Catatan umum (opsional)</label>
+            <input type="text" id="catatanCek" placeholder="mis. suhu siang 36°C, bunga sedikit">
+          </div>
+
           <div class="actions">
             <button type="button" class="btn btn-reset" onclick="resetFormCek()">Reset</button>
             <button type="submit" class="btn btn-submit" id="submitBtnCek">Kirim</button>
           </div>
+
           <div id="statusCek" class="status"></div>
         </form>
       </details>
+
+      <details class="bt-box">
+        <summary>⚙️ Pengaturan jadwal gula &amp; ambang populasi</summary>
+        <div class="cek-settings">
+          <div><label for="setGulaHari">Gula tiap … hari</label><input type="number" id="setGulaHari" min="1" max="30" inputmode="numeric"></div>
+          <div><label for="setCekHari">Cek maks tiap … hari</label><input type="number" id="setCekHari" min="1" max="30" inputmode="numeric"></div>
+          <div><label for="setWaspada">Waspada jika populasi ≤ (%)</label><input type="number" id="setWaspada" min="1" max="100" inputmode="numeric"></div>
+          <div><label for="setGanti">Ganti jika populasi ≤ (%)</label><input type="number" id="setGanti" min="1" max="100" inputmode="numeric"></div>
+        </div>
+        <div class="qc-hint">Tersimpan di perangkat ini. Angka awal hanya perkiraan, sesuaikan dengan kebiasaan di kebun.</div>
+        <div class="actions" style="margin-top:8px;">
+          <button type="button" class="btn btn-submit" onclick="cekSaveSettings()">Simpan pengaturan</button>
+        </div>
+      </details>
+
+      <h3 style="color:#2d5016;margin:18px 0 6px;">📉 Tren Populasi per Kotak</h3>
+      <div class="filter-bar" style="margin-bottom:8px;">
+        <div class="filter-group">
+          <label>Greenhouse</label>
+          <select id="cekGhFilter" onchange="renderCekCharts()">
+            <option value="GH 1">GH 1</option>
+            <option value="GH 2">GH 2</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-container"><canvas id="cekChart"></canvas></div>
+        <div id="cekChartNote" class="qc-hint" style="text-align:center;"></div>
+      </div>
+
+      <h3 style="color:#2d5016;margin:18px 0 6px;">📅 Rekap Mingguan per GH</h3>
+      <div class="qc-hint" style="padding-top:0;">Kalau populasi dan kunjungan turun bersamaan, itu petunjuk awal polinasi kurang. Cocokkan dengan hasil panen / buah petot.</div>
+      <div style="overflow-x:auto;margin-bottom:16px;">
+        <table class="history-table">
+          <thead><tr><th>Minggu</th><th>GH</th><th>Populasi rata²</th><th>Hari gula</th><th>Kunjungan/sesi</th></tr></thead>
+          <tbody id="cekWeekBody"></tbody>
+        </table>
+      </div>
+
+      <h3 style="color:#2d5016;margin:18px 0 6px;">🔎 Petunjuk Koloni yang Sudah Berakhir</h3>
+      <div class="qc-hint" style="padding-top:0;">Dihitung dari data cek, gula, dan kunjungan sebelum koloni berakhir. Ini petunjuk, bukan kepastian penyebab.</div>
+      <div style="overflow-x:auto;margin-bottom:16px;">
+        <table class="history-table">
+          <thead><tr><th>Koloni</th><th>Umur</th><th>Berakhir</th><th>Petunjuk</th></tr></thead>
+          <tbody id="cekDiagBody"></tbody>
+        </table>
+      </div>
+
+      <h3 style="color:#2d5016;margin:18px 0 6px;">🗒️ Riwayat Cek</h3>
+      <div style="overflow-x:auto;">
+        <table class="history-table">
+          <thead><tr><th>Tanggal</th><th>GH</th><th>Isi</th><th style="text-align:center;">Aksi</th></tr></thead>
+          <tbody id="cekHistoryBody"></tbody>
+        </table>
+      </div>
+
     </div>
 
-    <!-- RIWAYAT -->
+    <!-- =====================================
+         TREND DASHBOARD
+    ===================================== -->
+    <div id="tab-trend" class="tab-content">
+
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>Dari Tanggal</label>
+          <input type="date" id="trendFromDate" onchange="renderTrendDashboard()">
+        </div>
+        <div class="filter-group">
+          <label>Sampai Tanggal</label>
+          <input type="date" id="trendToDate" onchange="renderTrendDashboard()">
+        </div>
+        <div class="filter-group">
+          <label>Greenhouse</label>
+          <select id="trendGhFilter" onchange="renderTrendDashboard()">
+            <option value="">Semua GH</option>
+            <option value="GH 1">GH 1</option>
+            <option value="GH 2">GH 2</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Metrik</label>
+          <select id="trendMetric" onchange="renderTrendDashboard()">
+            <option value="total">Total Kunjungan</option>
+            <option value="bay1">Bay 1</option>
+            <option value="bay2">Bay 2</option>
+            <option value="bay3">Bay 3</option>
+            <option value="bay4">Bay 4</option>
+            <option value="bay5">Bay 5</option>
+            <option value="bay6">Bay 6</option>
+            <option value="bay7">Bay 7</option>
+            <option value="bay8">Bay 8</option>
+            <option value="bay9">Bay 9</option>
+            <option value="bay10">Bay 10</option>
+            <option value="bay11">Bay 11</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="summary-grid" id="trendSummary"></div>
+
+      <div class="chart-card">
+        <div class="chart-container">
+          <canvas id="weatherChart"></canvas>
+        </div>
+      </div>
+
+      <div class="summary-grid" id="weatherSummary"></div>
+
+      <div class="chart-card">
+        <div style="font-size: 12px; font-weight: 700; color: #2d5016; margin-bottom: 8px; text-transform: uppercase;">
+          📋 Detail Kunjungan per Cuaca
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="weather-table">
+            <thead>
+              <tr>
+                <th>Cuaca</th>
+                <th>Sesi</th>
+                <th>Total</th>
+                <th>Rata²/Sesi</th>
+                <th>Suhu Rata²</th>
+              </tr>
+            </thead>
+            <tbody id="weatherTableBody">
+              <tr><td colspan="5" style="text-align:center;color:#999;">Belum ada data</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-container">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-container">
+          <canvas id="barChart"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-container">
+          <canvas id="hourChart"></canvas>
+        </div>
+        <div id="hourPeakNote" style="font-size:12px;color:#2d5016;margin-top:8px;text-align:center;"></div>
+      </div>
+
+    </div>
+
+    <!-- =====================================
+         RIWAYAT
+    ===================================== -->
     <div id="tab-riwayat" class="tab-content">
+
       <div class="history-toolbar">
         <select id="historyType" onchange="renderHistory()">
           <option value="kunjungan">🐝 Kunjungan</option>
           <option value="qc">✅ QC Koloni</option>
-          <option value="cek">🍯 Cek Koloni</option>
         </select>
-        <button class="sync-btn" onclick="fetchAllDataFromSheet()">🔄 Sinkron ke Sheet</button>
+
+        <button class="sync-btn" onclick="fetchAllDataFromSheet()">
+          🔄 Sinkron ke Sheet
+        </button>
       </div>
+
       <div style="overflow-x:auto;">
         <table class="history-table">
-          <thead><tr><th>Tanggal</th><th>Waktu</th><th>GH</th><th>Info</th><th style="text-align:center;">Aksi</th></tr></thead>
-          <tbody id="historyBody"></tbody>
+          <thead>
+            <tr>
+              <th>Tanggal</th>
+              <th>Waktu</th>
+              <th>GH</th>
+              <th id="histCol4">Suhu</th>
+              <th id="histCol5">Cuaca</th>
+              <th style="text-align:center;">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr><td colspan="6" class="history-empty">Memuat data...</td></tr>
+          </tbody>
         </table>
       </div>
+
       <div id="syncStatus" class="status"></div>
+
     </div>
 
   </div>
+
 </div>
 
 <script>
+
 // ============================================
-// KONFIGURASI
+// 🔧 KONFIGURASI AUTO-CONNECT
 // ============================================
 const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzHsArMPnUoiveVoT5Kk2QcVWmV5dI2TbmidfFNnNfcstQkSf9uA9koPxx-7yLwDCLQTg/exec';
+
+// ============================================
+// STATE
+// ============================================
+
 let db;
 const dbName = 'BeeFormDB';
 const storeName = 'formQueue';
-let localHistory = { kunjungan: [], qc: [], akhir: [], cek: [] };
-let currentEditId = null, editExtra = {}, currentEditType = null, editOriginalKey = null;
+
+let localHistory = {
+  kunjungan: [],
+  qc: [],
+  akhir: [],
+  cek: []
+};
+
+let currentEditId = null;
+let editExtra = {}; 
+let currentEditType = null;
+let editOriginalKey = null; 
+
+function normalizeSuhu(val) {
+  if (val === undefined || val === null || val === '') return '';
+  if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(val)) {
+    const d = new Date(val);
+    if (!isNaN(d)) {
+      const wib = new Date(d.getTime() + 7 * 3600 * 1000);
+      return parseFloat(wib.getUTCDate() + '.' + (wib.getUTCMonth() + 1));
+    }
+    return '';
+  }
+  const n = parseFloat(String(val).replace(',', '.'));
+  return isNaN(n) ? '' : n;
+}
+
+const WAKTU_SHIFT_LEGACY_MIN = 7 * 60 + 7;
+let serverWaktuShiftMin = WAKTU_SHIFT_LEGACY_MIN;
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function nowHHMM() { const d = new Date(); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+
+function fixSheetWaktu(val) {
+  if (val === undefined || val === null || val === '') return '';
+  const str = String(val).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
+    const d = new Date(str);
+    if (isNaN(d)) return '';
+    const yr = d.getUTCFullYear();
+    const shiftMs = yr < 1901
+      ? (7 * 3600 + 7 * 60 + 12) * 1000 
+      : 7 * 3600 * 1000;                  
+    const w = new Date(d.getTime() + shiftMs);
+    return pad2(w.getUTCHours()) + ':' + pad2(w.getUTCMinutes());
+  }
+
+  const m = str.match(/^(\d{1,2}):(\d{2})/);
+  if (m) {
+    return pad2(parseInt(m[1], 10)) + ':' + m[2];
+  }
+  
+  return str;
+}
+
+function mapSheetRow(d) {
+  const rawWaktu = d.waktu;
+  return {
+    ...d,
+    waktu: fixSheetWaktu(rawWaktu),
+    _waktuRaw: rawWaktu,
+    _localId: 'sheet_' + (d._sheetRow || ((d.tanggal || '') + '_' + (rawWaktu || '') + '_' + (d.gh || ''))),
+    _syncedToSheet: true
+  };
+}
+
 let scriptUrl = DEFAULT_SCRIPT_URL;
+localStorage.setItem('bee_script_url', DEFAULT_SCRIPT_URL);
 let isAuthenticated = (localStorage.getItem('bee_auth') === 'false') ? false : true;
+
+const AUTO_SYNC_INTERVAL_MS = 3 * 60 * 1000; 
+let autoSyncTimer = null;
+let isSyncing = false;
+
 const APP_VERSION_KEY = 'pwa_app_version_v1';
-let autoSyncTimer = null, isSyncing = false;
 let currentRemoteVersion = null;
 
-// ============================================
-// UTILITIES
-// ============================================
-function pad2(n) { return String(n).padStart(2, '0'); }
-function getLocalDate() { const d = new Date(); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+function getLocalDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return year + '-' + month + '-' + day;
+}
+
+const today = getLocalDate();
+
 function showToast(title, message, type = 'success', duration = 3500) {
   const container = document.getElementById('toastContainer');
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-  let icon = type === 'error' ? '✕' : type === 'info' ? 'ℹ' : type === 'loading' ? '⏳' : type === 'update' ? '🆕' : '✓';
-  toast.innerHTML = `<div class="toast-icon">${icon}</div><div class="toast-body"><div class="toast-title">${title}</div>${message ? `<div class="toast-message">${message}</div>` : ''}</div>`;
+
+  let icon = '✓';
+  if (type === 'error') icon = '✕';
+  if (type === 'info') icon = 'ℹ';
+  if (type === 'loading') icon = '⏳';
+  if (type === 'update') icon = '🆕';
+
+  toast.innerHTML = `
+    <div class="toast-icon">${icon}</div>
+    <div class="toast-body">
+      <div class="toast-title">${title}</div>
+      ${message ? `<div class="toast-message">${message}</div>` : ''}
+    </div>
+  `;
+
   container.appendChild(toast);
-  if (duration > 0) setTimeout(() => toast.remove(), duration);
+
+  if (duration > 0) {
+    setTimeout(() => toast.remove(), duration);
+  }
+
   return toast;
 }
-function showLoadingOverlay(text = 'Memproses...') { document.getElementById('loadingText').textContent = text; document.getElementById('loadingOverlay').classList.add('show'); }
-function hideLoadingOverlay() { document.getElementById('loadingOverlay').classList.remove('show'); }
+
+function showLoadingOverlay(text = 'Memproses...') {
+  document.getElementById('loadingText').textContent = text;
+  document.getElementById('loadingOverlay').classList.add('show');
+}
+
+function hideLoadingOverlay() {
+  document.getElementById('loadingOverlay').classList.remove('show');
+}
+
+async function checkVersion(silent) {
+  try {
+    const res = await fetch('./version.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return 'error';
+    const remote = await res.json();
+    currentRemoteVersion = remote;
+    const localVer = localStorage.getItem(APP_VERSION_KEY);
+
+    const labelEl = document.getElementById('app-version-label');
+    if (labelEl) {
+      labelEl.textContent = 'v' + (localVer || remote.version || '?') + ' · ' + (remote.released || '');
+    }
+
+    if (!localVer) {
+      localStorage.setItem(APP_VERSION_KEY, remote.version);
+      return 'first';
+    }
+
+    if (localVer === remote.version) {
+      return 'latest';
+    }
+
+    const btn = document.getElementById('updateBtn');
+    if (btn) {
+      btn.classList.add('available');
+      btn.textContent = '🆕 v' + remote.version;
+      btn.title = remote.notes || 'Versi baru tersedia';
+    }
+
+    if (!silent) {
+      showToast('Update Tersedia! 🆕',
+        'Versi ' + remote.version + ' siap dipasang. Klik tombol kuning di atas.',
+        'update', 6000);
+    }
+
+    return remote.version;
+  } catch (err) {
+    console.warn('[VERSION] Gagal cek version:', err);
+    return 'error';
+  }
+}
+
+async function performHardReset(newVersion) {
+  if (newVersion) {
+    localStorage.setItem(APP_VERSION_KEY, newVersion);
+  }
+
+  if ('serviceWorker' in navigator) {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    } catch (e) { }
+  }
+
+  if ('caches' in window) {
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    } catch (e) { }
+  }
+
+  setTimeout(() => {
+    window.location.replace(window.location.pathname + '?v=' + Date.now());
+  }, 800);
+}
+
+async function manualUpdate() {
+  const btn = document.getElementById('updateBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Cek...';
+  }
+
+  showToast('🔄 Memeriksa update...', '', 'loading', 2000);
+
+  try {
+    const res = await fetch('./version.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('version.json tidak ditemukan');
+    const remote = await res.json();
+    const localVer = localStorage.getItem(APP_VERSION_KEY);
+
+    if (!localVer) {
+      localStorage.setItem(APP_VERSION_KEY, remote.version);
+      showToast('✓ Versi v' + remote.version + ' tersimpan', '', 'success', 3000);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '🔄 Update';
+        btn.classList.remove('available');
+      }
+      return;
+    }
+
+    if (localVer === remote.version) {
+      showToast('✓ Sudah versi terbaru', 'v' + localVer, 'success', 3000);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '🔄 Update';
+        btn.classList.remove('available');
+      }
+      return;
+    }
+
+    showToast('🆕 Update ke v' + remote.version, 'Memperbarui aplikasi...', 'update', 4000);
+    await performHardReset(remote.version);
+
+  } catch (err) {
+    console.error(err);
+    showToast('Gagal cek update', err.message, 'error', 4000);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🔄 Update';
+    }
+  }
+}
+
+function startVersionCheckInterval() {
+  if (window.__versionCheckInterval) return;
+  window.__versionCheckInterval = setInterval(() => {
+    checkVersion(true);
+  }, 30 * 60 * 1000);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    checkVersion(true);
+  }
+});
+
+function updateAuthStatus() {
+  const status = document.getElementById('authStatus');
+  const authBtn = document.getElementById('authBtn');
+  const pushBtn = document.getElementById('pushBtn');
+  const pullBtn = document.getElementById('pullBtn');
+
+  if (isAuthenticated && scriptUrl) {
+    status.innerHTML = '✓ Tersambung otomatis ke Google Sheets';
+    status.className = 'auth-status-text ok';
+
+    authBtn.textContent = '✓ Tersambung';
+    authBtn.className = 'hdr-btn hdr-btn-logout';
+    authBtn.title = 'Klik untuk memutuskan koneksi';
+
+    pushBtn.style.display = 'inline-flex';
+    pullBtn.style.display = 'inline-flex';
+    updateQueueBadge();
+    updateAutoSyncIndicator('aktif');
+    startAutoSync();
+  } else {
+    status.innerHTML = '⚠️ Koneksi terputus — klik tombol di atas untuk menyambungkan';
+    status.className = 'auth-status-text';
+
+    authBtn.textContent = '☁️ Sambungkan';
+    authBtn.className = 'hdr-btn hdr-btn-connect';
+    authBtn.title = 'Klik untuk menyambungkan kembali';
+
+    pushBtn.style.display = 'none';
+    pullBtn.style.display = 'none';
+    updateAutoSyncIndicator('nonaktif');
+    stopAutoSync();
+  }
+}
+
+function handleAuthClick() {
+  if (isAuthenticated) {
+    if (!confirm('Putuskan koneksi ke Google Sheets?\n\nData baru akan disimpan lokal sampai Anda menyambung kembali.')) {
+      return;
+    }
+
+    isAuthenticated = false;
+    localStorage.setItem('bee_auth', 'false');
+    updateAuthStatus();
+    showToast('Koneksi Diputus', 'Aplikasi kembali ke mode lokal.', 'info');
+    return;
+  }
+
+  if (!scriptUrl) {
+    showToast('URL Belum Disetel', 'Hubungi admin untuk setup aplikasi.', 'error', 5000);
+    return;
+  }
+
+  isAuthenticated = true;
+  localStorage.setItem('bee_auth', 'true');
+
+  updateAuthStatus();
+  showToast('Tersambung! ✓', 'Berhasil connect. Auto-sync aktif.', 'success');
+
+  setTimeout(() => autoSync(), 500);
+}
+
+function initDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => { db = request.result; resolve(db); };
+    request.onupgradeneeded = (e) => {
+      const database = e.target.result;
+      if (!database.objectStoreNames.contains(storeName)) {
+        database.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
+      }
+    };
+  });
+}
+
+async function saveToQueue(data, type) {
+  try {
+    const tx = db.transaction(storeName, 'readwrite');
+    tx.objectStore(storeName).add({
+      data, type,
+      timestamp: new Date().toISOString(),
+      synced: false
+    });
+    updateQueueBadge();
+  } catch (e) { console.error('Queue error:', e); }
+}
+
+async function getQueuedData() {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readonly');
+    const req = tx.objectStore(storeName).getAll();
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => resolve(req.result);
+  });
+}
+
+async function deleteFromQueue(id) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    const req = tx.objectStore(storeName).delete(id);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => { resolve(); updateQueueBadge(); };
+  });
+}
+
+async function updateQueueBadge() {
+  try {
+    const queued = await getQueuedData();
+    const badge = document.getElementById('queueBadge');
+    if (!badge) return;
+    if (queued.length > 0) {
+      badge.textContent = queued.length;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch (e) { console.error(e); }
+}
+
+async function syncQueuedData() {
+  if (!isAuthenticated || !scriptUrl) {
+    showToast('Belum Tersambung', 'Klik tombol "Sambungkan" dulu ya.', 'error');
+    return;
+  }
+
+  const queued = await getQueuedData();
+  if (queued.length === 0) {
+    showToast('Tidak Ada Data', 'Semua data sudah tersinkron.', 'info');
+    return;
+  }
+
+  if (!confirm(`Sinkronkan ${queued.length} data ke Google Sheets sekarang?`)) return;
+
+  showLoadingOverlay(`Mengirim ${queued.length} data...`);
+
+  let synced = 0, failed = 0;
+
+  for (const item of queued) {
+    try {
+      const res = await fetch(scriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(item.data)
+      });
+      const result = await res.json();
+      if (result.status === 'error') throw new Error(result.message || 'Gagal');
+      await deleteFromQueue(item.id);
+      synced++;
+    } catch (e) {
+      console.error('Sync error:', e);
+      failed++;
+    }
+  }
+
+  hideLoadingOverlay();
+  updateQueueBadge();
+
+  if (failed === 0) {
+    showToast('Sinkron Berhasil! 🎉', `${synced} data terkirim.`, 'success', 4000);
+    fetchAllDataFromSheet(); 
+  } else {
+    showToast('Sinkron Sebagian', `${synced} berhasil, ${failed} gagal.`, 'error', 5000);
+    if (synced > 0) fetchAllDataFromSheet(); 
+  }
+}
+
+function loadLocalHistory() {
+  const saved = localStorage.getItem('bee_local_history');
+  if (saved) {
+    try { localHistory = JSON.parse(saved); } catch (e) { console.error(e); }
+  }
+  if (!localHistory.kunjungan) localHistory.kunjungan = [];
+  if (!localHistory.qc) localHistory.qc = [];
+  if (!localHistory.akhir) localHistory.akhir = [];
+  if (!localHistory.cek) localHistory.cek = [];
+  delete localHistory.mortalitas;
+}
+
+function saveLocalHistory() {
+  localStorage.setItem('bee_local_history', JSON.stringify(localHistory));
+}
 
 // ============================================
 // FITUR DEFAULT ZONA & BAY (LOCAL STORAGE)
@@ -379,6 +1581,7 @@ function simpanDefaultZonaBay(i) {
   const bay = document.getElementById('cekbAY'+i).value;
   saveKotakMap(gh, 'kotak'+i, zona, bay);
   showToast('Tersimpan', `Default Kotak ${i} (${gh}): Zona ${zona}, Bay ${bay}`, 'success');
+  renderBatchTracking(); // Refresh kartu batch agar langsung update
 }
 
 // ============================================
@@ -405,12 +1608,70 @@ function renderBays() {
 function renderQcKotakList() {
   const gh = document.getElementById('ghQc').value;
   const container = document.getElementById('qcKotakList');
-  if (!gh) { container.innerHTML = '<div class="qc-hint">Pilih GH dulu.</div>'; return; }
+  if (!gh) { container.innerHTML = '<div class="qc-hint">Pilih GH dulu untuk menampilkan kotak.</div>'; return; }
   let html = '';
   for (let i = 1; i <= 6; i++) {
-    html += `<div class="qc-item k-bagus"><div class="qc-title">Kotak ${i}</div><div class="qc-row"><input type="text" class="qc-no" id="qcNo${i}" placeholder="No Koloni"></div><div class="qc-row"><select id="qcKondisi${i}"><option value="Bagus">Bagus</option><option value="Cukup">Cukup</option><option value="Jelek">Jelek</option></select><div class="qc-sisiran"><input type="number" id="qcSisiran${i}" placeholder="0"><span>sisir</span></div></div><input type="text" class="qc-cat" id="qcCat${i}" placeholder="Catatan (opsional)" style="margin-top:8px;"></div>`;
+    html += `
+      <div class="qc-item k-bagus">
+        <div class="qc-title">Kotak ${i}</div>
+        <div class="qc-row"><input type="text" class="qc-no" id="qcNo${i}" placeholder="No Koloni"></div>
+        <div class="qc-row">
+          <select id="qcKondisi${i}" onchange="updateQcItemColor(${i})">
+            <option value="Bagus">Bagus</option>
+            <option value="Cukup">Cukup</option>
+            <option value="Jelek">Jelek</option>
+          </select>
+          <div class="qc-sisiran"><input type="number" id="qcSisiran${i}" placeholder="0"><span>sisir</span></div>
+        </div>
+        <div class="qc-row">
+          <label class="qc-foto-btn" style="display:inline-block; margin-top:8px;">📷 Foto (bisa banyak)
+            <input type="file" accept="image/*" multiple style="display:none;" onchange="handleQcFoto(this, ${i})">
+          </label>
+        </div>
+        <div id="qcFotoWrap${i}" style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;"></div>
+        <input type="text" class="qc-cat" id="qcCat${i}" placeholder="Catatan (opsional)" style="margin-top:8px;">
+      </div>`;
   }
   container.innerHTML = html;
+  updateQcSummary();
+}
+
+function updateQcItemColor(i) {
+  const el = document.getElementById('qcKondisi' + i).value;
+  const parent = document.getElementById('qcKondisi' + i).closest('.qc-item');
+  parent.className = 'qc-item ' + (el === 'Bagus' ? 'k-bagus' : el === 'Cukup' ? 'k-cukup' : 'k-jelek');
+  updateQcSummary();
+}
+
+function updateQcSummary() {
+  let bagus = 0, cukup = 0, jelek = 0, totalSisir = 0;
+  for (let i = 1; i <= 6; i++) {
+    const no = document.getElementById('qcNo' + i).value.trim();
+    const kondisi = document.getElementById('qcKondisi' + i).value;
+    const sisir = parseInt(document.getElementById('qcSisiran' + i).value) || 0;
+    if (no) {
+      if (kondisi === 'Bagus') bagus++;
+      else if (kondisi === 'Cukup') cukup++;
+      else if (kondisi === 'Jelek') jelek++;
+      totalSisir += sisir;
+    }
+  }
+  document.getElementById('qcSummary').textContent = `Total: ${bagus} Bagus · ${cukup} Cukup · ${jelek} Jelek · ${totalSisir} sisir`;
+}
+
+function handleQcFoto(input, i) {
+  const wrap = document.getElementById('qcFotoWrap' + i);
+  wrap.innerHTML = '';
+  Array.from(input.files).forEach((file, idx) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      img.style.width = '40px'; img.style.height = '40px'; img.style.objectFit = 'cover'; img.style.borderRadius = '4px';
+      wrap.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function renderCekKotakList() {
@@ -423,7 +1684,21 @@ function renderCekKotakList() {
   for (let i = 1; i <= 6; i++) {
     const defZona = defaultMap['kotak'+i]?.zona || '';
     const defBay = defaultMap['kotak'+i]?.bay || '';
-    html += `<div class="cek-item"><div class="cek-title">Kotak ${i}</div><div class="cek-row"><input type="number" class="cek-pop-input" id="cekPop${i}" placeholder="Populasi" min="0" max="100"><span class="cek-pct">%</span><label class="cek-gula"><input type="checkbox" id="cekGula${i}"> Gula</label></div><div class="cek-row" style="margin-top:8px;"><input type="text" class="cek-pop-input" id="cekZona${i}" placeholder="Zona" value="${defZona}" style="width:70px;"><input type="text" class="cek-pop-input" id="cekbAY${i}" placeholder="Bay" value="${defBay}" style="width:70px;"><button type="button" class="cek-quick" onclick="simpanDefaultZonaBay(${i})">💾 Set Default</button></div><input type="text" class="cek-cat" id="cekCat${i}" placeholder="Catatan (opsional)" style="margin-top:8px;"></div>`;
+    html += `
+      <div class="cek-item">
+        <div class="cek-title">Kotak ${i}</div>
+        <div class="cek-row">
+          <input type="number" class="cek-pop-input" id="cekPop${i}" placeholder="Populasi" min="0" max="100">
+          <span class="cek-pct">%</span>
+          <label class="cek-gula"><input type="checkbox" id="cekGula${i}"> Gula</label>
+        </div>
+        <div class="cek-row" style="margin-top:8px;">
+          <input type="text" class="cek-pop-input" id="cekZona${i}" placeholder="Zona" value="${defZona}" style="width:70px;">
+          <input type="text" class="cek-pop-input" id="cekbAY${i}" placeholder="Bay" value="${defBay}" style="width:70px;">
+          <button type="button" class="cek-quick" onclick="simpanDefaultZonaBay(${i})">💾 Set Default</button>
+        </div>
+        <input type="text" class="cek-cat" id="cekCat${i}" placeholder="Catatan (opsional)" style="margin-top:8px;">
+      </div>`;
   }
   container.innerHTML = html;
 }
@@ -436,7 +1711,6 @@ function renderBatchTracking() {
     html += `<div class="bt-gh-title">${gh}</div><div class="bt-grid">`;
     const maxKotak = gh === 'GH 1' ? 6 : 6;
     for (let i = 1; i <= maxKotak; i++) {
-      // Cari data QC terakhir untuk kotak ini
       const qcData = localHistory.qc.filter(q => q.gh === gh && q['kotak'+i+'_no']).sort((a,b) => b.tanggal.localeCompare(a.tanggal))[0];
       const infoZona = map[gh]?.['kotak'+i]?.zona ? `<div style="font-size:10px;color:#666;">Zona ${map[gh]['kotak'+i].zona} · Bay ${map[gh]['kotak'+i].bay}</div>` : '';
       
@@ -465,7 +1739,7 @@ async function fetchAllDataFromSheet() {
       localHistory.qc = data.qc || [];
       localHistory.akhir = data.batch_akhir || [];
       localHistory.cek = data.cek_koloni || [];
-      localStorage.setItem('bee_local_history', JSON.stringify(localHistory));
+      saveLocalHistory();
       renderBatchTracking();
       renderHistory();
       showToast('Sinkron Berhasil', 'Data terbaru dimuat', 'success');
@@ -476,11 +1750,23 @@ async function fetchAllDataFromSheet() {
   hideLoadingOverlay();
 }
 
-async function syncQueuedData() {
-  if (!isAuthenticated) return showToast('Belum Tersambung', 'Klik tombol Sambungkan', 'error');
+function startAutoSync() {
+  if (autoSyncTimer) clearInterval(autoSyncTimer);
+  updateAutoSyncIndicator('aktif');
+  autoSyncTimer = setInterval(() => autoSync(), AUTO_SYNC_INTERVAL_MS);
+}
+
+function stopAutoSync() {
+  if (autoSyncTimer) clearInterval(autoSyncTimer);
+  autoSyncTimer = null;
+}
+
+async function autoSync() {
+  if (!isAuthenticated || isSyncing) return;
   const queued = await getQueuedData();
-  if (queued.length === 0) return showToast('Tidak Ada Data', 'Semua data sudah tersinkron', 'info');
-  showLoadingOverlay(`Mengirim ${queued.length} data...`);
+  if (queued.length === 0) return;
+  isSyncing = true;
+  updateAutoSyncIndicator('sinkronisasi...');
   let synced = 0;
   for (const item of queued) {
     try {
@@ -491,36 +1777,26 @@ async function syncQueuedData() {
       synced++;
     } catch (e) { console.error(e); }
   }
-  hideLoadingOverlay();
-  updateQueueBadge();
-  showToast('Sync Selesai', `${synced} data terkirim`, 'success');
-  fetchAllDataFromSheet();
+  isSyncing = false;
+  updateAutoSyncIndicator('aktif');
+  if (synced > 0) {
+    showToast('Auto-sync', `${synced} data terkirim`, 'success');
+    fetchAllDataFromSheet();
+  }
 }
 
-// ============================================
-// INDEXEDDB QUEUE
-// ============================================
-function initDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(dbName, 1);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => { db = request.result; resolve(db); };
-    request.onupgradeneeded = (e) => { const d = e.target.result; if (!d.objectStoreNames.contains(storeName)) d.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true }); };
-  });
-}
-async function saveToQueue(data, type) {
-  const tx = db.transaction(storeName, 'readwrite');
-  tx.objectStore(storeName).add({ data, type, timestamp: new Date().toISOString(), synced: false });
-  updateQueueBadge();
-}
-async function getQueuedData() {
-  return new Promise((resolve, reject) => { const tx = db.transaction(storeName, 'readonly'); const req = tx.objectStore(storeName).getAll(); req.onerror = () => reject(req.error); req.onsuccess = () => resolve(req.result); });
-}
-async function deleteFromQueue(id) {
-  return new Promise((resolve, reject) => { const tx = db.transaction(storeName, 'readwrite'); const req = tx.objectStore(storeName).delete(id); req.onerror = () => reject(req.error); req.onsuccess = () => { resolve(); updateQueueBadge(); }; });
-}
-async function updateQueueBadge() {
-  try { const queued = await getQueuedData(); const badge = document.getElementById('queueBadge'); if (badge) { if (queued.length > 0) { badge.textContent = queued.length; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; } } } catch (e) {}
+function updateAutoSyncIndicator(status) {
+  const el = document.getElementById('autoSyncStatus');
+  if (!el) return;
+  if (status === 'aktif') {
+    el.textContent = '⏱️ Auto-sync: aktif';
+    el.classList.add('active');
+  } else if (status === 'sinkronisasi...') {
+    el.textContent = '⏱️ Auto-sync: mengirim...';
+  } else {
+    el.textContent = '⏱️ Auto-sync: nonaktif';
+    el.classList.remove('active');
+  }
 }
 
 // ============================================
@@ -529,11 +1805,11 @@ async function updateQueueBadge() {
 function resetFormKunjungan() {
   document.getElementById('beeForm').reset();
   document.getElementById('tanggal').value = getLocalDate();
-  document.getElementById('waktu').value = new Date().toTimeString().slice(0,5);
+  document.getElementById('waktu').value = nowHHMM();
   renderBays();
 }
-function resetFormQc() { document.getElementById('qcForm').reset(); document.getElementById('tanggalQc').value = getLocalDate(); document.getElementById('waktuQc').value = new Date().toTimeString().slice(0,5); }
-function resetFormCek() { document.getElementById('cekForm').reset(); document.getElementById('tanggalCek').value = getLocalDate(); document.getElementById('waktuCek').value = new Date().toTimeString().slice(0,5); renderCekKotakList(); }
+function resetFormQc() { document.getElementById('qcForm').reset(); document.getElementById('tanggalQc').value = getLocalDate(); document.getElementById('waktuQc').value = nowHHMM(); renderQcKotakList(); }
+function resetFormCek() { document.getElementById('cekForm').reset(); document.getElementById('tanggalCek').value = getLocalDate(); document.getElementById('waktuCek').value = nowHHMM(); renderCekKotakList(); }
 
 document.getElementById('beeForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -553,6 +1829,30 @@ document.getElementById('beeForm').addEventListener('submit', async (e) => {
   showToast('Tersimpan', 'Data kunjungan masuk antrean', 'success');
   if (isAuthenticated) syncQueuedData();
   resetFormKunjungan();
+});
+
+document.getElementById('qcForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const data = {
+    sheet: 'qc',
+    tanggal: document.getElementById('tanggalQc').value,
+    waktu: document.getElementById('waktuQc').value,
+    gh: document.getElementById('ghQc').value,
+    asal: document.getElementById('asalQc').value,
+    no_batch: document.getElementById('batchQc').value,
+    catatan: document.getElementById('catatanQc').value,
+    cid: 'Q-' + Date.now()
+  };
+  for (let i = 1; i <= 6; i++) {
+    data['kotak' + i + '_no'] = document.getElementById('qcNo' + i).value;
+    data['kotak' + i + '_kondisi'] = document.getElementById('qcKondisi' + i).value;
+    data['kotak' + i + '_sisiran'] = document.getElementById('qcSisiran' + i).value;
+    data['kotak' + i + '_catatan'] = document.getElementById('qcCat' + i).value;
+  }
+  await saveToQueue(data, 'qc');
+  showToast('Tersimpan', 'Data QC masuk antrean', 'success');
+  if (isAuthenticated) syncQueuedData();
+  resetFormQc();
 });
 
 document.getElementById('cekForm').addEventListener('submit', async (e) => {
@@ -587,18 +1887,14 @@ function renderHistory() {
   let html = '';
   if (type === 'kunjungan') {
     localHistory.kunjungan.forEach(d => {
-      html += `<tr><td>${d.tanggal}</td><td>${d.waktu}</td><td>${d.gh}</td><td>${d.suhu}°C, ${d.cuaca}</td><td style="text-align:center;"></td></tr>`;
+      html += `<tr><td>${d.tanggal}</td><td>${d.waktu}</td><td>${d.gh}</td><td>${d.suhu}°C</td><td>${d.cuaca}</td><td style="text-align:center;"></td></tr>`;
     });
   } else if (type === 'qc') {
     localHistory.qc.forEach(d => {
-      html += `<tr><td>${d.tanggal}</td><td>${d.waktu}</td><td>${d.gh}</td><td>Batch: ${d.no_batch}</td><td style="text-align:center;"></td></tr>`;
-    });
-  } else {
-    localHistory.cek.forEach(d => {
-      html += `<tr><td>${d.tanggal}</td><td>${d.waktu}</td><td>${d.gh}</td><td>${d.catatan || '-'}</td><td style="text-align:center;"></td></tr>`;
+      html += `<tr><td>${d.tanggal}</td><td>${d.waktu}</td><td>${d.gh}</td><td>Batch: ${d.no_batch}</td><td>${d.catatan || '-'}</td><td style="text-align:center;"></td></tr>`;
     });
   }
-  tbody.innerHTML = html || '<tr><td colspan="5" class="history-empty">Belum ada data</td></tr>';
+  tbody.innerHTML = html || '<tr><td colspan="6" class="history-empty">Belum ada data</td></tr>';
 }
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -608,6 +1904,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById(btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'tab-riwayat') renderHistory();
+    if (btn.dataset.tab === 'tab-batch') renderBatchTracking();
+    if (btn.dataset.tab === 'tab-cek') renderCekKotakList();
   });
 });
 
@@ -620,31 +1918,12 @@ async function init() {
   resetFormCek();
   renderBatchTracking();
   updateQueueBadge();
-  
-  const saved = localStorage.getItem('bee_local_history');
-  if (saved) {
-    try { localHistory = JSON.parse(saved); } catch (e) {}
-  }
-  if(isAuthenticated) fetchAllDataFromSheet();
+  updateAuthStatus();
+  checkVersion(false);
+  startVersionCheckInterval();
 }
 document.addEventListener('DOMContentLoaded', init);
 
-function loadLocalHistory() {
-  const saved = localStorage.getItem('bee_local_history');
-  if (saved) { try { localHistory = JSON.parse(saved); } catch (e) {} }
-  if (!localHistory.kunjungan) localHistory.kunjungan = [];
-  if (!localHistory.qc) localHistory.qc = [];
-  if (!localHistory.akhir) localHistory.akhir = [];
-  if (!localHistory.cek) localHistory.cek = [];
-}
-
-function handleAuthClick() {
-  isAuthenticated = !isAuthenticated;
-  localStorage.setItem('bee_auth', isAuthenticated);
-  document.getElementById('authBtn').textContent = isAuthenticated ? '✓ Tersambung' : '☁️ Sambungkan';
-  if(isAuthenticated) fetchAllDataFromSheet();
-}
-function manualUpdate() { window.location.reload(); }
 </script>
 </body>
 </html>
