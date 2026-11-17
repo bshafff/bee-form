@@ -2064,14 +2064,6 @@ function normKoloni(x) { return String(x || '').toUpperCase().replace(/\s+/g, ''
 
 // Lokasi kotak terkini: dari Cek terbaru (sejak batch ini datang) -> kalau belum ada, dari data awal per no koloni.
 function lokasiKotak(gh, k, b) {
-  // 1. Prioritas: Data QC (saat kedatangan) jika ada
-  if (b) {
-    const zqc = String(b['kotak' + k + '_zona'] ?? '').trim();
-    const bqc = String(b['kotak' + k + '_bay'] ?? '').trim();
-    if (zqc || bqc) return { zona: zqc, bay: bqc, sumber: 'qc' };
-  }
-
-  // 2. Cek riwayat form "Cek" terbaru (kalau kotak pernah dipindah)
   const start = b && b.start ? b.start : '';
   const key = r => (r.tanggal || '') + ' ' + (r.waktu || '');
   const recs = (localHistory.cek || []).filter(r => r.gh === gh).sort((x, y) => key(x).localeCompare(key(y)));
@@ -2082,11 +2074,8 @@ function lokasiKotak(gh, k, b) {
     const by = String(r['kotak' + k + '_bay'] ?? '').trim();
     if (z || by) return { zona: z, bay: by, sumber: 'cek', tanggal: r.tanggal };
   }
-
-  // 3. Fallback: data hardcoded
   const awal = LOKASI_AWAL[normKoloni(b && b.koloni)];
   if (awal) return { zona: String(awal.zona), bay: String(awal.bay), sumber: 'awal' };
-  
   return { zona: '', bay: '', sumber: '' };
 }
 function lokasiText(l) {
@@ -2260,13 +2249,12 @@ function mediaTotalMB(fd) {
   return n / 1048576;
 }
 
-// Apps Script lama (< v6) tidak paham foto jamak / video / zona/bay QC → jangan kirim, simpan di antrean saja
+// Apps Script lama (< v6) tidak paham foto jamak / video → jangan kirim, simpan di antrean saja
 function mediaNeedsNewApi(fd) {
   fd = fd || {};
   if (fd.sheet === 'kunjungan' && (parseInt(fd.bay11) || 0) > 0) return true;
   return Object.keys(fd).some(k => {
-    // Jika ada data zona atau bay dari form Cek maupun QC
-    if ((fd.sheet === 'cek_koloni' || fd.sheet === 'qc') && /^kotak\d_(zona|bay)$/.test(k)) return !!fd[k];
+    if (fd.sheet === 'cek_koloni' && /^kotak\d_(zona|bay)$/.test(k)) return !!fd[k];
     if (!/^kotak\d_(foto|video)$/.test(k)) return false;
     const v = fd[k];
     if (!v || (Array.isArray(v) && !v.length)) return false;
@@ -2443,13 +2431,9 @@ function renderQcKotak(gh, values) {
     html += `
       <div class="qc-item ${kond ? 'k-' + kond.toLowerCase() : ''}" id="qcItem${i}">
         <div class="qc-title">Kotak ${i}</div>
-        <div class="qc-row" style="display: flex; gap: 8px;">
-          <input type="text" class="qc-no" id="kotak${i}_no" placeholder="No koloni (mis. A21)" style="flex: 1;"
+        <div class="qc-row">
+          <input type="text" class="qc-no" id="kotak${i}_no" placeholder="No koloni (mis. A1)"
                  value="${qcEsc(values[`kotak${i}_no`])}">
-          <input type="number" class="qc-no" id="kotak${i}_zona" placeholder="Zona" style="width: 70px; flex: none;"
-                 value="${qcEsc(values[`kotak${i}_zona`])}">
-          <input type="number" class="qc-no" id="kotak${i}_bay" placeholder="Bay" style="width: 70px; flex: none;"
-                 value="${qcEsc(values[`kotak${i}_bay`])}">
         </div>
         <div class="qc-row">
           <select id="kotak${i}_kondisi" onchange="updateQcSummary()">
@@ -2545,16 +2529,11 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     const kEl = document.getElementById(`kotak${i}_kondisi`);
     const sEl = document.getElementById(`kotak${i}_sisiran`);
     const nEl = document.getElementById(`kotak${i}_no`);
-    const zEl = document.getElementById(`kotak${i}_zona`); // Ambil input Zona
-    const bEl = document.getElementById(`kotak${i}_bay`);  // Ambil input Bay
     const cEl = document.getElementById(`kotak${i}_catatan`);
-    
     const aktif = i <= n && kEl;
     const kond = aktif ? kEl.value : '';
     const sis = (aktif && sEl && sEl.value !== '') ? (parseInt(sEl.value) || 0) : '';
     const no = aktif && nEl ? nEl.value.trim() : '';
-    const zona = aktif && zEl ? zEl.value.trim() : '';
-    const bay = aktif && bEl ? bEl.value.trim() : '';
     
     let cat = aktif && cEl ? cEl.value.trim() : '';
     const foto = aktif ? mediaPayload('qc', i, 'image') : '';
@@ -2582,8 +2561,6 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     }
 
     formData[`kotak${i}_no`] = no;
-    formData[`kotak${i}_zona`] = zona; // Masukkan ke payload
-    formData[`kotak${i}_bay`] = bay;   // Masukkan ke payload
     formData[`kotak${i}_kondisi`] = kond;
     formData[`kotak${i}_sisiran`] = sis;
     formData[`kotak${i}_foto`] = foto;
@@ -2917,42 +2894,1732 @@ async function deleteHistoryItem(type, localId) {
       deleteLocalHistory(type, localId);
       renderHistory();
       hideLoadingOverlay();
-      showToast('Data Dihapus Lokal', 'Data tidak ditemukan di Sheet, dihapus dari lokal.', 'info', 4000);
+      showToast('Data Tidak Ditemukan', 'Sudah tidak ada di Sheet.', 'info', 4000);
       return;
     }
 
-    throw new Error(result.message || 'Gagal menghapus');
-
+    throw new Error(result.message || 'Google Sheet gagal menghapus data.');
   } catch (error) {
     hideLoadingOverlay();
-    console.error(error);
-    showToast('Gagal Hapus', error.message || 'Periksa koneksi internet.', 'error');
+    console.error('Delete sync error:', error);
+    showToast('Gagal Hapus dari Sheet', 'Coba lagi.', 'error', 5000);
   }
 }
 
+// ============================================
+// TRACKING BATCH KOLONI
+// ============================================
+
+const BATCH_UMUR_WASPADA = 14; 
+const BATCH_UMUR_GANTI = 21;   
+const BATCH_UMUR_MAX = 28;     
+const AKHIR_PENYEBAB = [
+  'Kabur',
+  'Mati - kepanasan',
+  'Mati - pestisida',
+  'Mati - hama/penyakit',
+  'Mati - lainnya',
+  'Umur habis / diganti'
+];
+
 function friendlyErr(e) {
-  const m = String(e && e.message || e);
-  if (m.includes(MEDIA_API_ERR)) return m;
-  if (m.toLowerCase().includes('payload')) return 'Data terlalu besar. Kurangi ukuran foto/video.';
-  if (m.toLowerCase().includes('failed to fetch') || m.toLowerCase().includes('network')) return 'Koneksi gagal. Coba lagi.';
+  const m = (e && e.message) ? e.message : String(e);
+  if (e instanceof SyntaxError || /Unexpected token|JSON/i.test(m)) {
+    return 'Respon server bukan JSON (Apps Script belum diotorisasi / belum di-deploy versi baru).';
+  }
+  if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'Tidak bisa terhubung ke server.';
   return m;
 }
 
-function getTotalPerItem(item) {
-  let t = 0;
-  for (let i = 1; i <= BAY_MAX; i++) t += bayNum(item['bay' + i]);
-  return t;
+let serverWarned = false;
+let serverApiVersion = 0;
+function checkServerVersion(result, manual) {
+  serverApiVersion = Number(result && result.qcVersion) || 0;
+  const ok = serverApiVersion >= 5;
+  if (ok) {
+    serverWarned = false;
+    return;
+  }
+  if (manual || !serverWarned) {
+    serverWarned = true;
+    showToast('Apps Script Versi Lama ⚠️', 'Update Apps Script ke v5 (tambah Cek.gs) lalu deploy New version supaya Cek Koloni masuk ke Sheet.', 'error', 8000);
+  }
 }
-function bayNum(v) {
-  if (v === undefined || v === null || v === '') return 0;
-  const n = Number(String(v).replace(',', '.'));
-  return isNaN(n) ? 0 : n;
+
+function mergeAkhirFromServer(result) {
+  if (!result || !Array.isArray(result.batch_akhir)) return;
+  const sheet = result.batch_akhir.map(d => ({ ...d, _localId: 'sheet_ak_' + d._sheetRow, _syncedToSheet: true }));
+  const sameAk = (a, b) => a.tanggal === b.tanggal && a.gh === b.gh &&
+    String(a.kotak) === String(b.kotak) && String(a.no_batch) === String(b.no_batch);
+  const localOnly = (localHistory.akhir || []).filter(l => !String(l._localId || '').startsWith('sheet_'));
+  const unsynced = localOnly.filter(l => !sheet.some(sh => sameAk(sh, l)));
+  localHistory.akhir = [...sheet, ...unsynced];
 }
 
 function qcBatchText(item) {
-  const mb = mediaBadge('qc', item);
-  return (item.no_batch || '-') + (mb ? ' ' + mb : '');
+  const parts = [];
+  for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+    const no = String(item[`kotak${i}_no`] ?? '').trim();
+    if (no) parts.push(`K${i}: ${qcEsc(no)}`);
+  }
+  
+  const batchName = item.no_batch ? cleanBatchName(item.no_batch) : '';
+  const head = batchName ? `<b>Batch ${qcEsc(batchName)}</b><br>` : '';
+  
+  return (head + parts.join('<br>')) || qcEsc(item.asal || '-');
 }
+
+function dayNum(str) {
+  const m = String(str || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return NaN;
+  return Math.floor(Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000);
+}
+function daysBetween(a, b) {
+  const x = dayNum(a), y = dayNum(b);
+  return (isNaN(x) || isNaN(y)) ? null : Math.max(0, y - x);
+}
+
+function cleanBatchName(val) {
+  if (!val) return '';
+  let str = String(val).trim();
+  if (str.includes('T00:00:00.000Z')) {
+    const d = new Date(str);
+    if (!isNaN(d)) {
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+  }
+  return str;
+}
+
+function batchOfRow(row) {
+  const rawBatch = String(row.no_batch ?? '').trim();
+  if (!rawBatch) {
+    return 'Tgl ' + (row.tanggal || '?');
+  }
+  return cleanBatchName(rawBatch);
+}
+
+function buildBatches() {
+  const map = {};
+  const today = getLocalDate();
+
+   (localHistory.qc || []).forEach(row => {
+    const batch = batchOfRow(row);
+    for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+      const catatan = String(row[`kotak${i}_catatan`] || '');
+      
+      if (catatan.includes('[❌ DITOLAK]')) continue;
+
+      const koloni = String(row[`kotak${i}_no`] ?? '').trim();
+      const kond = row[`kotak${i}_kondisi`] || '';
+      if (!koloni && !kond) continue;
+      const key = `${row.gh}|${i}|${batch}`;
+      const b = map[key] || (map[key] = {
+        key, gh: row.gh, kotak: i, batch, koloni: '', start: row.tanggal || '',
+        kondisi: '', catatan: '', lastQc: ''
+      });
+      if (row.tanggal && (!b.start || row.tanggal < b.start)) b.start = row.tanggal;
+      if (!b.lastQc || (row.tanggal || '') >= b.lastQc) {
+        b.lastQc = row.tanggal || '';
+        b.koloni = koloni || b.koloni;
+        b.kondisi = kond;
+        b.catatan = row[`kotak${i}_catatan`] || '';
+      }
+    }
+  });
+
+  (localHistory.akhir || []).forEach(a => {
+    const batch = String(a.no_batch ?? '').trim();
+    if (!batch || !a.gh) return;
+    const key = `${a.gh}|${a.kotak}|${batch}`;
+    const b = map[key] || (map[key] = {
+      key, gh: a.gh, kotak: parseInt(a.kotak) || a.kotak, batch, koloni: a.no_koloni || '', start: '',
+      kondisi: '', catatan: '', lastQc: ''
+    });
+    if (!b.end || (a.tanggal || '') >= b.end) {
+      b.end = a.tanggal || '';
+      b.penyebab = a.penyebab || '';
+      b.akhirCatatan = a.catatan || '';
+      b.akhirId = a._localId;
+    }
+  });
+
+  const list = Object.values(map);
+
+  const groups = {};
+  list.forEach(b => { (groups[`${b.gh}|${b.kotak}`] = groups[`${b.gh}|${b.kotak}`] || []).push(b); });
+  Object.values(groups).forEach(g => {
+    g.sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+    g.forEach((b, idx) => {
+      b.isLatest = idx === g.length - 1;
+      const next = g[idx + 1];
+      if (!b.end && next && next.start) {
+        b.end = next.start;
+        b.penyebab = 'Diganti (batch baru)';
+        b.auto = true;
+      }
+    });
+  });
+
+  list.forEach(b => { b.umur = b.start ? daysBetween(b.start, b.end || today) : null; });
+  return list;
+}
+
+function batchLevel(umur) {
+  if (umur === null) return { cls: 'bt-green', text: 'Aktif' };
+  if (umur >= BATCH_UMUR_MAX) return { cls: 'bt-red', text: 'Lewat ' + BATCH_UMUR_MAX + ' hari — ganti' };
+  if (umur >= BATCH_UMUR_GANTI) return { cls: 'bt-orange', text: 'Siap diganti' };
+  if (umur >= BATCH_UMUR_WASPADA) return { cls: 'bt-yellow', text: 'Mulai dipantau' };
+  return { cls: 'bt-green', text: 'Aman' };
+}
+
+function renderBatchTab() {
+  const box = document.getElementById('btStatus');
+  if (!box) return;
+  const list = buildBatches();
+  const perluBeli = [];
+  let html = '';
+
+  Object.keys(QC_KOTAK_PER_GH).forEach(gh => {
+    html += `<div class="bt-gh-title">${gh}</div><div class="bt-grid">`;
+    const n = QC_KOTAK_PER_GH[gh];
+    for (let k = 1; k <= n; k++) {
+      const b = list.find(x => x.gh === gh && x.kotak === k && x.isLatest);
+      if ((!b || b.end) && kotakOpsional(gh, k)) {
+        html += `<div class="bt-card bt-empty" style="opacity:.8;"><div class="bt-top"><b>Kotak ${k}</b><span class="bt-days" style="color:#888;">OPSIONAL</span></div>
+          <div>Belum dipakai</div><div class="bt-note" style="color:#888;">Isi di tab QC kalau ada koloni ke-${k}</div></div>`;
+        continue;
+      }
+      if (!b || b.end) {
+        const info = b ? `Terakhir: ${qcEsc(b.koloni || '-')} · Batch ${qcEsc(b.batch)} · ${b.umur !== null ? b.umur + ' hari' : '?'}<br>${qcEsc(b.penyebab || '')}` : 'Belum ada data';
+        perluBeli.push(`${gh} K${k}`);
+        html += `<div class="bt-card bt-empty"><div class="bt-top"><b>Kotak ${k}</b><span class="bt-days" style="color:#c62828;">KOSONG</span></div>
+          <div>${info}</div><div class="bt-note" style="color:#c62828;">Perlu beli / isi koloni</div></div>`;
+        continue;
+      }
+      const lv = batchLevel(b.umur);
+      if (lv.cls === 'bt-orange' || lv.cls === 'bt-red') perluBeli.push(`${gh} K${k}`);
+      const warnJelek = (b.kondisi === 'Jelek' && b.umur !== null && b.umur < BATCH_UMUR_GANTI)
+        ? '<div>⚠️ Kondisi awal Jelek</div>' : '';
+      html += `<div class="bt-card ${lv.cls}">
+        <div class="bt-top"><b>Kotak ${k}${b.koloni ? ' · ' + qcEsc(b.koloni) : ''}</b><span class="bt-days">${b.umur !== null ? 'Hari ke-' + b.umur : '-'}</span></div>
+        <div>Batch <b>${qcEsc(b.batch)}</b></div>
+        <div>Datang ${qcEsc(b.start || '-')}</div>
+        <div>📍 ${(() => { const t = lokasiText(lokasiKotak(gh, k, b)); return t ? '<span class="bt-lok">' + t + '</span>' : '<span style="color:#999;">Lokasi belum diisi</span>'; })()}</div>
+        ${warnJelek}
+        <div class="bt-note">${lv.text}</div>
+        <button type="button" class="bt-btn" data-gh="${gh}" data-k="${k}" data-b="${qcEsc(b.batch)}">Akhiri</button>
+      </div>`;
+    }
+    html += '</div>';
+  });
+  box.innerHTML = html;
+
+  const sum = document.getElementById('btSummary');
+  if (perluBeli.length) {
+    sum.className = 'bt-summary warn';
+    sum.textContent = '🛒 Perlu beli / ganti: ' + perluBeli.join(', ');
+  } else {
+    sum.className = 'bt-summary ok';
+    sum.textContent = '✅ Semua kotak masih aman (umur < ' + BATCH_UMUR_GANTI + ' hari).';
+  }
+
+  const byBatch = {};
+  list.forEach(b => { (byBatch[b.batch] = byBatch[b.batch] || []).push(b); });
+  const batchRows = Object.entries(byBatch).map(([batch, arr]) => {
+    const starts = arr.map(x => x.start).filter(Boolean).sort();
+    const umurs = arr.map(x => x.umur).filter(u => u !== null);
+    const aktif = arr.filter(x => !x.end).length;
+    return { batch, datang: starts[0] || '-', total: arr.length, aktif,
+      avg: umurs.length ? Math.round(umurs.reduce((t, u) => t + u, 0) / umurs.length) : null,
+      maks: umurs.length ? Math.max(...umurs) : null };
+  }).sort((a, b) => b.datang.localeCompare(a.datang));
+  document.getElementById('btBatchBody').innerHTML = batchRows.length ? batchRows.map(r => `<tr>
+      <td><b>${qcEsc(r.batch)}</b></td><td>${qcEsc(r.datang)}</td><td>${r.total}</td>
+      <td>${r.aktif}</td><td>${r.avg !== null ? r.avg + ' / ' + r.maks + ' hr' : '-'}</td></tr>`).join('')
+    : '<tr><td colspan="5" class="history-empty">Belum ada data batch.</td></tr>';
+
+  const ended = list.filter(b => b.end && b.umur !== null);
+  const stats = document.getElementById('btStats');
+  if (ended.length) {
+    const avg = Math.round(ended.reduce((t, b) => t + b.umur, 0) / ended.length);
+    const mn = Math.min(...ended.map(b => b.umur)), mx = Math.max(...ended.map(b => b.umur));
+    const cnt = {};
+    ended.forEach(b => { cnt[b.penyebab || '-'] = (cnt[b.penyebab || '-'] || 0) + 1; });
+    stats.innerHTML = `Rata-rata bertahan <b>${avg} hari</b> (min ${mn}, maks ${mx}) dari ${ended.length} koloni selesai.<br>` +
+      Object.entries(cnt).map(([k, v]) => `${qcEsc(k)}: <b>${v}</b>`).join(' · ');
+  } else {
+    stats.textContent = 'Belum ada koloni yang selesai.';
+  }
+
+  const rows = [...list].sort((a, b) => (b.start || '').localeCompare(a.start || ''));
+  document.getElementById('btHistoryBody').innerHTML = rows.length ? rows.map(b => {
+    const lv = b.end ? null : batchLevel(b.umur);
+    const status = b.end
+      ? `${qcEsc(b.penyebab || 'Selesai')}<br><span style="color:#888;">${qcEsc(b.end)}</span>${b.akhirCatatan ? '<br><i>' + qcEsc(b.akhirCatatan) + '</i>' : ''}`
+      : `<b>Aktif</b><br>${lv.text}`;
+    const aksi = (b.akhirId && !b.auto)
+      ? `<button class="history-btn history-btn-delete" onclick="deleteAkhir('${b.akhirId}')" title="Batalkan catatan berakhir">↩️</button>` : '';
+    return `<tr>
+      <td><b>${qcEsc(b.batch)}</b></td>
+      <td>${b.gh}<br>K${b.kotak}${b.koloni ? '<br>' + qcEsc(b.koloni) : ''}</td>
+      <td>${qcEsc(b.start || '-')}</td>
+      <td>${b.umur !== null ? b.umur + ' hr' : '-'}</td>
+      <td>${status}</td>
+      <td>${aksi}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" class="history-empty">Belum ada data. Isi No Batch & No Koloni di tab QC Koloni.</td></tr>';
+
+  const rejectedHtml = [];
+  (localHistory.qc || []).forEach(row => {
+    for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+      const cat = String(row[`kotak${i}_catatan`] || '');
+      if (cat.includes('[❌ DITOLAK]')) {
+        const alasan = cat.replace('[❌ DITOLAK]', '').replace(/\[⚠️.*?\]/g, '').trim() || 'Tanpa catatan';
+        rejectedHtml.push(`
+          <div class="bt-card bt-red" style="margin-bottom:8px;">
+            <div class="bt-top">
+              <b>${row.gh} - Kotak ${i} (${row[`kotak${i}_no`] || '-'})</b>
+              <span class="bt-days">${row.tanggal}</span>
+            </div>
+            <div>Batch: <b>${row.no_batch || '-'}</b></div>
+            <div style="margin-top:4px; color:#c62828; font-weight:bold;">Alasan: ${qcEsc(alasan)}</div>
+          </div>
+        `);
+      }
+    }
+  });
+  
+  const rejBox = document.getElementById('rejectedList');
+  if (rejBox) {
+    rejBox.innerHTML = rejectedHtml.length ? rejectedHtml.join('') : '<div class="qc-hint">Tidak ada kotak yang ditolak. Semua aman.</div>';
+  }
+}
+
+// ---- Form "Akhiri batch" ----
+function fillKotakAk() {
+  const gh = document.getElementById('ghAk').value;
+  const sel = document.getElementById('kotakAk');
+  const n = QC_KOTAK_PER_GH[gh] || 0;
+  let o = '<option value="">-- Kotak --</option>';
+  for (let k = 1; k <= n; k++) o += `<option value="${k}">Kotak ${k}</option>`;
+  sel.innerHTML = o;
+  
+  document.getElementById('batchAk').value = '';
+  const datalist = document.getElementById('batchAkList');
+  if (datalist) datalist.innerHTML = '';
+}
+
+function prefillBatchAk() {
+  const gh = document.getElementById('ghAk').value;
+  const k = parseInt(document.getElementById('kotakAk').value);
+  const list = document.getElementById('batchAkList');
+  const input = document.getElementById('batchAk');
+  
+  if (!gh || !k) {
+    if(list) list.innerHTML = '';
+    return;
+  }
+
+  const allB = buildBatches().filter(x => x.gh === gh && x.kotak === k)
+    .sort((a, b) => (b.start || '').localeCompare(a.start || ''));
+
+  let html = '';
+  allB.forEach(b => {
+    const status = b.end ? `[Selesai]` : `[Aktif]`;
+    html += `<option value="${qcEsc(b.batch)}">${qcEsc(b.batch)} - ${qcEsc(b.koloni || '-')} ${status}</option>`;
+  });
+  if(list) list.innerHTML = html;
+
+  const active = allB.find(x => !x.end);
+  if (active) {
+    input.value = active.batch;
+  } else if (allB.length > 0) {
+    input.value = allB[0].batch;
+  } else {
+    input.value = '';
+  }
+}
+
+document.getElementById('penyebabAk').innerHTML =
+  '<option value="">-- Pilih penyebab --</option>' + AKHIR_PENYEBAB.map(p => `<option value="${p}">${p}</option>`).join('');
+
+document.getElementById('ghAk').addEventListener('change', fillKotakAk);
+document.getElementById('kotakAk').addEventListener('change', prefillBatchAk);
+
+document.getElementById('btStatus').addEventListener('click', e => {
+  const btn = e.target.closest('.bt-btn');
+  if (!btn) return;
+  document.getElementById('btAkhirBox').open = true;
+  document.getElementById('tanggalAk').value = getLocalDate();
+  document.getElementById('ghAk').value = btn.dataset.gh;
+  fillKotakAk();
+  document.getElementById('kotakAk').value = btn.dataset.k;
+  
+  prefillBatchAk(); 
+  document.getElementById('batchAk').value = btn.dataset.b; 
+  
+  document.getElementById('penyebabAk').focus();
+  document.getElementById('btAkhirBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+function showStatusAk(msg, type) {
+  const el = document.getElementById('statusAk');
+  el.textContent = msg;
+  el.className = 'status ' + type;
+}
+
+document.getElementById('akhirForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const formData = {
+    sheet: 'batch_akhir',
+    action: 'submit',
+    tanggal: document.getElementById('tanggalAk').value,
+    gh: document.getElementById('ghAk').value,
+    kotak: parseInt(document.getElementById('kotakAk').value),
+    no_batch: document.getElementById('batchAk').value.trim(),
+    no_koloni: '',
+    penyebab: document.getElementById('penyebabAk').value,
+    catatan: document.getElementById('catatanAk').value.trim()
+  };
+  if (!formData.no_batch) { showStatusAk('Isi No Batch.', 'error'); return; }
+  const hit = buildBatches().find(x => x.gh === formData.gh && x.kotak === formData.kotak && x.batch === formData.no_batch);
+  if (hit) formData.no_koloni = hit.koloni || '';
+
+  const btn = document.getElementById('submitBtnAk');
+  btn.disabled = true;
+  showStatusAk('Menyimpan...', 'loading');
+  let synced = false;
+  try {
+    if (isAuthenticated && scriptUrl && navigator.onLine) {
+      const res = await fetch(scriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(formData)
+      });
+      const result = await res.json();
+      if (result.status === 'error') throw new Error(result.message || 'Gagal');
+      if (result.sheet !== 'batch_akhir') throw new Error('Apps Script di server masih versi lama (belum deploy versi baru).');
+      synced = true;
+      showStatusAk('✓ Tersimpan di Sheet.', 'success');
+    } else {
+      await saveToQueue(formData, 'akhir');
+      showStatusAk('📥 Tersimpan lokal. Auto-sync akan kirim otomatis.', 'info');
+    }
+  } catch (err) {
+    console.error(err);
+    await saveToQueue(formData, 'akhir');
+    showStatusAk('⚠️ Belum masuk Sheet: ' + friendlyErr(err) + ' (tersimpan lokal)', 'error');
+  }
+
+  localHistory.akhir = (localHistory.akhir || []).filter(a => !(a.gh === formData.gh &&
+    String(a.kotak) === String(formData.kotak) && String(a.no_batch) === String(formData.no_batch)));
+  addLocalHistory('akhir', { ...formData }, synced);
+  updateQueueBadge();
+  btn.disabled = false;
+  document.getElementById('akhirForm').reset();
+  document.getElementById('tanggalAk').value = getLocalDate();
+  fillKotakAk();
+  renderBatchTab();
+});
+
+async function deleteAkhir(localId) {
+  const a = (localHistory.akhir || []).find(x => x._localId === localId);
+  if (!a) return;
+  if (!confirm(`Batalkan catatan "${a.penyebab}" untuk batch ${a.no_batch}? Batch akan dianggap aktif lagi.`)) return;
+  try {
+    if (isAuthenticated && scriptUrl && navigator.onLine) {
+      const res = await fetch(scriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ sheet: 'batch_akhir', action: 'delete-row', tanggal: a.tanggal, gh: a.gh, kotak: a.kotak, no_batch: a.no_batch })
+      });
+      const result = await res.json();
+      if (result.status === 'error') throw new Error(result.message || 'Gagal');
+    }
+    localHistory.akhir = localHistory.akhir.filter(x => x._localId !== localId);
+    saveLocalHistory();
+    renderBatchTab();
+    showToast('Dibatalkan', 'Catatan batch berakhir dihapus.', 'success', 3000);
+  } catch (err) {
+    showToast('Gagal Hapus', friendlyErr(err), 'error', 5000);
+  }
+}
+
+// ============================================
+// FETCH / SYNC SHEET (Manual)
+// ============================================
+
+async function fetchAllDataFromSheet() {
+  const syncStatus = document.getElementById('syncStatus');
+  syncStatus.className = 'status';
+  syncStatus.textContent = '';
+
+  if (!isAuthenticated || !scriptUrl) {
+    syncStatus.className = 'status error';
+    syncStatus.textContent = '❌ Belum tersambung ke Sheets.';
+    showToast('Belum Tersambung', 'Klik tombol "Sambungkan" dulu.', 'error');
+    return;
+  }
+
+  if (!navigator.onLine) {
+    syncStatus.className = 'status error';
+    syncStatus.textContent = '❌ Offline - tidak dapat sinkronisasi';
+    showToast('Offline', 'Tidak bisa sinkron sekarang.', 'error');
+    return;
+  }
+
+  showLoadingOverlay('Mengambil data dari Sheet...');
+
+  try {
+    const res = await fetch(scriptUrl + '?action=list');
+    const result = await res.json();
+    if (result.status === 'error') throw new Error(result.message || 'Gagal mengambil data.');
+
+    serverWaktuShiftMin = result.timeFix ? 0 : WAKTU_SHIFT_LEGACY_MIN;
+
+    const sheetKunjungan = (result.kunjungan || []).map(mapSheetRow);
+
+    const sheetQc = (result.qc || []).map(mapSheetRow);
+
+    const mergeData = (local, sheet) => {
+      const localOnly = (local || []).filter(
+        l => !String(l._localId || '').startsWith('sheet_')
+      );
+      
+      const unsyncedLocal = localOnly.filter(loc => {
+        const isAlreadyInSheet = sheet.some(sh => 
+          sh.tanggal === loc.tanggal && 
+          sh.waktu === loc.waktu && 
+          sh.gh === loc.gh
+        );
+        return !isAlreadyInSheet;
+      });
+
+      return [...sheet, ...unsyncedLocal];
+    };
+
+    localHistory.kunjungan = mergeData(localHistory.kunjungan, sheetKunjungan);
+    localHistory.qc = mergeData(localHistory.qc, sheetQc);
+    mergeAkhirFromServer(result);
+        mergeCekFromServer(result);
+    saveLocalHistory();
+    checkServerVersion(result, true);
+
+    renderHistory();
+    renderBatchTab();
+    hideLoadingOverlay();
+
+    syncStatus.className = 'status success';
+    syncStatus.textContent = `✓ Berhasil sinkron! ${sheetKunjungan.length} kunjungan, ${sheetQc.length} QC`;
+
+    showToast('Sinkron Berhasil! 🔄',
+      `${sheetKunjungan.length} kunjungan, ${sheetQc.length} QC dimuat.`,
+      'success', 4000);
+
+    const activeTab = document.querySelector('.tab-content.active');
+    if (activeTab && activeTab.id === 'tab-trend') renderTrendDashboard();
+    if (activeTab && activeTab.id === 'tab-cek') renderCekTab();
+
+    setTimeout(() => { syncStatus.className = 'status'; }, 5000);
+
+  } catch (e) {
+    console.error('Sync error:', e);
+    hideLoadingOverlay();
+    syncStatus.className = 'status error';
+    syncStatus.textContent = '❌ Gagal sinkronisasi: ' + e.message;
+    showToast('Gagal Sinkron', e.message, 'error', 5000);
+  }
+}
+
+// ============================================
+// TREND DASHBOARD
+// ============================================
+
+let trendChartInstance = null;
+let barChartInstance = null;
+let hourChartInstance = null;
+let weatherChartInstance = null;
+
+const WEATHER_ORDER = ['cerah', 'berawan', 'mendung', 'hujan', 'gerimis'];
+const WEATHER_LABEL = {
+  cerah: 'Cerah',
+  berawan: 'Berawan',
+  mendung: 'Mendung',
+  hujan: 'Hujan',
+  gerimis: 'Gerimis'
+};
+const WEATHER_COLOR = {
+  cerah: '#f59e0b',
+  berawan: '#64748b',
+  mendung: '#475569',
+  hujan: '#0284c7',
+  gerimis: '#0891b2'
+};
+
+function getFilteredKunjungan() {
+  const fromDate = document.getElementById('trendFromDate').value;
+  const toDate = document.getElementById('trendToDate').value;
+  const ghFilter = document.getElementById('trendGhFilter').value;
+
+  return (localHistory.kunjungan || []).filter(item => {
+    const matchDate = (!fromDate || item.tanggal >= fromDate) &&
+                      (!toDate || item.tanggal <= toDate);
+    const matchGh = !ghFilter || item.gh === ghFilter;
+    return matchDate && matchGh;
+  });
+}
+
+// Nilai bay hanya angka 0-999; teks lain (mis. data sheet geser kolom) dianggap 0 supaya total tidak ngawur
+function bayNum(v) { const t = String(v === undefined || v === null ? '' : v).trim(); return /^\d{1,3}$/.test(t) ? parseInt(t, 10) : 0; }
+
+function getTotalPerItem(item) {
+  let total = 0;
+  for (let i = 1; i <= BAY_MAX; i++) total += bayNum(item['bay' + i]);
+  return total;
+}
+
+function renderTrendDashboard() {
+  const metric = document.getElementById('trendMetric').value;
+  const ghFilter = document.getElementById('trendGhFilter').value;
+  const filteredData = getFilteredKunjungan();
+
+  const groupedByDate = {};
+  filteredData.forEach(item => {
+    if (!groupedByDate[item.tanggal]) groupedByDate[item.tanggal] = [];
+    groupedByDate[item.tanggal].push(item);
+  });
+
+  const sortedDates = Object.keys(groupedByDate).sort();
+  const chartData = [], sessN = [], dayTot = [];
+  let grandTotal = 0;
+  let maxVal = 0;
+  let maxDate = '-';
+
+  sortedDates.forEach(date => {
+    const dayItems = groupedByDate[date];
+    let dailyTotal = 0;
+    dayItems.forEach(item => {
+      if (metric === 'total') dailyTotal += getTotalPerItem(item);
+      else dailyTotal += bayNum(item[metric]);
+    });
+    chartData.push(+(dailyTotal / dayItems.length).toFixed(1)); sessN.push(dayItems.length); dayTot.push(dailyTotal);
+    grandTotal += dailyTotal;
+    const mean = dailyTotal / dayItems.length;
+    if (mean > maxVal) { maxVal = +mean.toFixed(1); maxDate = date; }
+  });
+
+  const totalSessions = filteredData.length;
+  const avgPerDay = totalSessions > 0 ? (grandTotal / totalSessions).toFixed(1) : 0;
+
+  document.getElementById('trendSummary').innerHTML = `
+    <div class="summary-card">
+      <div class="header">📊 Total Kunjungan</div>
+      <div class="value">${grandTotal}</div>
+      <div class="sub">Selama periode terpilih</div>
+    </div>
+    <div class="summary-card">
+      <div class="header">📈 Rata-rata / Sesi</div>
+      <div class="value">${avgPerDay}</div>
+      <div class="sub">Kunjungan per sesi</div>
+    </div>
+    <div class="summary-card">
+      <div class="header">🏆 Tertinggi</div>
+      <div class="value">${maxVal}</div>
+      <div class="sub">Rata²/sesi · ${maxDate}</div>
+    </div>
+    <div class="summary-card">
+      <div class="header">🕒 Sesi Pengamatan</div>
+      <div class="value">${totalSessions}</div>
+      <div class="sub">Total sesi tercatat</div>
+    </div>
+  `;
+
+  const sessByDate = {}, totByDate = {};
+  sortedDates.forEach((d, i) => { sessByDate[d] = sessN[i]; totByDate[d] = dayTot[i]; });
+  let allDates = sortedDates;
+  if (sortedDates.length && sortedDates.every(d => /^\d{4}-\d{2}-\d{2}$/.test(d))) {
+    allDates = [];
+    let d = new Date(sortedDates[0] + 'T00:00:00Z'); const end = new Date(sortedDates[sortedDates.length - 1] + 'T00:00:00Z');
+    while (d <= end) { allDates.push(d.toISOString().slice(0, 10)); d = new Date(d.getTime() + 86400000); }
+  }
+  const allData = allDates.map(d => d in sessByDate ? chartData[sortedDates.indexOf(d)] : null);
+  const metricLabel = metric === 'total' ? 'Rata² Kunjungan/Sesi' : `Rata² Kunjungan/Sesi ${metric.toUpperCase()}`;
+
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  if (trendChartInstance) trendChartInstance.destroy();
+
+  trendChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: allDates,
+      datasets: [{
+        label: metricLabel,
+        data: allData,
+        borderColor: '#2d5016',
+        backgroundColor: 'rgba(45, 80, 22, 0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        pointBackgroundColor: '#2d5016',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        title: {
+          display: true,
+          text: `Trend ${metricLabel} - ${ghFilter || 'Semua GH'}`,
+          font: { weight: 'bold', size: 14, family: 'sans-serif' },
+          color: '#2d5016'
+        },
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Kunjungan / sesi', font: { weight: 'bold' } },
+          grid: { color: '#f0f0f0' }
+        },
+        x: {
+          title: { display: true, text: 'Tanggal', font: { weight: 'bold' } },
+          grid: { display: false }
+        }
+      }
+    }
+  });
+
+  const flo = allDates.map(dt => {
+    const v = (ghFilter ? [ghFilter] : Object.keys(FLOWERING_REF)).map(g => floweringPct(g, dt)).filter(x => x !== null);
+    return v.length ? +(v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : null;
+  });
+  if (flo.some(v => v !== null)) {
+    trendChartInstance.data.datasets.push({ label: 'Bunga mekar % (tim fertigasi)', data: flo, yAxisID: 'y2', borderColor: '#e11d48', borderDash: [5, 4], backgroundColor: 'transparent', stepped: true, pointRadius: 0, borderWidth: 2 });
+    trendChartInstance.options.scales.y2 = { position: 'right', beginAtZero: true, title: { display: true, text: 'Bunga mekar (%)', font: { weight: 'bold' } }, grid: { drawOnChartArea: false } };
+    trendChartInstance.options.plugins.legend = { display: true, position: 'bottom' };
+  }
+  const evByDate = {};
+  filteredData.forEach(it => { if (it.kejadian) evByDate[it.tanggal] = (evByDate[it.tanggal] ? evByDate[it.tanggal] + '; ' : '') + it.gh + ': ' + it.kejadian; });
+  if (Object.keys(evByDate).length) {
+    const top = Math.max(1, ...allData.filter(v => v !== null)) * 1.1;
+    trendChartInstance.data.datasets.push({ label: 'Kejadian (semprot/pruning/koloni)', data: allDates.map(d => evByDate[d] ? top : null), showLine: false, pointStyle: 'triangle', pointRadius: 8, backgroundColor: '#7c3aed', borderColor: '#7c3aed' });
+    trendChartInstance.options.plugins.legend = { display: true, position: 'bottom' };
+  }
+  trendChartInstance.options.plugins.tooltip = { callbacks: { label: c => c.dataset.label.startsWith('Kejadian') ? (evByDate[allDates[c.dataIndex]] || '') : (c.dataset.label + ': ' + c.formattedValue), afterLabel: c => (c.datasetIndex === 0 && sessByDate[allDates[c.dataIndex]]) ? `Sesi: ${sessByDate[allDates[c.dataIndex]]} · Total: ${totByDate[allDates[c.dataIndex]]}` : '' } };
+  trendChartInstance.update();
+  renderBarChart(filteredData, ghFilter);
+  renderHourChart(filteredData, ghFilter, metric);
+  renderWeatherDashboard(filteredData, ghFilter);
+}
+
+// ============================================
+// TREND BY CUACA
+// ============================================
+
+function renderWeatherDashboard(filteredData, ghFilter) {
+  const byWeather = {};
+  WEATHER_ORDER.forEach(w => {
+    byWeather[w] = { sessions: 0, totalKunjungan: 0, totalSuhu: 0, suhuCount: 0, list: [] };
+  });
+
+  filteredData.forEach(item => {
+    const w = (item.cuaca || '').toLowerCase().trim();
+    if (!byWeather[w]) {
+      byWeather[w] = { sessions: 0, totalKunjungan: 0, totalSuhu: 0, suhuCount: 0, list: [] };
+    }
+    const total = getTotalPerItem(item);
+    byWeather[w].sessions += 1;
+    byWeather[w].totalKunjungan += total;
+    byWeather[w].list.push(total);
+
+    const suhu = parseFloat(normalizeSuhu(item.suhu));
+    if (!isNaN(suhu)) {
+      byWeather[w].totalSuhu += suhu;
+      byWeather[w].suhuCount += 1;
+    }
+  });
+
+  const activeWeather = Object.keys(byWeather).filter(w => byWeather[w].sessions > 0);
+
+  const labels = activeWeather.map(w => WEATHER_LABEL[w] || w);
+  const avgPerSession = activeWeather.map(w => {
+    const d = byWeather[w];
+    return d.sessions > 0 ? +(d.totalKunjungan / d.sessions).toFixed(2) : 0;
+  });
+  const colors = activeWeather.map(w => WEATHER_COLOR[w] || '#2d5016');
+
+  const wctx = document.getElementById('weatherChart').getContext('2d');
+  if (weatherChartInstance) weatherChartInstance.destroy();
+
+  weatherChartInstance = new Chart(wctx, {
+    type: 'bar',
+    data: {
+      labels: labels.length ? labels : ['Belum ada data'],
+      datasets: [{
+        label: 'Rata-rata Kunjungan / Sesi',
+        data: avgPerSession.length ? avgPerSession : [0],
+        backgroundColor: colors.length ? colors : ['#e0e0e0'],
+        borderColor: '#2d5016',
+        borderWidth: 1,
+        borderRadius: 8
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        title: {
+          display: true,
+          text: `🌤️ Rata-rata Kunjungan per Sesi berdasarkan Cuaca - ${ghFilter || 'Semua GH'}`,
+          font: { weight: 'bold', size: 13, family: 'sans-serif' },
+          color: '#2d5016'
+        },
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            afterLabel: function(context) {
+              const w = activeWeather[context.dataIndex];
+              if (!w) return '';
+              const d = byWeather[w];
+              return [
+                'Total: ' + d.totalKunjungan + ' kunjungan',
+                'Sesi: ' + d.sessions
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Kunjungan / Sesi', font: { weight: 'bold' } },
+          grid: { color: '#f0f0f0' }
+        },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  if (activeWeather.length === 0) {
+    document.getElementById('weatherSummary').innerHTML =
+      `<div class="summary-card"><div class="header">🌤️ Belum ada data cuaca</div><div class="value">-</div></div>`;
+    document.getElementById('weatherTableBody').innerHTML =
+      `<tr><td colspan="5" style="text-align:center;color:#999;">Belum ada data</td></tr>`;
+    return;
+  }
+
+  let bestWeather = activeWeather[0];
+  let worstWeather = activeWeather[0];
+  activeWeather.forEach(w => {
+    const avg = byWeather[w].sessions > 0 ? byWeather[w].totalKunjungan / byWeather[w].sessions : 0;
+    const bestAvg = byWeather[bestWeather].sessions > 0 ? byWeather[bestWeather].totalKunjungan / byWeather[bestWeather].sessions : 0;
+    const worstAvg = byWeather[worstWeather].sessions > 0 ? byWeather[worstWeather].totalKunjungan / byWeather[worstWeather].sessions : 0;
+    if (avg > bestAvg) bestWeather = w;
+    if (avg < worstAvg) worstWeather = w;
+  });
+
+  const bestAvg = byWeather[bestWeather].sessions > 0
+    ? (byWeather[bestWeather].totalKunjungan / byWeather[bestWeather].sessions).toFixed(1) : 0;
+  const worstAvg = byWeather[worstWeather].sessions > 0
+    ? (byWeather[worstWeather].totalKunjungan / byWeather[worstWeather].sessions).toFixed(1) : 0;
+
+  document.getElementById('weatherSummary').innerHTML = `
+    <div class="summary-card weather-${bestWeather}">
+      <div class="header">🌞 Cuaca Terbaik</div>
+      <div class="value">${WEATHER_LABEL[bestWeather] || bestWeather}</div>
+      <div class="sub">Rata² ${bestAvg} kunjungan/sesi</div>
+    </div>
+    <div class="summary-card weather-${worstWeather}">
+      <div class="header">🌧️ Cuaca Terendah</div>
+      <div class="value">${WEATHER_LABEL[worstWeather] || worstWeather}</div>
+      <div class="sub">Rata² ${worstAvg} kunjungan/sesi</div>
+    </div>
+    <div class="summary-card">
+      <div class="header">📅 Jenis Cuaca</div>
+      <div class="value">${activeWeather.length}</div>
+      <div class="sub">Jenis cuaca tercatat</div>
+    </div>
+  `;
+
+  let tableHtml = '';
+  WEATHER_ORDER.forEach(w => {
+    const d = byWeather[w];
+    if (!d || d.sessions === 0) return;
+    const avgPerSesi = d.sessions > 0 ? (d.totalKunjungan / d.sessions).toFixed(1) : 0;
+    const avgSuhu = d.suhuCount > 0 ? (d.totalSuhu / d.suhuCount).toFixed(1) + '°C' : '-';
+    tableHtml += `
+      <tr>
+        <td class="w-${w}">${WEATHER_LABEL[w] || w}</td>
+        <td>${d.sessions}${d.sessions < 5 ? ' ⚠️' : ''}</td>
+        <td>${d.totalKunjungan}</td>
+        <td><b>${avgPerSesi}</b> <small style="color:#888">±${sdOf(d.list)}</small></td>
+        <td>${avgSuhu}</td>
+      </tr>
+    `;
+  });
+  renderWeatherTime(filteredData);
+  document.getElementById('weatherTableBody').innerHTML =
+    tableHtml || `<tr><td colspan="5" style="text-align:center;color:#999;">Belum ada data</td></tr>`;
+}
+
+function sdOf(a) { if (a.length < 2) return '–'; const m = a.reduce((x, y) => x + y, 0) / a.length; return Math.sqrt(a.reduce((t, v) => t + (v - m) * (v - m), 0) / (a.length - 1)).toFixed(1); }
+
+const FLOWERING_REF = {
+  'GH 1': [['2026-08-17','2026-08-22',19],['2026-08-23','2026-08-29',18],['2026-08-30','2026-09-06',25],['2026-09-07','2026-09-12',17],['2026-09-14','2026-09-19',13],['2026-09-21','2026-09-26',14],['2026-09-27','2026-10-03',9],['2026-10-04','2026-10-10',7],['2026-10-12','2026-10-17',4],['2026-10-18','2026-10-24',6],['2026-10-25','2026-10-31',9.8]],
+  'GH 2': [['2026-09-21','2026-09-26',18],['2026-09-28','2026-10-03',18],['2026-10-04','2026-10-10',12],['2026-10-12','2026-10-17',12],['2026-10-18','2026-10-24',12],['2026-10-25','2026-10-31',18]]
+};
+function floweringPct(gh, date) {
+  const L = FLOWERING_REF[gh]; if (!L) return null;
+  let r = null;
+  for (let i = 0; i < L.length; i++) { if (L[i][0] <= date) { r = L[i]; if (i === L.length - 1 && date > L[i][1]) r = null; } }
+  return r ? r[2] : null;
+}
+
+function renderWeatherTime(data) {
+  const card = document.getElementById('weatherTableBody').closest('.chart-card');
+  let box = document.getElementById('weatherTimeBox');
+  if (!box) { box = document.createElement('div'); box.id = 'weatherTimeBox'; box.style.cssText = 'margin-top:14px;overflow-x:auto;'; card.appendChild(box); }
+  const B = ['≤10', '11–12', '13–14', '≥15'];
+  const bi = t => { const h = parseInt(String(t || '').split(':')[0], 10); return isNaN(h) ? -1 : h <= 10 ? 0 : h <= 12 ? 1 : h <= 14 ? 2 : 3; };
+  const g = {};
+  data.forEach(it => { const w = (it.cuaca || '').toLowerCase().trim(), b = bi(it.waktu); if (!w || b < 0) return; (g[w] = g[w] || [[], [], [], []])[b].push(getTotalPerItem(it)); });
+  const rows = WEATHER_ORDER.filter(w => g[w]).map(w => `<tr><td class="w-${w}">${WEATHER_LABEL[w] || w}</td>` + g[w].map(a => a.length ? `<td><b>${(a.reduce((x, y) => x + y, 0) / a.length).toFixed(1)}</b> <small style="color:#888">n=${a.length}</small></td>` : '<td>-</td>').join('') + '</tr>').join('');
+  box.innerHTML = '<div style="font-size:12px;font-weight:700;color:#2d5016;margin-bottom:8px;text-transform:uppercase;">🕒 Cuaca × Jam (rata²/sesi)</div><table class="weather-table"><thead><tr><th>Cuaca</th>' + B.map(x => `<th>${x}</th>`).join('') + '</tr></thead><tbody>' + (rows || '<tr><td colspan="5" style="text-align:center;color:#999;">Belum ada data</td></tr>') + '</tbody></table><div style="font-size:11px;color:#888;margin-top:6px;">⚠️ n &lt; 5 sesi: belum cukup untuk disimpulkan.</div>';
+}
+
+function renderHourChart(filteredData, ghFilter, metric) {
+  const val = it => metric === 'total' ? getTotalPerItem(it) : (parseInt(it[metric]) || 0);
+  const byHour = {};
+  filteredData.forEach(it => {
+    const h = parseInt(String(it.waktu || '').split(':')[0], 10);
+    if (isNaN(h) || h < 0 || h > 23) return;
+    (byHour[h] = byHour[h] || []).push(val(it));
+  });
+  const hrs = Object.keys(byHour).map(Number).sort((a, b) => a - b);
+  const note = document.getElementById('hourPeakNote');
+  if (hourChartInstance) { hourChartInstance.destroy(); hourChartInstance = null; }
+  if (!hrs.length) { note.textContent = 'Belum ada data jam kunjungan.'; return; }
+
+  const labels = [], avgs = [], ns = [];
+  for (let h = hrs[0]; h <= hrs[hrs.length - 1]; h++) {
+    const a = byHour[h];
+    labels.push(String(h).padStart(2, '0') + '–' + String((h + 1) % 24).padStart(2, '0'));
+    ns.push(a ? a.length : 0);
+    avgs.push(a ? +(a.reduce((x, y) => x + y, 0) / a.length).toFixed(1) : null);
+  }
+  const maxAvg = Math.max(...avgs.filter(v => v !== null));
+  const peakIdx = avgs.indexOf(maxAvg);
+  const colors = avgs.map((v, i) => i === peakIdx ? '#f59e0b' : (ns[i] < 5 ? 'rgba(74,124,44,0.45)' : '#4a7c2c'));
+  const metricLabel = metric === 'total' ? 'Kunjungan' : metric.toUpperCase().replace('BAY', 'Bay ');
+
+  note.innerHTML = `🔥 Paling aktif: <b>jam ${labels[peakIdx]}</b> (rata² ${maxAvg}/sesi, n=${ns[peakIdx]} sesi)` +
+    (ns.some(n => n > 0 && n < 5) ? '<br><span style="color:#888;">Bar pudar: n &lt; 5 sesi, belum cukup untuk disimpulkan.</span>' : '');
+
+  hourChartInstance = new Chart(document.getElementById('hourChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Rata² ' + metricLabel + ' / Sesi',
+        data: avgs,
+        backgroundColor: colors,
+        borderColor: '#2d5016',
+        borderWidth: 1,
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        title: {
+          display: true,
+          text: `Rata² ${metricLabel} per Jam - ${ghFilter || 'Semua GH'}`,
+          font: { weight: 'bold', size: 14, family: 'sans-serif' },
+          color: '#2d5016'
+        },
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => `Rata²: ${c.formattedValue} / sesi`, afterLabel: c => `Jumlah sesi: ${ns[c.dataIndex]}` } }
+      },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: 'Kunjungan / sesi', font: { weight: 'bold' } }, grid: { color: '#f0f0f0' } },
+        x: { title: { display: true, text: 'Jam', font: { weight: 'bold' } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderBarChart(filteredData, ghFilter) {
+  const nBay = ghFilter === 'GH 1' ? 10 : BAY_MAX;
+  const bayTotals = Array(BAY_MAX).fill(0);
+  const bayN = Array(BAY_MAX).fill(0);   // jumlah sesi yang punya bay itu (bay 11 hanya GH 2)
+
+  filteredData.forEach(item => {
+    for (let i = 1; i <= BAY_MAX; i++) {
+      if (i > (GH_BAY_COUNT[item.gh] || 10)) continue;
+      bayTotals[i - 1] += bayNum(item['bay' + i]);
+      bayN[i - 1]++;
+    }
+  });
+
+  const ctx2 = document.getElementById('barChart').getContext('2d');
+  if (barChartInstance) barChartInstance.destroy();
+
+  barChartInstance = new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels: Array.from({ length: nBay }, (_, i) => 'Bay ' + (i + 1)),
+      datasets: [{
+        label: 'Rata² / Sesi',
+        data: bayTotals.slice(0, nBay).map((v, i) => +(v / (bayN[i] || 1)).toFixed(1)),
+        backgroundColor: '#4a7c2c',
+        borderColor: '#2d5016',
+        borderWidth: 1,
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        title: {
+          display: true,
+          text: `Rata² Kunjungan per Bay per Sesi - ${ghFilter || 'Semua GH'}`,
+          font: { weight: 'bold', size: 14, family: 'sans-serif' },
+          color: '#2d5016'
+        },
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Kunjungan / sesi', font: { weight: 'bold' } },
+          grid: { color: '#f0f0f0' }
+        },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ============================================
+// CEK KOLONI: POPULASI (%) + JADWAL GULA
+// ============================================
+
+const CEK_FLAGS = ['Ratu terlihat', 'Ada telur/larva', 'Ulat lilin', 'Pakan/gula habis', 'Kepanasan', 'Terpapar semprot', 'Bergerombol di luar kotak'];
+const CEK_FLAGS_BURUK = ['Ulat lilin', 'Pakan/gula habis', 'Kepanasan', 'Terpapar semprot', 'Bergerombol di luar kotak'];
+const CEK_POP_QUICK = [100, 75, 50, 25, 10];
+const CEK_SUHU_PANAS = 34;            // batas suhu (°C) yang dicatat sebagai petunjuk di analisis koloni berakhir
+const CEK_TURUN_POIN = 20;            // penurunan populasi (poin) antar cek yang dianggap mencolok
+const CEK_DEFAULTS = { gulaHari: 3, cekHari: 3, waspada: 60, ganti: 40 };
+
+let cekEditId = null;
+let cekEditExtra = {};
+let cekEditKey = null;
+let cekChartInstance = null;
+
+function cekSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('bee_cek_settings') || '{}');
+    return { ...CEK_DEFAULTS, ...s };
+  } catch (e) { return { ...CEK_DEFAULTS }; }
+}
+
+function cekLoadSettingsUI() {
+  const s = cekSettings();
+  document.getElementById('setGulaHari').value = s.gulaHari;
+  document.getElementById('setCekHari').value = s.cekHari;
+  document.getElementById('setWaspada').value = s.waspada;
+  document.getElementById('setGanti').value = s.ganti;
+}
+
+function cekSaveSettings() {
+  const num = (id, def, min, max) => {
+    const n = parseInt(document.getElementById(id).value, 10);
+    return (isNaN(n) || n < min || n > max) ? def : n;
+  };
+  const s = {
+    gulaHari: num('setGulaHari', CEK_DEFAULTS.gulaHari, 1, 30),
+    cekHari: num('setCekHari', CEK_DEFAULTS.cekHari, 1, 30),
+    waspada: num('setWaspada', CEK_DEFAULTS.waspada, 1, 100),
+    ganti: num('setGanti', CEK_DEFAULTS.ganti, 1, 100)
+  };
+  if (s.ganti > s.waspada) s.ganti = s.waspada;
+  localStorage.setItem('bee_cek_settings', JSON.stringify(s));
+  cekLoadSettingsUI();
+  renderCekTab();
+  showToast('Pengaturan Tersimpan ✓', 'Jadwal gula & ambang populasi diperbarui.', 'success', 2500);
+}
+
+function cekPop(v) {
+  if (v === '' || v === null || v === undefined) return null;
+  const n = parseFloat(String(v).replace(',', '.'));
+  return isNaN(n) ? null : Math.max(0, Math.min(100, Math.round(n)));
+}
+function cekIsGula(v) { return /^(ya|y|1|true)$/i.test(String(v === undefined || v === null ? '' : v).trim()); }
+function cekIso(n) { return new Date(n * 86400000).toISOString().slice(0, 10); }
+function cekShort(str) { const m = String(str || '').match(/^\d{4}-(\d{2})-(\d{2})/); return m ? m[2] + '/' + m[1] : (str || '-'); }
+function cekAgo(d) { return d === 0 ? 'hari ini' : d + ' hr lalu'; }
+function cekWeekStart(str) { const n = dayNum(str); return isNaN(n) ? NaN : n - ((n + 3) % 7); } // Senin (hari ke-0 = Kamis)
+function cekPopClass(p, set) { return p === null ? '' : (p <= set.ganti ? 'cek-pop-bad' : (p <= set.waspada ? 'cek-pop-warn' : 'cek-pop-ok')); }
+
+// ---- Server: pastikan Apps Script sudah v5 sebelum kirim data cek ----
+async function ensureServerVersion() {
+  if (serverApiVersion >= 5) return serverApiVersion;
+  try {
+    const res = await fetch(scriptUrl);
+    const j = await res.json();
+    serverApiVersion = Number(j.qcVersion) || 0;
+  } catch (e) { /* biarkan 0 */ }
+  return serverApiVersion;
+}
+
+async function cekPost(payload) {
+  const res = await fetch(scriptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+async function cekDropQueued(cid) {
+  if (!cid) return;
+  try {
+    const q = await getQueuedData();
+    for (const item of q) {
+      if (item.type === 'cek' && item.data && item.data.cid === cid && item.data.action !== 'delete-row') {
+        await deleteFromQueue(item.id);
+      }
+    }
+  } catch (e) { console.error(e); }
+}
+
+function mergeCekFromServer(result) {
+  if (!result || !Array.isArray(result.cek_koloni)) return;
+  const sheet = result.cek_koloni.map(mapSheetRow);
+  const localOnly = (localHistory.cek || []).filter(l => !String(l._localId || '').startsWith('sheet_'));
+  const unsynced = localOnly.filter(loc => !sheet.some(sh =>
+    sh.tanggal === loc.tanggal && sh.waktu === loc.waktu && sh.gh === loc.gh));
+  localHistory.cek = [...sheet, ...unsynced];
+}
+
+// ---- Data cek: satu entri per kotak ----
+function cekFlat() {
+  const out = [];
+  const key = r => (r.tanggal || '') + ' ' + (r.waktu || '');
+  [...(localHistory.cek || [])].sort((a, b) => key(a).localeCompare(key(b))).forEach(r => {
+    for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+      const pop = cekPop(r['kotak' + i + '_pop']);
+      const gula = cekIsGula(r['kotak' + i + '_gula']);
+      const tanda = String(r['kotak' + i + '_tanda'] || '').split(',').map(s => s.trim()).filter(Boolean);
+      const catatan = String(r['kotak' + i + '_catatan'] || '').trim();
+      if (pop === null && !gula && !tanda.length && !catatan) continue;
+      out.push({ gh: r.gh, kotak: i, tanggal: r.tanggal, waktu: r.waktu, pop, gula, tanda, catatan });
+    }
+  });
+  return out;
+}
+
+function cekState(flat, batches, gh, k, set, todayStr) {
+  const b = batches.find(x => x.gh === gh && x.kotak === k && x.isLatest) || null;
+  const kosong = !!(b && b.end);
+  const aktif = (b && !b.end) ? b : null;
+  let es = flat.filter(e => e.gh === gh && e.kotak === k);
+  if (b && b.start) es = es.filter(e => e.tanggal >= b.start);
+
+  const pops = es.filter(e => e.pop !== null);
+  const lastPop = pops.length ? pops[pops.length - 1] : null;
+  const prevPop = pops.length > 1 ? pops[pops.length - 2] : null;
+  const delta = (lastPop && prevPop) ? lastPop.pop - prevPop.pop : null;
+  const deltaHari = (lastPop && prevPop) ? daysBetween(prevPop.tanggal, lastPop.tanggal) : null;
+
+  const gulas = es.filter(e => e.gula);
+  const lastGula = gulas.length ? gulas[gulas.length - 1] : null;
+  const gulaHari = lastGula ? daysBetween(lastGula.tanggal, todayStr) : null;
+
+  const lastCek = es.length ? es[es.length - 1] : null;
+  const cekHari = lastCek ? daysBetween(lastCek.tanggal, todayStr) : null;
+
+  const umur = (aktif && aktif.umur !== null) ? aktif.umur : (es.length ? daysBetween(es[0].tanggal, todayStr) : null);
+
+  const todayN = dayNum(todayStr);
+  const buruk = [];
+  es.filter(e => dayNum(e.tanggal) >= todayN - 7).forEach(e => e.tanda.forEach(t => {
+    if (CEK_FLAGS_BURUK.includes(t) && !buruk.includes(t)) buruk.push(t);
+  }));
+
+  let gulaDue = false, gulaTelat = 0;
+  if (!kosong) {
+    if (gulaHari === null) { if (umur !== null && umur >= set.gulaHari) { gulaDue = true; gulaTelat = umur - set.gulaHari; } }
+    else if (gulaHari >= set.gulaHari) { gulaDue = true; gulaTelat = gulaHari - set.gulaHari; }
+  }
+
+  return { gh, kotak: k, b, aktif, kosong, es, lastPop, delta, deltaHari, lastGula, gulaHari, lastCek, cekHari, umur, buruk, gulaDue, gulaTelat };
+}
+
+// ---- Render tab utama ----
+function renderCekTab() {
+  const box = document.getElementById('cekStatus');
+  if (!box) return;
+  const set = cekSettings();
+  const flat = cekFlat();
+  const batches = buildBatches();
+  const todayStr = getLocalDate();
+
+  const perhatian = [];
+  const perluGula = [];
+  let html = '';
+
+  Object.keys(QC_KOTAK_PER_GH).forEach(gh => {
+    html += `<div class="bt-gh-title">${gh}</div><div class="bt-grid">`;
+    for (let k = 1; k <= QC_KOTAK_PER_GH[gh]; k++) {
+      const s = cekState(flat, batches, gh, k, set, todayStr);
+
+      if (kotakOpsional(gh, k) && !s.aktif) {
+        html += `<div class="bt-card bt-empty" style="opacity:.8;"><div class="bt-top"><b>Kotak ${k}</b><span class="bt-days" style="color:#888;">OPSIONAL</span></div>
+          <div>Belum dipakai</div></div>`;
+        continue;
+      }
+
+      if (s.kosong) {
+        html += `<div class="bt-card bt-empty"><div class="bt-top"><b>Kotak ${k}</b><span class="bt-days" style="color:#c62828;">KOSONG</span></div>
+          <div>Batch ${qcEsc(s.b.batch)} sudah berakhir</div><div class="bt-note" style="color:#c62828;">Isi koloni baru di tab QC</div></div>`;
+        continue;
+      }
+
+      const alasan = [];
+      if (s.lastPop) {
+        if (s.lastPop.pop <= set.ganti) alasan.push(`populasi ${s.lastPop.pop}% (di bawah ambang ganti)`);
+        else if (s.lastPop.pop <= set.waspada) alasan.push(`populasi ${s.lastPop.pop}%`);
+      }
+      if (s.delta !== null && s.delta <= -CEK_TURUN_POIN) alasan.push(`turun ${-s.delta} poin dalam ${s.deltaHari} hr`);
+      if (s.cekHari === null) { if (s.aktif && s.umur !== null && s.umur >= set.cekHari) alasan.push('belum pernah dicek'); }
+      else if (s.cekHari > set.cekHari) alasan.push(`belum dicek ${s.cekHari} hr`);
+      if (s.buruk.length) alasan.push(s.buruk.join(', ').toLowerCase());
+      if (alasan.length) perhatian.push(`<b>${gh} K${k}</b>: ${alasan.join('; ')}`);
+      if (s.gulaDue) perluGula.push(`${gh} K${k} (${s.gulaHari === null ? 'belum pernah' : (s.gulaTelat === 0 ? 'jadwal hari ini' : 'telat ' + s.gulaTelat + ' hr')})`);
+
+      let cls = 'bt-green', popTxt = 'Belum ada %';
+      if (s.lastPop) {
+        const p = s.lastPop.pop;
+        cls = p <= set.ganti ? 'bt-red' : (p <= set.waspada ? 'bt-orange' : 'bt-green');
+        const tr = s.delta === null ? '' : (s.delta > 0 ? ` <span class="cek-trend-up">▲${s.delta}</span>` : (s.delta < 0 ? ` <span class="cek-trend-down">▼${-s.delta}</span>` : ''));
+        popTxt = `${p}%${tr}`;
+      } else { cls = ''; }
+
+      let gulaTxt;
+      if (s.gulaHari === null) gulaTxt = '<span class="cek-late">belum ada catatan gula</span>';
+      else {
+        const sisa = set.gulaHari - s.gulaHari;
+        if (sisa > 0) gulaTxt = `${cekAgo(s.gulaHari)} · berikut ${sisa} hr lagi`;
+        else if (sisa === 0) gulaTxt = `${cekAgo(s.gulaHari)} · <b>jadwal hari ini</b>`;
+        else gulaTxt = `<span class="cek-late">telat ${-sisa} hr</span> (${cekAgo(s.gulaHari)})`;
+      }
+
+      const batchLine = s.aktif ? `Batch <b>${qcEsc(s.aktif.batch)}</b>${s.umur !== null ? ' · hari ke-' + s.umur : ''}` : '<span style="color:#888;">Belum ada batch di tab QC</span>';
+      const cekTxt = s.lastCek ? `${cekShort(s.lastCek.tanggal)} (${cekAgo(s.cekHari)})` : 'belum pernah';
+      const chips = s.buruk.map(t => `<span class="cek-chip">${qcEsc(t)}</span>`).join('');
+
+      html += `<div class="bt-card ${cls}">
+        <div class="bt-top"><b>Kotak ${k}${s.aktif && s.aktif.koloni ? ' · ' + qcEsc(s.aktif.koloni) : ''}</b><span class="bt-days">${popTxt}</span></div>
+        <div>${batchLine}</div>
+        <div>🍯 ${gulaTxt}</div>
+        <div>Cek: ${cekTxt}</div>
+        <div>📍 ${(() => { const t = lokasiText(lokasiKotak(gh, k, s.aktif)); return t ? '<span class="bt-lok">' + t + '</span>' : '<span style="color:#999;">Lokasi belum diisi</span>'; })()}</div>
+        ${chips ? '<div>' + chips + '</div>' : ''}
+        <button type="button" class="bt-btn" data-gh="${gh}" data-k="${k}">Catat cek</button>
+      </div>`;
+    }
+    html += '</div>';
+  });
+  box.innerHTML = html;
+
+  const sum = document.getElementById('cekSummary');
+  if (perhatian.length) {
+    sum.className = 'bt-summary warn';
+    sum.innerHTML = '⚠️ Perlu perhatian:<br><span style="font-weight:500;font-size:13px;">' + perhatian.join('<br>') + '</span>';
+  } else if (flat.length) {
+    sum.className = 'bt-summary ok';
+    sum.textContent = '✅ Populasi & cek semua kotak masih dalam batas.';
+  } else {
+    sum.className = 'bt-summary ok';
+    sum.textContent = 'Belum ada data cek. Catat cek pertama di bawah.';
+  }
+
+  const gs = document.getElementById('cekGulaSummary');
+  if (perluGula.length) {
+    gs.className = 'bt-summary warn';
+    gs.innerHTML = '🍯 Perlu gula: ' + perluGula.join(', ');
+  } else {
+    gs.className = 'bt-summary ok';
+    gs.textContent = '🍯 Jadwal gula aman (tiap ' + set.gulaHari + ' hari).';
+  }
+
+  renderCekCharts(flat);
+  renderCekWeekly(flat, set);
+  renderCekDiag(flat, batches, set);
+  renderCekHistory(set);
+}
+
+// ---- Grafik tren populasi ----
+function renderCekCharts(flatArg) {
+  const canvas = document.getElementById('cekChart');
+  const note = document.getElementById('cekChartNote');
+  if (!canvas) return;
+  const flat = flatArg || cekFlat();
+  const set = cekSettings();
+  const gh = document.getElementById('cekGhFilter').value;
+  const es = flat.filter(e => e.gh === gh && e.pop !== null);
+
+  if (cekChartInstance) { cekChartInstance.destroy(); cekChartInstance = null; }
+  if (typeof Chart === 'undefined') { note.textContent = 'Grafik belum bisa dimuat (Chart.js belum tersedia).'; return; }
+  if (!es.length) { canvas.style.display = 'none'; note.textContent = 'Belum ada data % populasi untuk ' + gh + '.'; return; }
+  canvas.style.display = 'block';
+  note.textContent = '';
+
+  const dates = [...new Set(es.map(e => e.tanggal))].sort();
+  const colors = ['#2d5016', '#1565c0', '#ef6c00', '#6a1b9a', '#00838f', '#ad1457'];
+  const datasets = [];
+  for (let k = 1; k <= QC_KOTAK_PER_GH[gh]; k++) {
+    const data = dates.map(d => {
+      const x = es.filter(e => e.kotak === k && e.tanggal === d);
+      return x.length ? x[x.length - 1].pop : null;
+    });
+    if (data.some(v => v !== null)) {
+      datasets.push({ label: 'K' + k, data, borderColor: colors[k - 1], backgroundColor: colors[k - 1], tension: 0.25, spanGaps: true, pointRadius: 3, borderWidth: 2 });
+    }
+  }
+  datasets.push({ label: 'Waspada', data: dates.map(() => set.waspada), borderColor: '#f9a825', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5, fill: false });
+  datasets.push({ label: 'Ganti', data: dates.map(() => set.ganti), borderColor: '#c62828', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5, fill: false });
+
+  cekChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: { labels: dates.map(cekShort), datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { y: { min: 0, max: 100, title: { display: true, text: 'Populasi (%)' } } },
+      plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Populasi koloni ' + gh } }
+    }
+  });
+}
+
+// ---- Rekap mingguan ----
+function renderCekWeekly(flat, set) {
+  const body = document.getElementById('cekWeekBody');
+  const ws0 = cekWeekStart(getLocalDate());
+  const rows = [];
+  for (let w = 0; w < 6; w++) {
+    const wsN = ws0 - 7 * w, weN = wsN + 6;
+    const inW = d => { const n = dayNum(d); return n >= wsN && n <= weN; };
+    Object.keys(QC_KOTAK_PER_GH).forEach(gh => {
+      const es = flat.filter(e => e.gh === gh && inW(e.tanggal));
+      const pops = es.filter(e => e.pop !== null).map(e => e.pop);
+      const gulaDates = new Set(es.filter(e => e.gula).map(e => e.tanggal));
+      const kj = (localHistory.kunjungan || []).filter(r => r.gh === gh && inW(r.tanggal));
+      if (!pops.length && !gulaDates.size && !kj.length) return;
+      const avgPop = pops.length ? Math.round(pops.reduce((t, v) => t + v, 0) / pops.length) : null;
+      const kjTotal = kj.reduce((t, r) => t + getTotalPerItem(r), 0);
+      rows.push(`<tr>
+        <td>${cekShort(cekIso(wsN))}–${cekShort(cekIso(weN))}</td>
+        <td>${gh}</td>
+        <td>${avgPop !== null ? `<span class="${cekPopClass(avgPop, set)}">${avgPop}%</span>` : '-'}</td>
+        <td>${gulaDates.size || '-'}</td>
+        <td>${kj.length ? (kjTotal / kj.length).toFixed(1) + ' <span style="color:#888;">(' + kj.length + ' sesi)</span>' : '-'}</td>
+      </tr>`);
+    });
+  }
+  body.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="5" class="history-empty">Belum ada data 6 minggu terakhir.</td></tr>';
+}
+
+// ---- Petunjuk koloni berakhir ----
+function cekDiagnose(b, flat, set) {
+  const out = [];
+  const es = flat.filter(e => e.gh === b.gh && e.kotak === b.kotak && e.tanggal >= b.start && e.tanggal <= b.end);
+  const pops = es.filter(e => e.pop !== null);
+  if (pops.length) {
+    const last = pops[pops.length - 1];
+    const peak = pops.reduce((m, e) => e.pop > m.pop ? e : m, pops[0]);
+    out.push(`Populasi terakhir ${last.pop}% (${daysBetween(last.tanggal, b.end)} hr sebelum berakhir)`);
+    if (peak.pop - last.pop >= CEK_TURUN_POIN) out.push(`Turun dari ${peak.pop}% (${cekShort(peak.tanggal)})`);
+  } else {
+    out.push('<span style="color:#888;">Tidak ada data % populasi</span>');
+  }
+
+  const gulas = es.filter(e => e.gula);
+  if (gulas.length) {
+    const d = daysBetween(gulas[gulas.length - 1].tanggal, b.end);
+    out.push(`Gula terakhir ${d} hr sebelum berakhir${d > set.gulaHari ? ' <span class="cek-late">(lewat jadwal)</span>' : ''}`);
+  } else {
+    out.push('<span class="cek-late">Tidak ada catatan gula</span>');
+  }
+
+  const endN = dayNum(b.end);
+  const kj = (localHistory.kunjungan || []).filter(r => r.gh === b.gh && dayNum(r.tanggal) >= endN - 3 && dayNum(r.tanggal) <= endN);
+  const sem = kj.filter(r => String(r.kejadian || '').includes('Habis semprot')).map(r => r.tanggal).sort();
+  if (sem.length) out.push(`Habis semprot ${daysBetween(sem[sem.length - 1], b.end)} hr sebelumnya`);
+  const temps = kj.filter(r => dayNum(r.tanggal) >= endN - 2).map(r => normalizeSuhu(r.suhu)).filter(x => x !== '');
+  if (temps.length && Math.max(...temps) >= CEK_SUHU_PANAS) out.push(`Suhu maks ${Math.max(...temps)}°C (≥${CEK_SUHU_PANAS}°C)`);
+
+  const buruk = [];
+  es.filter(e => dayNum(e.tanggal) >= endN - 7).forEach(e => e.tanda.forEach(t => {
+    if (CEK_FLAGS_BURUK.includes(t) && !buruk.includes(t)) buruk.push(t);
+  }));
+  const chips = buruk.map(t => `<span class="cek-chip">${qcEsc(t)}</span>`).join('');
+
+  return out.map(x => `<div>${x}</div>`).join('') + (chips ? `<div>${chips}</div>` : '');
+}
+
+function renderCekDiag(flat, batches, set) {
+  const body = document.getElementById('cekDiagBody');
+  const ended = batches.filter(b => b.end && b.start)
+    .sort((a, b) => (b.end || '').localeCompare(a.end || '')).slice(0, 12);
+  body.innerHTML = ended.length ? ended.map(b => `<tr>
+      <td><b>${b.gh}</b> K${b.kotak}<br>${qcEsc(b.batch)}${b.koloni ? '<br>' + qcEsc(b.koloni) : ''}</td>
+      <td>${b.umur !== null ? b.umur + ' hr' : '-'}</td>
+      <td>${qcEsc(b.penyebab || 'Selesai')}<br><span style="color:#888;">${cekShort(b.end)}</span></td>
+      <td class="cek-hint-list">${cekDiagnose(b, flat, set)}</td>
+    </tr>`).join('') : '<tr><td colspan="4" class="history-empty">Belum ada koloni yang berakhir.</td></tr>';
+}
+
+// ---- Riwayat ----
+function renderCekHistory(set) {
+  const body = document.getElementById('cekHistoryBody');
+  const rows = [...(localHistory.cek || [])].sort((a, b) =>
+    ((b.tanggal || '') + (b.waktu || '')).localeCompare((a.tanggal || '') + (a.waktu || ''))).slice(0, 15);
+  body.innerHTML = rows.length ? rows.map(r => {
+    const parts = [];
+    for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+      const pop = cekPop(r['kotak' + i + '_pop']);
+      const gula = cekIsGula(r['kotak' + i + '_gula']);
+      const tanda = String(r['kotak' + i + '_tanda'] || '').split(',').map(s => s.trim()).filter(t => CEK_FLAGS_BURUK.includes(t));
+      const cat = String(r['kotak' + i + '_catatan'] || '').trim();
+      if (pop === null && !gula && !tanda.length && !cat) continue;
+      parts.push(`K${i}${pop !== null ? ' <span class="' + cekPopClass(pop, set) + '">' + pop + '%</span>' : ''}${gula ? ' 🍯' : ''}${tanda.length ? ' ⚠️' : ''}`);
+    }
+    const badge = r._syncedToSheet
+      ? '<span style="color:#2e7d32;font-size:9px;font-weight:700;">● SHEET</span>'
+      : '<span style="color:#e65100;font-size:9px;font-weight:700;">● LOCAL</span>';
+    return `<tr>
+      <td>${qcEsc(r.tanggal || '-')}<br>${qcEsc(r.waktu || '')}<br>${badge}</td>
+      <td>${qcEsc(r.gh || '-')}</td>
+      <td style="font-size:12px;line-height:1.6;">${parts.join(' · ') || '-'}${mediaBadge('cek', r) ? '<br>' + mediaBadge('cek', r) : ''}</td>
+      <td style="text-align:center;white-space:nowrap;">
+        <button class="history-btn history-btn-edit" onclick="cekEdit('${r._localId}')">✏️</button>
+        <button class="history-btn history-btn-delete" onclick="cekDelete('${r._localId}')">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="4" class="history-empty">Belum ada riwayat cek.</td></tr>';
+}
+
+// ---- Form ----
+function renderCekKotak(gh, values) {
+  const box = document.getElementById('cekKotakList');
+  const n = QC_KOTAK_PER_GH[gh] || 0;
+  mediaInit('cek', values);
+  if (!n) { box.innerHTML = '<div class="qc-hint">Pilih GH dulu untuk menampilkan kotak.</div>'; return; }
+  const batches = buildBatches();
+  const v = values || {};
+  let html = '';
+  for (let i = 1; i <= n; i++) {
+    const b = batches.find(x => x.gh === gh && x.kotak === i && x.isLatest && !x.end);
+    const sub = b ? `Batch ${qcEsc(b.batch)}${b.koloni ? ' · ' + qcEsc(b.koloni) : ''}${b.umur !== null ? ' · hari ke-' + b.umur : ''}` : '';
+    const pop = cekPop(v['kotak' + i + '_pop']);
+    const gula = cekIsGula(v['kotak' + i + '_gula']);
+    const tanda = String(v['kotak' + i + '_tanda'] || '').split(',').map(s => s.trim());
+    let lok = { zona: String(v['kotak' + i + '_zona'] ?? '').trim(), bay: String(v['kotak' + i + '_bay'] ?? '').trim(), sumber: 'form' };
+    if (!lok.zona && !lok.bay) lok = lokasiKotak(gh, i, b);
+    const bayMax = Math.max(GH_BAY_COUNT[gh] || 10, parseInt(lok.bay) || 0);
+    const srcTxt = lok.sumber === 'cek' ? `lokasi cek ${cekShort(lok.tanggal)} — ubah kalau dipindah` : (lok.sumber === 'awal' ? 'data awal — ubah kalau dipindah' : '');
+    const lokHtml = `<div class="cek-lok">📍
+        <select id="cek-zona-${i}"><option value="">Zona</option>${['1', '2'].map(z => `<option value="${z}" ${lok.zona === z ? 'selected' : ''}>Zona ${z}</option>`).join('')}</select>
+        <select id="cek-bay-${i}"><option value="">Bay</option>${Array.from({ length: bayMax }, (_, x) => String(x + 1)).map(n => `<option value="${n}" ${lok.bay === n ? 'selected' : ''}>Bay ${n}</option>`).join('')}</select>
+        <span class="cek-lok-src">${srcTxt}</span>
+      </div>`;
+    html += `<div class="cek-item" data-k="${i}">
+      <div class="cek-title">Kotak ${i} <span class="cek-sub">${sub}</span></div>
+      ${lokHtml}
+      <div class="cek-row">
+        <input type="number" class="cek-pop-input" id="cek-pop-${i}" min="0" max="100" step="5" inputmode="numeric" placeholder="–" value="${pop === null ? '' : pop}">
+        <span class="cek-pct">%</span>
+        ${CEK_POP_QUICK.map(q => `<button type="button" class="cek-quick" data-k="${i}" data-v="${q}">${q}</button>`).join('')}
+      </div>
+      <div class="cek-row"><label class="cek-gula"><input type="checkbox" id="cek-gula-${i}" ${gula ? 'checked' : ''}> 🍯 Dikasih gula</label></div>
+      <div class="qc-flags cek-flags" id="cek-flags-${i}">${CEK_FLAGS.map(f => `<label><input type="checkbox" value="${qcEsc(f)}" ${tanda.includes(f) ? 'checked' : ''}> ${qcEsc(f)}</label>`).join('')}</div>
+      ${mediaBlockHtml('cek', i, true)}
+      <input type="text" class="cek-cat" id="cek-cat-${i}" style="margin-top:8px;" placeholder="Catatan kotak ${i} (opsional)" value="${qcEsc(v['kotak' + i + '_catatan'] || '')}">
+    </div>`;
+  }
+  box.innerHTML = html;
+}
+
+function collectCek(gh) {
+  const n = QC_KOTAK_PER_GH[gh] || 0;
+  const fields = {};
+  let filled = 0;
+  for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+    let pop = '', gula = '', tanda = '', cat = '';
+    if (i <= n) {
+      const p = cekPop(document.getElementById('cek-pop-' + i).value.trim());
+      pop = p === null ? '' : p;
+      gula = document.getElementById('cek-gula-' + i).checked ? 'Ya' : '';
+      tanda = [...document.querySelectorAll('#cek-flags-' + i + ' input:checked')].map(x => x.value).join(', ');
+      cat = document.getElementById('cek-cat-' + i).value.trim();
+    }
+    fields['kotak' + i + '_pop'] = pop;
+    fields['kotak' + i + '_gula'] = gula;
+    fields['kotak' + i + '_tanda'] = tanda;
+    fields['kotak' + i + '_catatan'] = cat;
+    const zEl = document.getElementById('cek-zona-' + i), bEl = document.getElementById('cek-bay-' + i);
+    fields['kotak' + i + '_zona'] = (i <= n && zEl) ? zEl.value : '';
+    fields['kotak' + i + '_bay'] = (i <= n && bEl) ? bEl.value : '';
+    const foto = i <= n ? mediaPayload('cek', i, 'image') : '';
+    const video = i <= n ? mediaPayload('cek', i, 'video') : '';
+    fields['kotak' + i + '_foto'] = foto;
+    fields['kotak' + i + '_video'] = video;
+    if (pop !== '' || gula || tanda || cat || foto || video) filled++;
+  }
+  return { fields, filled };
+}
+
+function showStatusCek(msg, type) {
+  const el = document.getElementById('statusCek');
+  el.textContent = msg;
+  el.className = 'status ' + type;
+}
+
+function resetFormCek() {
+  document.getElementById('cekForm').reset();
+  document.getElementById('tanggalCek').value = getLocalDate();
+  document.getElementById('waktuCek').value = nowHHMM();
+  cekEditId = null; cekEditExtra = {}; cekEditKey = null;
+  document.getElementById('editIndicatorCek').classList.remove('show');
+  const btn = document.getElementById('submitBtnCek');
+  btn.textContent = 'Kirim';
+  btn.disabled = false;
+  document.getElementById('statusCek').className = 'status';
+  renderCekKotak('');
+}
+
+function cekPrefill(gh, k) {
+  resetFormCek();
+  document.getElementById('cekFormBox').open = true;
+  document.getElementById('ghCek').value = gh;
+  renderCekKotak(gh);
+  document.getElementById('cekFormBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const inp = document.getElementById('cek-pop-' + k);
+  if (inp) setTimeout(() => inp.focus({ preventScroll: true }), 350);
+}
+
+function cekEdit(localId) {
+  const d = (localHistory.cek || []).find(x => x._localId === localId);
+  if (!d) return;
+  cekEditId = localId;
+  cekEditKey = { tanggal: d.tanggal || '', waktu: (d._waktuRaw !== undefined ? d._waktuRaw : d.waktu) || '', gh: d.gh || '' };
+  cekEditExtra = { cid: d.cid || '' };
+  document.getElementById('cekFormBox').open = true;
+  document.getElementById('tanggalCek').value = d.tanggal || getLocalDate();
+  document.getElementById('waktuCek').value = d.waktu || '';
+  document.getElementById('ghCek').value = d.gh || '';
+  document.getElementById('catatanCek').value = d.catatan || '';
+  renderCekKotak(d.gh || '', d);
+  document.getElementById('editIndicatorCek').classList.add('show');
+  document.getElementById('submitBtnCek').textContent = 'Update Data';
+  document.getElementById('cekFormBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showToast('Mode Edit ✏️', 'Ubah data lalu klik Update.', 'info', 2500);
+}
+
+async function cekDelete(localId) {
+  const d = (localHistory.cek || []).find(x => x._localId === localId);
+  if (!d) return;
+  if (!confirm(`Hapus cek tanggal ${d.tanggal} ${d.waktu || ''} (${d.gh})?`)) return;
+
+  if (!d._syncedToSheet) {
+    await cekDropQueued(d.cid);
+    deleteLocalHistory('cek', localId);
+    updateQueueBadge();
+    renderCekTab();
+    showToast('Data Dihapus 🗑️', 'Data lokal dihapus.', 'success', 3000);
+    return;
+  }
+
+  if (!isAuthenticated || !scriptUrl || !navigator.onLine) {
+    showToast('Perlu Online', 'Data ini sudah ada di Sheet. Hapus saat online supaya tidak muncul lagi.', 'error', 5000);
+    return;
+  }
+
+  showLoadingOverlay('Menghapus data dari Google Sheet...');
+  try {
+    if ((await ensureServerVersion()) < 5) throw new Error('Apps Script di server masih versi lama (belum deploy v5).');
+    const result = await cekPost({
+      sheet: 'cek_koloni', action: 'delete-row',
+      tanggal: d.tanggal, waktu: (d._waktuRaw !== undefined ? d._waktuRaw : d.waktu), gh: d.gh
+    });
+    if (result.status === 'error') throw new Error(result.message || 'Gagal menghapus.');
+    deleteLocalHistory('cek', localId);
+    hideLoadingOverlay();
+    renderCekTab();
+    showToast('Data Dihapus 🗑️', result.status === 'not_found' ? 'Sudah tidak ada di Sheet.' : 'Cek berhasil dihapus.', 'success', 3500);
+  } catch (err) {
+    hideLoadingOverlay();
+    showToast('Gagal Hapus', friendlyErr(err), 'error', 5000);
+  }
+}
+
+document.getElementById('ghCek').addEventListener('change', e => renderCekKotak(e.target.value));
+
+document.getElementById('cekKotakList').addEventListener('click', e => {
+  const q = e.target.closest('.cek-quick');
+  if (!q) return;
+  document.getElementById('cek-pop-' + q.dataset.k).value = q.dataset.v;
+});
+
+document.getElementById('cekStatus').addEventListener('click', e => {
+  const btn = e.target.closest('.bt-btn');
+  if (!btn) return;
+  cekPrefill(btn.dataset.gh, parseInt(btn.dataset.k, 10));
+});
+
+document.getElementById('cekForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const gh = document.getElementById('ghCek').value;
+  const tanggal = document.getElementById('tanggalCek').value;
+  const waktu = document.getElementById('waktuCek').value;
+  if (!gh) { showStatusCek('Pilih greenhouse dulu.', 'error'); return; }
+
+  const { fields, filled } = collectCek(gh);
+  if (!filled) { showStatusCek('Isi minimal satu kotak (populasi, gula, tanda, catatan, foto, atau video).', 'error'); return; }
+  if (mediaTotalMB(fields) > MEDIA_MAX_TOTAL_MB) {
+    showStatusCek(`Foto/video terlalu besar (${mediaTotalMB(fields).toFixed(0)} MB). Kurangi atau kirim bertahap (maks ${MEDIA_MAX_TOTAL_MB} MB).`, 'error');
+    return;
+  }
+
+  const isEdit = !!cekEditId;
+  const clash = (localHistory.cek || []).some(x => x._localId !== cekEditId && x.tanggal === tanggal && x.waktu === waktu && x.gh === gh);
+  if (clash) { showStatusCek(`Sudah ada cek ${gh} jam ${waktu} di tanggal ini. Ubah jamnya, atau edit data yang lama.`, 'error'); return; }
+
+  const existing = isEdit ? (localHistory.cek || []).find(x => x._localId === cekEditId) : null;
+  const formData = {
+    sheet: 'cek_koloni',
+    action: (isEdit && existing && existing._syncedToSheet) ? 'update' : 'submit',
+    tanggal, waktu, gh,
+    catatan: document.getElementById('catatanCek').value.trim(),
+    cid: (isEdit && cekEditExtra.cid) ? cekEditExtra.cid : newCid(),
+    ...fields
+  };
+  if (isEdit && cekEditKey) {
+    formData.oldTanggal = cekEditKey.tanggal;
+    formData.oldWaktu = cekEditKey.waktu;
+    formData.oldGh = cekEditKey.gh;
+  }
+  if (isEdit && existing && !existing._syncedToSheet) await cekDropQueued(formData.cid);
+
+  const btn = document.getElementById('submitBtnCek');
+  btn.disabled = true;
+  showStatusCek(isEdit ? 'Mengupdate...' : 'Menyimpan...', 'loading');
+
+  let synced = false;
+  try {
+    if (isAuthenticated && scriptUrl && navigator.onLine) {
+      if ((await ensureServerVersion()) < 5) throw new Error('Apps Script di server masih versi lama (belum deploy v5).');
+      if (mediaNeedsNewApi(formData) && !(await mediaApiOk())) throw new Error(MEDIA_API_ERR);
+      showStatusCek(mediaHasNew(formData) ? 'Mengunggah foto/video & data...' : (isEdit ? 'Mengupdate...' : 'Menyimpan...'), 'loading');
+      let result = await cekPost(formData);
+      if (formData.action === 'update' && result.status === 'not_found') {
+        formData.action = 'submit';
+        result = await cekPost(formData);
+      }
+      if (result.status === 'error') throw new Error(result.message || 'Gagal');
+      if (result.sheet !== 'cek_koloni') throw new Error('Apps Script di server masih versi lama (belum deploy v5).');
+      synced = true;
+      showStatusCek(isEdit ? '✓ Cek berhasil diupdate!' : '✓ Cek tersimpan di Sheet.', 'success');
+      showToast(isEdit ? 'Update Berhasil! ✏️' : 'Cek Tersimpan! ✓', 'Data cek koloni masuk ke Sheet.', 'success', 3500);
+    } else {
+      await saveToQueue(formData, 'cek');
+      showStatusCek('📥 Tersimpan lokal. Auto-sync akan kirim otomatis.', 'info');
+    }
+  } catch (err) {
+    console.error(err);
+    await saveToQueue(formData, 'cek');
+    showStatusCek('⚠️ Belum masuk Sheet: ' + friendlyErr(err) + ' (tersimpan lokal)', 'error');
+  }
+
+  const rec = mediaStrip(formData);
+  delete rec.oldTanggal; delete rec.oldWaktu; delete rec.oldGh;
+  if (isEdit) updateLocalHistory('cek', cekEditId, rec, synced);
+  else addLocalHistory('cek', rec, synced);
+
+  updateQueueBadge();
+  const keepMsg = document.getElementById('statusCek').textContent;
+  const keepCls = document.getElementById('statusCek').className;
+  resetFormCek();
+  showStatusCek(keepMsg, keepCls.replace('status ', ''));
+  renderCekTab();
+});
+
+cekLoadSettingsUI();
+resetFormCek();
+
+// ============================================
+// SERVICE WORKER
+// ============================================
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
+      .then(reg => console.log('✅ SW registered:', reg.scope))
+      .catch(err => console.error('❌ SW gagal:', err));
+  });
+}
+
+// ============================================
+// PWA INSTALL
+// ============================================
+
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+
+  if (document.getElementById('installBtn')) return;
+
+  const btn = document.createElement('button');
+  btn.textContent = '⬇️ Install Aplikasi';
+  btn.id = 'installBtn';
+  btn.style.cssText = `
+    position:fixed; bottom:20px; left:50%;
+    transform:translateX(-50%);
+    background:#2d5016; color:white;
+    padding:12px 24px; border:none;
+    border-radius:30px; font-weight:700;
+    font-size:14px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.3);
+    z-index:9999; cursor:pointer;
+  `;
+
+  btn.onclick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log('User choice:', outcome);
+    deferredPrompt = null;
+    btn.remove();
+  };
+
+  document.body.appendChild(btn);
+});
+
+window.addEventListener('appinstalled', () => {
+  console.log('✅ PWA berhasil di-install');
+  const btn = document.getElementById('installBtn');
+  if (btn) btn.remove();
+});
+
 </script>
+
 </body>
 </html>
