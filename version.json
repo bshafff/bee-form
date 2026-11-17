@@ -1,5 +1,5 @@
 {
-  "version": "1.5.3",
+  "version": "1.5.4",
   "released": "2026-11-17",
   "notes": "Lokasi kotak (zona & bay) di Batch/Cek dengan default; GH 2: 5 atau 6 kotak, 11 bay di kunjungan."
 }
