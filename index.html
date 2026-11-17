@@ -1123,7 +1123,7 @@ button.btn-delete:hover { background: #c82333; }
 // ============================================
 // 🔧 KONFIGURASI AUTO-CONNECT
 // ============================================
-const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx-FwoT0FIuUJZ1AvwLDRpvxM42R9Cz3bPdT9ZwS2HCSfLRo-p0WrtnKTpGKMTPRWp9NQ/exec';
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwCpIHZQiQwXA2nuIqC_ijApFk3PPnH103O5tCEhNKktHMzzHN_vCHiOQo0manKDCnvdA/exec';
 
 // ============================================
 // STATE
@@ -2074,6 +2074,7 @@ function lokasiKotak(gh, k, b) {
     const by = String(r['kotak' + k + '_bay'] ?? '').trim();
     if (z || by) return { zona: z, bay: by, sumber: 'cek', tanggal: r.tanggal };
   }
+  if (b && (b.lokZona || b.lokBay)) return { zona: b.lokZona, bay: b.lokBay, sumber: 'qc' };
   const awal = LOKASI_AWAL[normKoloni(b && b.koloni)];
   if (awal) return { zona: String(awal.zona), bay: String(awal.bay), sumber: 'awal' };
   return { zona: '', bay: '', sumber: '' };
@@ -2099,7 +2100,7 @@ const MEDIA_MAX_FOTO = 8;        // per kotak
 const MEDIA_MAX_VIDEO = 3;       // per kotak
 const MEDIA_MAX_VIDEO_MB = 15;   // per file video
 const MEDIA_MAX_TOTAL_MB = 35;   // total satu kali kirim
-const MEDIA_MIN_API = 7;         // versi Apps Script yang paham foto jamak, video, lokasi kotak, Bay 11
+const MEDIA_MIN_API = 8;         // versi Apps Script yang paham foto jamak, video, lokasi kotak (QC & Cek), Bay 11
 const mediaState = { qc: {}, cek: {} };
 
 function mediaParse(v) {
@@ -2254,7 +2255,7 @@ function mediaNeedsNewApi(fd) {
   fd = fd || {};
   if (fd.sheet === 'kunjungan' && (parseInt(fd.bay11) || 0) > 0) return true;
   return Object.keys(fd).some(k => {
-    if (fd.sheet === 'cek_koloni' && /^kotak\d_(zona|bay)$/.test(k)) return !!fd[k];
+    if ((fd.sheet === 'cek_koloni' || fd.sheet === 'qc') && /^kotak\d_(zona|bay)$/.test(k)) return !!fd[k];
     if (!/^kotak\d_(foto|video)$/.test(k)) return false;
     const v = fd[k];
     if (!v || (Array.isArray(v) && !v.length)) return false;
@@ -2272,7 +2273,7 @@ async function mediaApiOk() {
   } catch (e) { /* biarkan */ }
   return serverApiVersion >= MEDIA_MIN_API;
 }
-const MEDIA_API_ERR = 'Apps Script belum versi 7 (foto jamak, video, lokasi kotak, Bay 11). Update script lalu deploy.';
+const MEDIA_API_ERR = 'Apps Script belum versi 8 (foto jamak, video, lokasi kotak, Bay 11). Update script lalu deploy.';
 
 // ---- Hitung & lihat di riwayat ----
 function mediaCounts(rec) {
@@ -2428,6 +2429,20 @@ function renderQcKotak(gh, values) {
        }
     }
 
+    // Lokasi koloni: dari data tersimpan; kalau data lama kosong, isi dari data awal (per No Koloni) supaya tinggal dicek & disimpan
+    let zonaV = String(values[`kotak${i}_zona`] ?? '').trim();
+    let bayV = String(values[`kotak${i}_bay`] ?? '').trim();
+    if (!zonaV && !bayV && values[`kotak${i}_no`]) {
+      const awal = LOKASI_AWAL[normKoloni(values[`kotak${i}_no`])];
+      if (awal) { zonaV = String(awal.zona); bayV = String(awal.bay); }
+    }
+    const bayMaxQ = Math.max(GH_BAY_COUNT[gh] || 10, parseInt(bayV) || 0);
+    const lokQcHtml = `<div class="cek-lok">📍
+          <select id="kotak${i}_zona"><option value="">Zona</option>${['1', '2'].map(z => `<option value="${z}" ${zonaV === z ? 'selected' : ''}>Zona ${z}</option>`).join('')}</select>
+          <select id="kotak${i}_bay"><option value="">Bay</option>${Array.from({ length: bayMaxQ }, (_, x) => String(x + 1)).map(n2 => `<option value="${n2}" ${bayV === n2 ? 'selected' : ''}>Bay ${n2}</option>`).join('')}</select>
+          <span class="cek-lok-src">lokasi saat datang (kalau dipindah, ubah di menu Cek)</span>
+        </div>`;
+
     html += `
       <div class="qc-item ${kond ? 'k-' + kond.toLowerCase() : ''}" id="qcItem${i}">
         <div class="qc-title">Kotak ${i}</div>
@@ -2435,6 +2450,7 @@ function renderQcKotak(gh, values) {
           <input type="text" class="qc-no" id="kotak${i}_no" placeholder="No koloni (mis. A1)"
                  value="${qcEsc(values[`kotak${i}_no`])}">
         </div>
+        ${lokQcHtml}
         <div class="qc-row">
           <select id="kotak${i}_kondisi" onchange="updateQcSummary()">
             <option value="">-- Kondisi --</option>
@@ -2564,6 +2580,9 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     formData[`kotak${i}_kondisi`] = kond;
     formData[`kotak${i}_sisiran`] = sis;
     formData[`kotak${i}_foto`] = foto;
+    const zEl = document.getElementById(`kotak${i}_zona`), bEl = document.getElementById(`kotak${i}_bay`);
+    formData[`kotak${i}_zona`] = (aktif && zEl && (no || kond)) ? zEl.value : '';
+    formData[`kotak${i}_bay`] = (aktif && bEl && (no || kond)) ? bEl.value : '';
     formData[`kotak${i}_catatan`] = cat; 
     
     if (kond) jml[kond]++;
@@ -3019,7 +3038,7 @@ function buildBatches() {
       const key = `${row.gh}|${i}|${batch}`;
       const b = map[key] || (map[key] = {
         key, gh: row.gh, kotak: i, batch, koloni: '', start: row.tanggal || '',
-        kondisi: '', catatan: '', lastQc: ''
+        kondisi: '', catatan: '', lastQc: '', lokZona: '', lokBay: ''
       });
       if (row.tanggal && (!b.start || row.tanggal < b.start)) b.start = row.tanggal;
       if (!b.lastQc || (row.tanggal || '') >= b.lastQc) {
@@ -3027,6 +3046,8 @@ function buildBatches() {
         b.koloni = koloni || b.koloni;
         b.kondisi = kond;
         b.catatan = row[`kotak${i}_catatan`] || '';
+        b.lokZona = String(row[`kotak${i}_zona`] ?? '').trim();
+        b.lokBay = String(row[`kotak${i}_bay`] ?? '').trim();
       }
     }
   });
@@ -4331,12 +4352,13 @@ function renderCekKotak(gh, values) {
     const gula = cekIsGula(v['kotak' + i + '_gula']);
     const tanda = String(v['kotak' + i + '_tanda'] || '').split(',').map(s => s.trim());
     let lok = { zona: String(v['kotak' + i + '_zona'] ?? '').trim(), bay: String(v['kotak' + i + '_bay'] ?? '').trim(), sumber: 'form' };
-    if (!lok.zona && !lok.bay) lok = lokasiKotak(gh, i, b);
+    const lokOwn = !!(lok.zona || lok.bay);   // edit cek yang memang mencatat pindah lokasi
+    if (!lokOwn) lok = lokasiKotak(gh, i, b);
     const bayMax = Math.max(GH_BAY_COUNT[gh] || 10, parseInt(lok.bay) || 0);
-    const srcTxt = lok.sumber === 'cek' ? `lokasi cek ${cekShort(lok.tanggal)} — ubah kalau dipindah` : (lok.sumber === 'awal' ? 'data awal — ubah kalau dipindah' : '');
+    const srcTxt = lok.sumber === 'cek' ? `dipindah ke sini (cek ${cekShort(lok.tanggal)}) — ubah kalau dipindah lagi` : (lok.sumber === 'qc' ? 'lokasi dari QC — ubah kalau dipindah' : (lok.sumber === 'awal' ? 'data awal — ubah kalau dipindah' : ''));
     const lokHtml = `<div class="cek-lok">📍
-        <select id="cek-zona-${i}"><option value="">Zona</option>${['1', '2'].map(z => `<option value="${z}" ${lok.zona === z ? 'selected' : ''}>Zona ${z}</option>`).join('')}</select>
-        <select id="cek-bay-${i}"><option value="">Bay</option>${Array.from({ length: bayMax }, (_, x) => String(x + 1)).map(n => `<option value="${n}" ${lok.bay === n ? 'selected' : ''}>Bay ${n}</option>`).join('')}</select>
+        <select id="cek-zona-${i}" data-def="${lokOwn ? '' : lok.zona}"><option value="">Zona</option>${['1', '2'].map(z => `<option value="${z}" ${lok.zona === z ? 'selected' : ''}>Zona ${z}</option>`).join('')}</select>
+        <select id="cek-bay-${i}" data-def="${lokOwn ? '' : lok.bay}"><option value="">Bay</option>${Array.from({ length: bayMax }, (_, x) => String(x + 1)).map(n => `<option value="${n}" ${lok.bay === n ? 'selected' : ''}>Bay ${n}</option>`).join('')}</select>
         <span class="cek-lok-src">${srcTxt}</span>
       </div>`;
     html += `<div class="cek-item" data-k="${i}">
@@ -4374,13 +4396,15 @@ function collectCek(gh) {
     fields['kotak' + i + '_tanda'] = tanda;
     fields['kotak' + i + '_catatan'] = cat;
     const zEl = document.getElementById('cek-zona-' + i), bEl = document.getElementById('cek-bay-' + i);
-    fields['kotak' + i + '_zona'] = (i <= n && zEl) ? zEl.value : '';
-    fields['kotak' + i + '_bay'] = (i <= n && bEl) ? bEl.value : '';
+    // Lokasi hanya dicatat kalau DIUBAH dari default (artinya koloni dipindah)
+    const pindah = i <= n && zEl && bEl && (zEl.value !== (zEl.dataset.def || '') || bEl.value !== (bEl.dataset.def || ''));
+    fields['kotak' + i + '_zona'] = pindah ? zEl.value : '';
+    fields['kotak' + i + '_bay'] = pindah ? bEl.value : '';
     const foto = i <= n ? mediaPayload('cek', i, 'image') : '';
     const video = i <= n ? mediaPayload('cek', i, 'video') : '';
     fields['kotak' + i + '_foto'] = foto;
     fields['kotak' + i + '_video'] = video;
-    if (pop !== '' || gula || tanda || cat || foto || video) filled++;
+    if (pop !== '' || gula || tanda || cat || foto || video || fields['kotak' + i + '_zona'] || fields['kotak' + i + '_bay']) filled++;
   }
   return { fields, filled };
 }
