@@ -1,5 +1,5 @@
 {
-  "version": "1.5.0",
-  "released": "2026-11-16",
-  "notes": "Peta Zona/Bay default di Cek, GH 2 mendukung 6 kotak, dan penambahan Bay 11 di Kunjungan."
+  "version": "1.5.1",
+  "released": "2026-11-17",
+  "notes": "Lokasi kotak (zona & bay) di Batch/Cek dengan default; GH 2: 5 atau 6 kotak, 11 bay di kunjungan."
 }
