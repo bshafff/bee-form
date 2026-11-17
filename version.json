@@ -1,5 +1,5 @@
 {
-  "version": "1.6.0",
+  "version": "1.6.1",
   "released": "2026-11-17",
   "notes": "Input lokasi (zona & bay) di QC Koloni + riwayat QC; Cek hanya mencatat saat koloni dipindah."
 }
