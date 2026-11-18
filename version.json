@@ -1,5 +1,5 @@
 {
-  "version": "1.6.2",
+  "version": "1.7.0",
   "released": "2026-11-18",
-  "notes": "Draft otomatis: isian, foto & video di Kunjungan / QC / Cek tersimpan otomatis dan kembali lagi kalau aplikasi ke-refresh atau tertutup."
+  "notes": "Laporan PDF Cek Koloni (pilih tanggal, lengkap dengan foto) + draft otomatis isian/foto."
 }

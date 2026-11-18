@@ -925,6 +925,23 @@ button.btn-delete:hover { background: #c82333; }
         </form>
       </details>
 
+      <details class="bt-box" id="cekReportBox">
+        <summary>📄 Laporan PDF untuk manajemen</summary>
+        <div class="row-inputs" style="margin-top:12px;">
+          <div class="form-group"><label for="repDari">Dari tanggal</label><input type="date" id="repDari"></div>
+          <div class="form-group"><label for="repSampai">Sampai tanggal</label><input type="date" id="repSampai"></div>
+        </div>
+        <div class="form-group">
+          <label for="repGh">Greenhouse</label>
+          <select id="repGh"><option value="">Semua GH</option><option value="GH 1">GH 1</option><option value="GH 2">GH 2</option></select>
+        </div>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:4px 0 8px;"><input type="checkbox" id="repFoto" checked> Sertakan foto</label>
+        <div class="qc-hint">Isi: ringkasan, tabel per kotak (koloni, lokasi, populasi, gula, tanda), dan foto. Foto yang muncul hanya yang sudah terkirim ke Sheet; butuh internet. Setelah pratinjau muncul, tekan <b>Simpan PDF</b>.</div>
+        <div class="actions" style="margin-top:8px;">
+          <button type="button" class="btn btn-submit" onclick="cekReportOpen()">Buat laporan</button>
+        </div>
+      </details>
+
       <details class="bt-box">
         <summary>⚙️ Pengaturan jadwal gula &amp; ambang populasi</summary>
         <div class="cek-settings">
@@ -4190,6 +4207,7 @@ function renderCekTab() {
   renderCekWeekly(flat, set);
   renderCekDiag(flat, batches, set);
   renderCekHistory(set);
+  cekReportDefaults();
 }
 
 // ---- Grafik tren populasi ----
@@ -4336,6 +4354,7 @@ function renderCekHistory(set) {
       <td>${qcEsc(r.gh || '-')}</td>
       <td style="font-size:12px;line-height:1.6;">${parts.join(' · ') || '-'}${mediaBadge('cek', r) ? '<br>' + mediaBadge('cek', r) : ''}</td>
       <td style="text-align:center;white-space:nowrap;">
+        <button class="history-btn" style="background:#ecfccb;color:#365314;" title="Laporan PDF tanggal ini" onclick="cekReportQuick('${r.tanggal}','${r.gh}')">📄</button>
         <button class="history-btn history-btn-edit" onclick="cekEdit('${r._localId}')">✏️</button>
         <button class="history-btn history-btn-delete" onclick="cekDelete('${r._localId}')">🗑️</button>
       </td>
@@ -4598,6 +4617,243 @@ document.getElementById('cekForm').addEventListener('submit', async e => {
 cekLoadSettingsUI();
 resetFormCek();
 
+
+
+// ============================================
+// LAPORAN CEK KOLONI (PDF lewat cetak browser)
+// Pilih tanggal → pratinjau → "Simpan PDF" (dialog cetak → Save as PDF)
+// ============================================
+const REP_BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const REP_HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+function repTgl(iso, withDay) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso || '-';
+  const d = new Date(+m[1], +m[2] - 1, +m[3]);
+  return (withDay ? REP_HARI[d.getDay()] + ', ' : '') + (+m[3]) + ' ' + REP_BULAN[+m[2] - 1] + ' ' + m[1];
+}
+function repImgUrl(src) {
+  const id = mediaDriveId(src);
+  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1000` : src;
+}
+
+function cekReportDefaults() {
+  const a = document.getElementById('repDari'), b = document.getElementById('repSampai');
+  if (!a || !b || a.value || b.value) return;
+  const dates = (localHistory.cek || []).map(r => r.tanggal).filter(Boolean).sort();
+  const last = dates.length ? dates[dates.length - 1] : getLocalDate();
+  a.value = last; b.value = last;
+}
+
+function cekReportRows(dari, sampai, gh) {
+  return (localHistory.cek || [])
+    .filter(r => r.tanggal && r.tanggal >= dari && r.tanggal <= sampai && (!gh || r.gh === gh))
+    .sort((x, y) => ((x.tanggal || '') + (x.waktu || '') + (x.gh || '')).localeCompare((y.tanggal || '') + (y.waktu || '') + (y.gh || '')));
+}
+
+function cekReportHtml(dari, sampai, gh, withFoto, title) {
+  const set = cekSettings();
+  const rows = cekReportRows(dari, sampai, gh);
+  const batches = buildBatches();
+  const esc = qcEsc;
+  const isHttp = u => /^https?:/.test(u);
+
+  const batchAt = (g, k, tgl) => {
+    const c = batches.filter(b => b.gh === g && Number(b.kotak) === k && b.start && b.start <= tgl && (!b.end || tgl <= b.end));
+    c.sort((x, y) => (y.start || '').localeCompare(x.start || ''));
+    return c[0] || null;
+  };
+
+  let nKotak = 0, nGula = 0, nFoto = 0, nVideo = 0;
+  const pops = [];
+  const flagged = {};
+  let sessHtml = '';
+
+  rows.forEach(r => {
+    const trs = [], figs = [], vids = [];
+    for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+      const pop = cekPop(r['kotak' + i + '_pop']);
+      const gula = cekIsGula(r['kotak' + i + '_gula']);
+      const tanda = String(r['kotak' + i + '_tanda'] || '').split(',').map(x => x.trim()).filter(Boolean);
+      const cat = String(r['kotak' + i + '_catatan'] || '').trim();
+      const fotos = mediaParse(r['kotak' + i + '_foto']).filter(isHttp);
+      const vds = mediaParse(r['kotak' + i + '_video']).filter(isHttp);
+      if (pop === null && !gula && !tanda.length && !cat && !fotos.length && !vds.length) continue;
+
+      const b = batchAt(r.gh, i, r.tanggal);
+      let lz = String(r['kotak' + i + '_zona'] ?? '').trim(), lb = String(r['kotak' + i + '_bay'] ?? '').trim();
+      if (!lz && !lb && b) { lz = b.lokZona || ''; lb = b.lokBay || ''; }
+      if (!lz && !lb && b) { const aw = LOKASI_AWAL[normKoloni(b.koloni)]; if (aw) { lz = String(aw.zona); lb = String(aw.bay); } }
+      const lok = lokasiText({ zona: lz, bay: lb });
+      const koloni = b && b.koloni ? b.koloni : '';
+      const buruk = tanda.filter(t => CEK_FLAGS_BURUK.includes(t));
+
+      nKotak++;
+      if (gula) nGula++;
+      if (pop !== null) pops.push(pop);
+      nFoto += fotos.length; nVideo += vds.length;
+      if ((pop !== null && pop <= set.waspada) || buruk.length) {
+        flagged[r.gh + '|' + i] = { tgl: r.tanggal, gh: r.gh, k: i, koloni, pop, buruk };
+      }
+
+      const pc = pop === null ? '' : (pop <= set.ganti ? 'p-bad' : (pop <= set.waspada ? 'p-warn' : 'p-ok'));
+      const chips = tanda.map(t => `<span class="chip${CEK_FLAGS_BURUK.includes(t) ? ' bad' : ''}">${esc(t)}</span>`).join(' ');
+      trs.push(`<tr>
+        <td><b>K${i}</b></td>
+        <td>${esc(koloni || '-')}${b ? `<br><small>Batch ${esc(b.batch)}${b.start ? ' · hari ke-' + daysBetween(b.start, r.tanggal) : ''}</small>` : ''}</td>
+        <td>${esc(lok || '-')}</td>
+        <td class="pop ${pc}">${pop !== null ? pop + '%' : '-'}</td>
+        <td>${gula ? '✓ Gula' : '-'}</td>
+        <td>${chips}${cat ? `<div class="cat">${esc(cat)}</div>` : ''}${!chips && !cat ? '-' : ''}</td>
+      </tr>`);
+
+      if (withFoto) {
+        fotos.forEach((src, n) => figs.push(`<figure><img src="${esc(repImgUrl(src))}" alt=""><figcaption>Kotak ${i}${koloni ? ' · ' + esc(koloni) : ''}${lok ? ' · ' + esc(lok) : ''}${fotos.length > 1 ? ' (' + (n + 1) + '/' + fotos.length + ')' : ''}</figcaption></figure>`));
+        vds.forEach(src => vids.push(`<li>Kotak ${i}: <a href="${esc(src)}">${esc(src)}</a></li>`));
+      }
+    }
+    if (!trs.length) return;
+    sessHtml += `<section class="sess">
+      <h2>${esc(r.gh)} · ${esc(repTgl(r.tanggal, true))} · ${esc(r.waktu || '')}</h2>
+      ${r.catatan ? `<div class="note">Catatan umum: ${esc(r.catatan)}</div>` : ''}
+      <table><thead><tr><th>Kotak</th><th>Koloni / Batch</th><th>Lokasi</th><th>Populasi</th><th>Gula</th><th>Tanda &amp; catatan</th></tr></thead><tbody>${trs.join('')}</tbody></table>
+      ${figs.length ? `<div class="figs">${figs.join('')}</div>` : ''}
+      ${vids.length ? `<div class="vids"><b>Video:</b><ul>${vids.join('')}</ul></div>` : ''}
+    </section>`;
+  });
+
+  const avg = pops.length ? Math.round(pops.reduce((a, b) => a + b, 0) / pops.length) : null;
+  const flagList = Object.values(flagged).map(f => {
+    const why = [];
+    if (f.pop !== null && f.pop <= set.waspada) why.push(`populasi ${f.pop}%${f.pop <= set.ganti ? ' (di bawah ambang ganti)' : ''}`);
+    if (f.buruk.length) why.push(f.buruk.join(', ').toLowerCase());
+    return `<li><b>${esc(f.gh)} K${f.k}</b>${f.koloni ? ' (' + esc(f.koloni) + ')' : ''} · ${esc(repTgl(f.tgl))}: ${esc(why.join('; '))}</li>`;
+  });
+
+  const periode = dari === sampai ? repTgl(dari, true) : repTgl(dari) + ' – ' + repTgl(sampai);
+  const now = new Date();
+  const stamp = repTgl(getLocalDate()) + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+
+  return `<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
+<style>
+@page { size: A4; margin: 12mm; }
+* { box-sizing: border-box; }
+body { font-family: Arial, Helvetica, sans-serif; color: #222; font-size: 12px; line-height: 1.4; margin: 0; padding: 14px; max-width: 820px; margin-left: auto; margin-right: auto; }
+@media print { body { padding: 0; max-width: none; } }
+.head { border-bottom: 3px solid #2d5016; padding-bottom: 8px; margin-bottom: 10px; }
+.head h1 { margin: 0; font-size: 20px; color: #2d5016; }
+.head .sub { color: #555; margin-top: 3px; }
+.stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 10px 0; }
+.stats div { border: 1px solid #d7e3c8; background: #f6faf0; border-radius: 6px; padding: 6px 4px; text-align: center; }
+.stats b { display: block; font-size: 16px; color: #2d5016; }
+.stats span { font-size: 10px; color: #555; }
+.warn { border: 1px solid #f0b429; background: #fff8e1; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
+.warn ul { margin: 4px 0 0 18px; padding: 0; }
+.okbox { border: 1px solid #b7d9a0; background: #f1f8e9; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
+.sess { margin-top: 14px; }
+.sess h2 { font-size: 14px; margin: 0 0 6px; padding: 5px 8px; background: #2d5016; color: #fff; border-radius: 4px; page-break-after: avoid; }
+.note { margin: 0 0 6px; color: #444; }
+table { width: 100%; border-collapse: collapse; page-break-inside: avoid; }
+th, td { border: 1px solid #ccc; padding: 4px 6px; text-align: left; vertical-align: top; }
+th { background: #eef3e6; font-size: 10px; text-transform: uppercase; }
+small { color: #666; }
+.pop { font-weight: 700; text-align: center; white-space: nowrap; }
+.p-ok { color: #2e7d32; } .p-warn { color: #e65100; } .p-bad { color: #c62828; }
+.chip { display: inline-block; border: 1px solid #bbb; border-radius: 10px; padding: 0 6px; font-size: 10px; margin: 0 2px 2px 0; }
+.chip.bad { border-color: #c62828; color: #c62828; background: #fdecea; }
+.cat { margin-top: 2px; }
+.figs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+figure { margin: 0; page-break-inside: avoid; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
+figure img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #eee; }
+figcaption { font-size: 10px; padding: 3px 5px; color: #444; }
+.vids { margin-top: 6px; font-size: 11px; word-break: break-all; }
+.vids ul { margin: 2px 0 0 18px; padding: 0; }
+.foot { margin-top: 18px; padding-top: 6px; border-top: 1px solid #ccc; color: #777; font-size: 10px; }
+.empty { padding: 30px; text-align: center; color: #888; }
+@media (max-width: 560px) { .stats { grid-template-columns: repeat(3, 1fr); } .figs { grid-template-columns: repeat(2, 1fr); } }
+</style></head><body>
+<div class="head">
+  <h1>Laporan Cek Koloni Lebah</h1>
+  <div class="sub">PT. Agri Wangi Berry · ${esc(gh || 'GH 1 & GH 2')} · ${esc(periode)}</div>
+</div>
+<div class="stats">
+  <div><b>${rows.length}</b><span>sesi cek</span></div>
+  <div><b>${nKotak}</b><span>kotak tercatat</span></div>
+  <div><b>${avg === null ? '-' : avg + '%'}</b><span>populasi rata²</span></div>
+  <div><b>${nGula}</b><span>kotak diberi gula</span></div>
+  <div><b>${nFoto}</b><span>foto</span></div>
+  <div><b>${nVideo}</b><span>video</span></div>
+</div>
+${flagList.length
+    ? `<div class="warn"><b>Perlu perhatian</b><ul>${flagList.join('')}</ul></div>`
+    : (nKotak ? `<div class="okbox">Semua kotak yang dicek masih dalam batas (populasi di atas ${set.waspada}%, tanpa tanda buruk).</div>` : '')}
+${sessHtml || '<div class="empty">Tidak ada data cek pada periode ini.</div>'}
+<div class="foot">Ambang populasi: waspada ≤ ${set.waspada}%, ganti ≤ ${set.ganti}%. Populasi 100% = sekuat saat koloni datang. Dibuat dari aplikasi bee-form · ${esc(stamp)}</div>
+</body></html>`;
+}
+
+function cekReportClose() {
+  const ov = document.getElementById('cekReportOv');
+  if (ov) ov.remove();
+  document.body.style.overflow = '';
+}
+
+function cekReportOpen() {
+  let dari = document.getElementById('repDari').value;
+  let sampai = document.getElementById('repSampai').value;
+  const gh = document.getElementById('repGh').value;
+  const withFoto = document.getElementById('repFoto').checked;
+  if (!dari && !sampai) { showToast('Pilih Tanggal', 'Isi tanggal laporan dulu.', 'error', 3000); return; }
+  if (!dari) dari = sampai;
+  if (!sampai) sampai = dari;
+  if (dari > sampai) { const t = dari; dari = sampai; sampai = t; }
+
+  const rows = cekReportRows(dari, sampai, gh);
+  if (!rows.length) { showToast('Tidak Ada Data', 'Belum ada data cek di tanggal itu.', 'error', 3500); return; }
+
+  const title = 'Laporan Cek Lebah ' + (gh ? gh.replace(' ', '') + ' ' : '') + (dari === sampai ? dari : dari + '_' + sampai);
+  const html = cekReportHtml(dari, sampai, gh, withFoto, title);
+
+  cekReportClose();
+  const ov = document.createElement('div');
+  ov.id = 'cekReportOv';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:10001;background:#e5e7eb;display:flex;flex-direction:column;';
+  const btn = 'border:none;border-radius:6px;padding:8px 10px;font-weight:700;font-size:13px;cursor:pointer;';
+  ov.innerHTML = `<div style="display:flex;gap:6px;align-items:center;padding:8px 10px;background:#2d5016;color:#fff;">
+      <button type="button" id="repBtnClose" style="${btn}background:#fff;color:#2d5016;">← Tutup</button>
+      <div style="flex:1;font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Pratinjau laporan</div>
+      <button type="button" id="repBtnTab" style="${btn}background:#e0f2fe;color:#0369a1;">↗ Tab baru</button>
+      <button type="button" id="repBtnPrint" style="${btn}background:#fbbf24;color:#222;">🖨️ Simpan PDF</button>
+    </div>
+    <iframe id="cekReportFrame" style="flex:1;border:0;width:100%;background:#fff;"></iframe>`;
+  document.body.appendChild(ov);
+  document.body.style.overflow = 'hidden';
+  document.getElementById('cekReportFrame').srcdoc = html;
+
+  document.getElementById('repBtnClose').onclick = cekReportClose;
+  document.getElementById('repBtnTab').onclick = () => {
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    window.open(url, '_blank');
+  };
+  document.getElementById('repBtnPrint').onclick = () => {
+    const fr = document.getElementById('cekReportFrame');
+    if (!fr || !fr.contentWindow) return;
+    const old = document.title;
+    document.title = title; // jadi nama file PDF
+    const restore = () => { document.title = old; window.removeEventListener('afterprint', restore); };
+    window.addEventListener('afterprint', restore);
+    setTimeout(restore, 90000);
+    fr.contentWindow.focus();
+    fr.contentWindow.print();
+  };
+}
+
+function cekReportQuick(tgl, gh) {
+  document.getElementById('repDari').value = tgl;
+  document.getElementById('repSampai').value = tgl;
+  document.getElementById('repGh').value = gh || '';
+  cekReportOpen();
+}
 
 // ============================================
 // DRAFT OTOMATIS — isian + foto/video yang belum terkirim
