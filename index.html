@@ -715,7 +715,7 @@ button.btn-delete:hover { background: #c82333; }
         </div>
 
         <div class="actions">
-          <button type="button" class="btn btn-reset" onclick="resetFormKunjungan()">Reset</button>
+          <button type="button" class="btn btn-reset" onclick="confirmResetForm('kunjungan')">Reset</button>
           <button type="submit" class="btn btn-submit" id="submitBtnKunjungan">Kirim</button>
           <button type="button" class="btn btn-delete" onclick="deleteDataKunjungan()">Hapus Terakhir</button>
         </div>
@@ -780,7 +780,7 @@ button.btn-delete:hover { background: #c82333; }
         </div>
 
         <div class="actions">
-          <button type="button" class="btn btn-reset" onclick="resetFormQc()">Reset</button>
+          <button type="button" class="btn btn-reset" onclick="confirmResetForm('qc')">Reset</button>
           <button type="submit" class="btn btn-submit" id="submitBtnQc">Kirim</button>
           <button type="button" class="btn btn-delete" onclick="deleteDataQc()">Hapus Terakhir</button>
         </div>
@@ -917,7 +917,7 @@ button.btn-delete:hover { background: #c82333; }
           </div>
 
           <div class="actions">
-            <button type="button" class="btn btn-reset" onclick="resetFormCek()">Reset</button>
+            <button type="button" class="btn btn-reset" onclick="confirmResetForm('cek')">Reset</button>
             <button type="submit" class="btn btn-submit" id="submitBtnCek">Kirim</button>
           </div>
 
@@ -1785,6 +1785,7 @@ initDB()
 
     checkVersion(true);
     startVersionCheckInterval();
+    draftInit().then(draftRestoreAll);
   })
   .catch(err => console.error('DB init failed:', err));
 
@@ -1997,6 +1998,7 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
     currentEditId = null;
     currentEditType = null;
 
+    draftClear('kunjungan');
     resetFormKunjungan();
     renderHistory();
     updateQueueBadge();
@@ -2013,6 +2015,7 @@ document.getElementById('beeForm').addEventListener('submit', async e => {
     currentEditId = null;
     currentEditType = null;
 
+    draftClear('kunjungan');
     resetFormKunjungan();
     renderHistory();
     updateQueueBadge();
@@ -2178,6 +2181,7 @@ function mediaBlockHtml(ns, i, withVideo) {
 }
 
 function mediaRefresh(ns, i) {
+  draftSchedule(ns, true, 300);
   const g = document.getElementById(`${ns}-mdx-grid-${i}`);
   const c = document.getElementById(`${ns}-mdx-count-${i}`);
   if (g) g.innerHTML = mediaGridHtml(ns, i);
@@ -2653,6 +2657,7 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     currentEditId = null;
     currentEditType = null;
 
+    draftClear('qc');
     resetFormQc();
     renderHistory();
     updateQueueBadge();
@@ -2670,6 +2675,7 @@ document.getElementById('qcForm').addEventListener('submit', async e => {
     currentEditId = null;
     currentEditType = null;
 
+    draftClear('qc');
     resetFormQc();
     renderHistory();
     updateQueueBadge();
@@ -2853,6 +2859,7 @@ function editHistory(type, localId) {
 
   showToast('Mode Edit ✏️', 'Ubah data lalu klik Update.', 'info', 2500);
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  draftSchedule(type === 'kunjungan' ? 'kunjungan' : 'qc', true, 100);
 }
 
 function activateTab(tabName) {
@@ -4429,6 +4436,7 @@ function resetFormCek() {
 }
 
 function cekPrefill(gh, k) {
+  if (draftHasContent('cek') && !confirm('Ada isian cek yang belum terkirim. Ganti dengan form baru untuk kotak ini?')) return;
   resetFormCek();
   document.getElementById('cekFormBox').open = true;
   document.getElementById('ghCek').value = gh;
@@ -4436,6 +4444,7 @@ function cekPrefill(gh, k) {
   document.getElementById('cekFormBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
   const inp = document.getElementById('cek-pop-' + k);
   if (inp) setTimeout(() => inp.focus({ preventScroll: true }), 350);
+  draftSchedule('cek', true, 100);
 }
 
 function cekEdit(localId) {
@@ -4454,6 +4463,7 @@ function cekEdit(localId) {
   document.getElementById('submitBtnCek').textContent = 'Update Data';
   document.getElementById('cekFormBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
   showToast('Mode Edit ✏️', 'Ubah data lalu klik Update.', 'info', 2500);
+  draftSchedule('cek', true, 100);
 }
 
 async function cekDelete(localId) {
@@ -4579,6 +4589,7 @@ document.getElementById('cekForm').addEventListener('submit', async e => {
   updateQueueBadge();
   const keepMsg = document.getElementById('statusCek').textContent;
   const keepCls = document.getElementById('statusCek').className;
+  draftClear('cek');
   resetFormCek();
   showStatusCek(keepMsg, keepCls.replace('status ', ''));
   renderCekTab();
@@ -4586,6 +4597,295 @@ document.getElementById('cekForm').addEventListener('submit', async e => {
 
 cekLoadSettingsUI();
 resetFormCek();
+
+
+// ============================================
+// DRAFT OTOMATIS — isian + foto/video yang belum terkirim
+// Disimpan ke IndexedDB terpisah (BeeDraftDB) supaya selamat dari
+// refresh / aplikasi ditutup / tab di-kill OS. Dihapus saat Kirim/Reset.
+// ============================================
+
+const DRAFT_CFG = {
+  kunjungan: { formId: 'beeForm', dynId: null,           ghId: 'gh',    tab: 'tab-kunjungan', label: 'Kunjungan', media: false },
+  qc:        { formId: 'qcForm',  dynId: 'qcKotakList',  ghId: 'ghQc',  tab: 'tab-qc',        label: 'QC Koloni', media: true },
+  cek:       { formId: 'cekForm', dynId: 'cekKotakList', ghId: 'ghCek', tab: 'tab-cek',       label: 'Cek',       media: true }
+};
+const DRAFT_NS = Object.keys(DRAFT_CFG);
+// isian yang selalu terisi otomatis (tidak dihitung sebagai "sudah diisi user")
+const DRAFT_IGNORE = /^(tanggal|waktu)(Qc|Cek)?$|^(gh|ghQc|ghCek)$|^cek-(zona|bay)-\d+$|^kotak\d+_(zona|bay)$/;
+
+let draftDb = null;
+let draftReady = false;
+let draftRestoring = false;
+let draftWarned = false;
+const draftTimers = {};
+const draftMediaDirty = {};
+
+function draftOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('BeeDraftDB', 1);
+    req.onupgradeneeded = e => { if (!e.target.result.objectStoreNames.contains('drafts')) e.target.result.createObjectStore('drafts'); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function draftPut(key, val) {
+  return new Promise((resolve, reject) => {
+    const tx = draftDb.transaction('drafts', 'readwrite');
+    tx.objectStore('drafts').put(val, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+function draftGet(key) {
+  return new Promise((resolve, reject) => {
+    const req = draftDb.transaction('drafts', 'readonly').objectStore('drafts').get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function draftDel(key) {
+  return new Promise(resolve => {
+    try {
+      const tx = draftDb.transaction('drafts', 'readwrite');
+      tx.objectStore('drafts').delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
+    } catch (e) { resolve(); }
+  });
+}
+
+// ---- kunci elemen (id, atau id induk + urutan untuk checkbox tanpa id) ----
+function draftKey(el) {
+  if (el.id) return el.id;
+  const host = el.closest('[id]');
+  if (!host) return null;
+  const sibs = [...host.querySelectorAll('input,select,textarea')].filter(x => !x.id);
+  return host.id + ':' + sibs.indexOf(el);
+}
+function draftFind(key) {
+  const direct = document.getElementById(key);
+  if (direct) return direct;
+  const i = key.lastIndexOf(':');
+  if (i < 0) return null;
+  const host = document.getElementById(key.slice(0, i));
+  if (!host) return null;
+  return [...host.querySelectorAll('input,select,textarea')].filter(x => !x.id)[parseInt(key.slice(i + 1), 10)] || null;
+}
+function draftSetVal(el, v) {
+  if (!el) return;
+  if (el.type === 'checkbox') { el.checked = !!v; return; }
+  if (el.tagName === 'SELECT' && v !== '' && ![...el.options].some(o => o.value === v)) {
+    const o = document.createElement('option'); o.value = v; o.textContent = v; el.appendChild(o);
+  }
+  el.value = v;
+}
+function draftFields(ns) {
+  const c = DRAFT_CFG[ns];
+  const form = document.getElementById(c.formId);
+  const dyn = c.dynId ? document.getElementById(c.dynId) : null;
+  const out = [];
+  form.querySelectorAll('input,select,textarea').forEach(el => {
+    if (['file', 'button', 'submit'].includes(el.type)) return;
+    const key = draftKey(el);
+    if (!key) return;
+    const late = (dyn && dyn.contains(el)) || /^row-bay\d+$/.test(el.id);
+    out.push({ key, late, ignore: DRAFT_IGNORE.test(key), v: el.type === 'checkbox' ? el.checked : el.value });
+  });
+  return out;
+}
+
+function draftHasMedia(ns) {
+  if (!DRAFT_CFG[ns].media) return false;
+  return Object.values(mediaState[ns] || {}).some(o => (o.image && o.image.length) || (o.video && o.video.length));
+}
+function draftHasContent(ns) {
+  if (draftHasMedia(ns)) return true;
+  if (draftFields(ns).some(f => !f.ignore && (f.v === true || (f.v !== false && String(f.v).trim() !== '')))) return true;
+  if (ns === 'kunjungan' && Object.values(bays).some(n => n > 0)) return true;
+  return false;
+}
+
+function draftCollect(ns) {
+  const f = draftFields(ns);
+  const snap = {
+    savedAt: Date.now(),
+    gh: document.getElementById(DRAFT_CFG[ns].ghId).value,
+    fields: {}, late: {}
+  };
+  f.forEach(x => { (x.late ? snap.late : snap.fields)[x.key] = x.v; });
+  if (ns === 'kunjungan') {
+    snap.bays = { ...bays };
+    if (currentEditType === 'kunjungan' && currentEditId) snap.edit = { id: currentEditId, type: 'kunjungan', key: editOriginalKey, extra: editExtra };
+  } else if (ns === 'qc') {
+    if (currentEditType === 'qc' && currentEditId) snap.edit = { id: currentEditId, type: 'qc', key: editOriginalKey, extra: editExtra };
+  } else if (ns === 'cek') {
+    if (cekEditId) snap.edit = { id: cekEditId, key: cekEditKey, extra: cekEditExtra };
+  }
+  return snap;
+}
+function draftCollectMedia(ns) {
+  const out = {};
+  Object.entries(mediaState[ns] || {}).forEach(([i, o]) => {
+    const image = (o.image || []).map(m => m.src), video = (o.video || []).map(m => m.src);
+    if (image.length || video.length) out[i] = { image, video };
+  });
+  return out;
+}
+
+function draftInfo(ns, on) {
+  const el = document.getElementById('draftInfo-' + ns);
+  if (!el) return;
+  if (!on) { el.style.display = 'none'; return; }
+  const d = new Date();
+  el.textContent = '💾 Draft tersimpan otomatis · ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  el.style.display = '';
+}
+
+async function draftSave(ns) {
+  clearTimeout(draftTimers[ns]); draftTimers[ns] = null;
+  if (draftRestoring || !draftReady) return;
+  try {
+    if (!draftHasContent(ns)) {
+      draftMediaDirty[ns] = false;
+      await draftDel(ns); await draftDel(ns + ':media');
+      draftInfo(ns, false);
+      return;
+    }
+    await draftPut(ns, draftCollect(ns));
+    if (DRAFT_CFG[ns].media && draftMediaDirty[ns]) {
+      draftMediaDirty[ns] = false;
+      const m = draftCollectMedia(ns);
+      if (Object.keys(m).length) await draftPut(ns + ':media', m); else await draftDel(ns + ':media');
+    }
+    draftInfo(ns, true);
+  } catch (e) {
+    console.warn('Draft gagal disimpan:', e);
+    if (!draftWarned) {
+      draftWarned = true;
+      showToast('Draft Gagal Disimpan ⚠️', 'Memori HP penuh? Kirim data lebih cepat supaya foto tidak hilang.', 'error', 6000);
+    }
+  }
+}
+function draftSchedule(ns, media, delay) {
+  if (draftRestoring || !draftReady || !DRAFT_CFG[ns]) return;
+  if (media) draftMediaDirty[ns] = true;
+  clearTimeout(draftTimers[ns]);
+  draftTimers[ns] = setTimeout(() => draftSave(ns), delay === undefined ? 500 : delay);
+}
+function draftClear(ns) {
+  clearTimeout(draftTimers[ns]); draftTimers[ns] = null;
+  draftMediaDirty[ns] = false;
+  if (!draftReady) return;
+  draftDel(ns); draftDel(ns + ':media');
+  draftInfo(ns, false);
+}
+
+function confirmResetForm(ns) {
+  if (draftHasContent(ns) && !confirm('Reset form? Semua isian dan foto yang belum terkirim akan dihapus.')) return;
+  draftClear(ns);
+  ({ kunjungan: resetFormKunjungan, qc: resetFormQc, cek: resetFormCek })[ns]();
+}
+
+// ---- pulihkan ----
+async function draftDataUrlToBlobUrl(src) {
+  try { const b = await (await fetch(src)).blob(); return URL.createObjectURL(b); } catch (e) { return null; }
+}
+
+async function draftApply(ns, snap, media) {
+  const c = DRAFT_CFG[ns];
+  // draft yang sedang mode edit tidak boleh bentrok dengan mode edit lain
+  if (snap.edit && (ns === 'kunjungan' || ns === 'qc') && currentEditType && currentEditType !== ns) return false;
+
+  Object.entries(snap.fields || {}).forEach(([k, v]) => draftSetVal(draftFind(k), v));
+  const gh = snap.gh || '';
+  if (ns === 'kunjungan') updateBayRows(gh);
+  else if (ns === 'qc') renderQcKotak(gh);
+  else renderCekKotak(gh);
+  Object.entries(snap.late || {}).forEach(([k, v]) => draftSetVal(draftFind(k), v));
+
+  if (ns === 'kunjungan' && snap.bays) {
+    Object.keys(bays).forEach(b => { bays[b] = parseInt(snap.bays[b]) || 0; updateBayDisplay(b); });
+  }
+  if (ns === 'qc') updateQcSummary();
+
+  if (c.media && media) {
+    for (const [i, o] of Object.entries(media)) {
+      const st = mediaState[ns][i];
+      if (!st) continue;
+      (o.image || []).forEach(src => st.image.push({ src }));
+      for (const src of (o.video || [])) {
+        const obj = String(src).startsWith('data:') ? await draftDataUrlToBlobUrl(src) : null;
+        st.video.push(obj ? { src, obj } : { src });
+      }
+      mediaRefresh(ns, parseInt(i, 10));
+    }
+  }
+
+  if (snap.edit) {
+    if (ns === 'cek') {
+      cekEditId = snap.edit.id; cekEditKey = snap.edit.key || null; cekEditExtra = snap.edit.extra || {};
+      document.getElementById('editIndicatorCek').classList.add('show');
+      document.getElementById('submitBtnCek').textContent = 'Update Data';
+    } else {
+      currentEditId = snap.edit.id; currentEditType = ns; editOriginalKey = snap.edit.key || null; editExtra = snap.edit.extra || {};
+      document.getElementById(ns === 'qc' ? 'editIndicatorQc' : 'editIndicatorKunjungan').classList.add('show');
+      document.getElementById(ns === 'qc' ? 'submitBtnQc' : 'submitBtnKunjungan').textContent = 'Update Data';
+    }
+  }
+  return true;
+}
+
+async function draftRestoreAll() {
+  if (!draftReady) return;
+  const restored = [];
+  draftRestoring = true;
+  try {
+    for (const ns of DRAFT_NS) {
+      let snap = null, media = null;
+      try { snap = await draftGet(ns); media = await draftGet(ns + ':media'); } catch (e) { continue; }
+      if (!snap) continue;
+      try {
+        if (await draftApply(ns, snap, media)) { restored.push({ ns, at: snap.savedAt || 0 }); draftInfo(ns, true); }
+      } catch (e) { console.warn('Draft gagal dipulihkan:', ns, e); }
+    }
+  } finally {
+    draftRestoring = false;
+  }
+  if (!restored.length) return;
+  restored.sort((a, b) => b.at - a.at);
+  activateTab(DRAFT_CFG[restored[0].ns].tab);
+  const names = restored.map(r => DRAFT_CFG[r.ns].label).join(', ');
+  showToast('Draft Dipulihkan 📝', 'Isian & foto yang belum terkirim sudah dikembalikan (' + names + ').', 'info', 7000);
+}
+
+async function draftInit() {
+  try {
+    draftDb = await draftOpen();
+    draftReady = true;
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  } catch (e) { console.warn('Draft DB tidak tersedia:', e); return; }
+
+  DRAFT_NS.forEach(ns => {
+    const form = document.getElementById(DRAFT_CFG[ns].formId);
+    const info = document.createElement('div');
+    info.id = 'draftInfo-' + ns;
+    info.className = 'qc-hint';
+    info.style.cssText = 'display:none;text-align:center;color:#2d5016;padding:4px 0;';
+    const actions = form.querySelector('.actions');
+    if (actions) actions.parentNode.insertBefore(info, actions); else form.appendChild(info);
+
+    // ketik / pilih / klik (+/−, tombol cepat populasi) → simpan draft isian
+    ['input', 'change', 'click'].forEach(evt => form.addEventListener(evt, () => draftSchedule(ns, false, 500)));
+  });
+
+  // simpan segera saat aplikasi ke background / ditutup
+  const flush = () => DRAFT_NS.forEach(ns => { if (draftTimers[ns]) draftSave(ns); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+  window.addEventListener('pagehide', flush);
+}
 
 // ============================================
 // SERVICE WORKER
