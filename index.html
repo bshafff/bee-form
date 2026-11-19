@@ -935,8 +935,15 @@ button.btn-delete:hover { background: #c82333; }
           <label for="repGh">Greenhouse</label>
           <select id="repGh"><option value="">Semua GH</option><option value="GH 1">GH 1</option><option value="GH 2">GH 2</option></select>
         </div>
-        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:4px 0 8px;"><input type="checkbox" id="repFoto" checked> Sertakan foto</label>
-        <div class="qc-hint">Isi: ringkasan, tabel per kotak (koloni, lokasi, populasi, gula, tanda), dan foto. Foto yang muncul hanya yang sudah terkirim ke Sheet; butuh internet. Setelah pratinjau muncul, tekan <b>Simpan PDF</b>.</div>
+        <div class="form-group">
+          <label for="repMode">Format</label>
+          <select id="repMode">
+            <option value="foto">Foto saja (gambar JPG, mudah dibagikan)</option>
+            <option value="lengkap">Lengkap: tabel + foto (PDF)</option>
+          </select>
+        </div>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:4px 0 8px;"><input type="checkbox" id="repFoto" checked> Sertakan foto (format lengkap)</label>
+        <div class="qc-hint"><b>Foto saja</b>: tiap foto diberi keterangan kotak, koloni, lokasi, dan populasi. Tekan <b>Simpan gambar</b> lalu bagikan atau unduh. <b>Lengkap</b>: ringkasan + tabel, tekan <b>Simpan PDF</b>. Foto yang muncul hanya yang sudah terkirim ke Sheet; butuh internet.</div>
         <div class="actions" style="margin-top:8px;">
           <button type="button" class="btn btn-submit" onclick="cekReportOpen()">Buat laporan</button>
         </div>
@@ -4798,21 +4805,210 @@ function cekReportClose() {
   document.body.style.overflow = '';
 }
 
+function cekReportBatchAt(batches, g, k, tgl) {
+  const c = batches.filter(b => b.gh === g && Number(b.kotak) === k && b.start && b.start <= tgl && (!b.end || tgl <= b.end));
+  c.sort((x, y) => (y.start || '').localeCompare(x.start || ''));
+  return c[0] || null;
+}
+function cekReportLok(r, i, b) {
+  let lz = String(r['kotak' + i + '_zona'] ?? '').trim(), lb = String(r['kotak' + i + '_bay'] ?? '').trim();
+  if (!lz && !lb && b) { lz = b.lokZona || ''; lb = b.lokBay || ''; }
+  if (!lz && !lb && b) { const aw = LOKASI_AWAL[normKoloni(b.koloni)]; if (aw) { lz = String(aw.zona); lb = String(aw.bay); } }
+  return lokasiText({ zona: lz, bay: lb });
+}
+
+// ---- Mode "Foto saja" ----
+function cekPhotoItems(dari, sampai, gh) {
+  const batches = buildBatches();
+  const isHttp = u => /^https?:/.test(u);
+  const out = [];
+  cekReportRows(dari, sampai, gh).forEach(r => {
+    for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+      const fotos = mediaParse(r['kotak' + i + '_foto']).filter(isHttp);
+      const vds = mediaParse(r['kotak' + i + '_video']).filter(isHttp);
+      if (!fotos.length && !vds.length) continue;
+      const b = cekReportBatchAt(batches, r.gh, i, r.tanggal);
+      const base = {
+        gh: r.gh, tgl: r.tanggal, waktu: r.waktu || '', k: i,
+        koloni: b && b.koloni ? b.koloni : '', lok: cekReportLok(r, i, b),
+        pop: cekPop(r['kotak' + i + '_pop']),
+        buruk: String(r['kotak' + i + '_tanda'] || '').split(',').map(x => x.trim()).filter(t => CEK_FLAGS_BURUK.includes(t))
+      };
+      fotos.forEach(src => out.push({ ...base, kind: 'image', src }));
+      vds.forEach(src => out.push({ ...base, kind: 'video', src }));
+    }
+  });
+  return out;
+}
+
+function cekPhotoHtml(items, dari, sampai, gh, title) {
+  const set = cekSettings();
+  const esc = qcEsc;
+  const imgs = items.filter(x => x.kind === 'image');
+  const vids = items.filter(x => x.kind === 'video');
+  const periode = dari === sampai ? repTgl(dari, true) : repTgl(dari) + ' – ' + repTgl(sampai);
+  const figs = imgs.map(it => {
+    const pc = it.pop === null ? '' : (it.pop <= set.ganti ? 'p-bad' : (it.pop <= set.waspada ? 'p-warn' : 'p-ok'));
+    const l2 = [it.lok, repTgl(it.tgl) + (it.waktu ? ' ' + it.waktu : '')].filter(Boolean).join(' · ');
+    return `<figure><img src="${esc(repImgUrl(it.src))}" alt="">
+      <figcaption><div class="l1"><b>${esc(it.gh)} · K${it.k}${it.koloni ? ' · ' + esc(it.koloni) : ''}</b>${it.pop !== null ? `<span class="pop ${pc}">${it.pop}%</span>` : ''}</div>
+      <div class="l2">${esc(l2)}</div>${it.buruk.length ? `<div class="bad">⚠ ${esc(it.buruk.join(', '))}</div>` : ''}</figcaption></figure>`;
+  }).join('');
+  const vlist = vids.map(it => `<li>${esc(it.gh)} K${it.k}${it.koloni ? ' (' + esc(it.koloni) + ')' : ''} · ${esc(repTgl(it.tgl))}: <a href="${esc(it.src)}">${esc(it.src)}</a></li>`).join('');
+  return `<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
+<style>
+@page { size: A4; margin: 10mm; }
+* { box-sizing: border-box; }
+body { font-family: Arial, Helvetica, sans-serif; color: #222; font-size: 12px; margin: 0; padding: 12px; max-width: 820px; margin-left: auto; margin-right: auto; }
+@media print { body { padding: 0; max-width: none; } }
+.head { border-bottom: 3px solid #2d5016; padding-bottom: 6px; margin-bottom: 10px; }
+.head h1 { margin: 0; font-size: 18px; color: #2d5016; }
+.head .sub { color: #555; margin-top: 2px; }
+.figs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+figure { margin: 0; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; page-break-inside: avoid; background: #fff; }
+figure img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #eee; }
+figcaption { padding: 5px 8px 6px; }
+.l1 { display: flex; justify-content: space-between; gap: 6px; font-size: 13px; }
+.l2 { color: #555; font-size: 11px; margin-top: 1px; }
+.bad { color: #c62828; font-size: 11px; margin-top: 1px; font-weight: 700; }
+.pop { font-weight: 700; }
+.p-ok { color: #2e7d32; } .p-warn { color: #e65100; } .p-bad { color: #c62828; }
+.vids { margin-top: 12px; font-size: 11px; word-break: break-all; }
+.vids ul { margin: 2px 0 0 18px; padding: 0; }
+.empty { padding: 30px; text-align: center; color: #888; }
+@media (max-width: 480px) { .figs { gap: 6px; } .l1 { font-size: 12px; } }
+</style></head><body>
+<div class="head"><h1>Foto Cek Koloni Lebah</h1><div class="sub">PT. Agri Wangi Berry · ${esc(gh || 'GH 1 & GH 2')} · ${esc(periode)} · ${imgs.length} foto</div></div>
+${figs ? `<div class="figs">${figs}</div>` : '<div class="empty">Tidak ada foto pada periode ini.</div>'}
+${vlist ? `<div class="vids"><b>Video:</b><ul>${vlist}</ul></div>` : ''}
+</body></html>`;
+}
+
+// Gambar JPG (kolase foto + keterangan) untuk dibagikan. Butuh foto Drive bisa dimuat lewat CORS.
+async function cekPhotoExport(items, title, periode, gh) {
+  const set = cekSettings();
+  const imgs = items.filter(x => x.kind === 'image');
+  const W = 1080, PAD = 24, GAP = 16, COLS = 2, PER = 8, HEAD = 104, CAP = 88;
+  const cw = Math.floor((W - PAD * 2 - GAP) / COLS), ih = Math.round(cw * 3 / 4);
+
+  const loadImg = it => new Promise(res => {
+    const id = mediaDriveId(it.src);
+    const urls = id ? [`https://lh3.googleusercontent.com/d/${id}=w1000`, `https://drive.google.com/thumbnail?id=${id}&sz=w1000`] : [it.src];
+    let n = 0;
+    const next = () => {
+      if (n >= urls.length) return res(null);
+      const im = new Image();
+      im.crossOrigin = 'anonymous';
+      im.onload = () => res(im);
+      im.onerror = next;
+      im.src = urls[n++];
+    };
+    next();
+  });
+
+  const loaded = [];
+  for (let i = 0; i < imgs.length; i += 4) {
+    loaded.push(...await Promise.all(imgs.slice(i, i + 4).map(loadImg)));
+  }
+  if (loaded.some(x => !x)) throw new Error('foto-tidak-bisa-dimuat');
+
+  const pages = Math.ceil(imgs.length / PER);
+  const files = [];
+  for (let pg = 0; pg < pages; pg++) {
+    const part = imgs.slice(pg * PER, pg * PER + PER);
+    const rows = Math.ceil(part.length / COLS);
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = HEAD + rows * (ih + CAP + GAP) + PAD - GAP + 8;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, canvas.height);
+    ctx.fillStyle = '#2d5016'; ctx.fillRect(0, 0, W, 6);
+    ctx.fillStyle = '#2d5016'; ctx.font = 'bold 34px Arial, sans-serif'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText('Foto Cek Koloni Lebah', PAD, 52);
+    ctx.fillStyle = '#555'; ctx.font = '22px Arial, sans-serif';
+    ctx.fillText('PT. Agri Wangi Berry · ' + (gh || 'GH 1 & GH 2') + ' · ' + periode + (pages > 1 ? '  (' + (pg + 1) + '/' + pages + ')' : ''), PAD, 84);
+
+    part.forEach((it, idx) => {
+      const im = loaded[pg * PER + idx];
+      const x = PAD + (idx % COLS) * (cw + GAP);
+      const y = HEAD + Math.floor(idx / COLS) * (ih + CAP + GAP);
+      const ar = cw / ih, iar = im.width / im.height;
+      let sx = 0, sy = 0, sw = im.width, sh = im.height;
+      if (iar > ar) { sw = im.height * ar; sx = (im.width - sw) / 2; } else { sh = im.width / ar; sy = (im.height - sh) / 2; }
+      ctx.drawImage(im, sx, sy, sw, sh, x, y, cw, ih);
+      ctx.strokeStyle = '#dddddd'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, cw - 1, ih + CAP - 1);
+
+      ctx.fillStyle = '#222'; ctx.font = 'bold 24px Arial, sans-serif';
+      let l1 = it.gh + ' · K' + it.k + (it.koloni ? ' · ' + it.koloni : '');
+      ctx.fillText(l1, x + 12, y + ih + 30);
+      if (it.pop !== null) {
+        ctx.fillStyle = it.pop <= set.ganti ? '#c62828' : (it.pop <= set.waspada ? '#e65100' : '#2e7d32');
+        ctx.textAlign = 'right'; ctx.fillText(it.pop + '%', x + cw - 12, y + ih + 30); ctx.textAlign = 'left';
+      }
+      ctx.fillStyle = '#555'; ctx.font = '19px Arial, sans-serif';
+      ctx.fillText([it.lok, repTgl(it.tgl) + (it.waktu ? ' ' + it.waktu : '')].filter(Boolean).join(' · '), x + 12, y + ih + 54);
+      if (it.buruk.length) { ctx.fillStyle = '#c62828'; ctx.font = 'bold 18px Arial, sans-serif'; ctx.fillText('⚠ ' + it.buruk.join(', '), x + 12, y + ih + 74); }
+    });
+
+    const blob = await new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob')), 'image/jpeg', 0.88));
+    const name = title.replace(/\s+/g, '_') + (pages > 1 ? '_' + (pg + 1) : '') + '.jpg';
+    files.push({ name, blob, url: URL.createObjectURL(blob), file: new File([blob], name, { type: 'image/jpeg' }) });
+  }
+  return files;
+}
+
+function cekPhotoShowResult(files, title) {
+  const ov = document.getElementById('cekReportOv');
+  const fr = document.getElementById('cekReportFrame');
+  if (!ov) return;
+  const old = document.getElementById('cekReportImgs'); if (old) old.remove();
+  const box = document.createElement('div');
+  box.id = 'cekReportImgs';
+  box.style.cssText = 'flex:1;overflow:auto;padding:10px;background:#e5e7eb;';
+  const btn = 'border:none;border-radius:6px;padding:10px 12px;font-weight:700;font-size:14px;cursor:pointer;';
+  box.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button type="button" id="repShare" style="${btn}background:#2d5016;color:#fff;flex:1;">📤 Bagikan</button>
+      <button type="button" id="repDl" style="${btn}background:#fff;color:#2d5016;flex:1;">⬇ Unduh${files.length > 1 ? ' (' + files.length + ')' : ''}</button>
+    </div>
+    <div style="font-size:12px;color:#555;text-align:center;margin-bottom:8px;">Atau tekan-tahan gambar untuk menyimpan.</div>` +
+    files.map(f => `<img src="${f.url}" alt="" style="width:100%;max-width:560px;display:block;margin:0 auto 10px;border-radius:6px;background:#fff;">`).join('');
+  if (fr) fr.style.display = 'none';
+  ov.appendChild(box);
+  document.getElementById('repShare').onclick = () => {
+    const fl = files.map(f => f.file);
+    if (navigator.canShare && navigator.canShare({ files: fl })) navigator.share({ files: fl, title }).catch(() => {});
+    else showToast('Tidak Bisa Bagikan', 'Perangkat belum mendukung. Pakai Unduh atau tekan-tahan gambar.', 'error', 4000);
+  };
+  document.getElementById('repDl').onclick = () => files.forEach((f, i) => setTimeout(() => {
+    const a = document.createElement('a'); a.href = f.url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+  }, i * 400));
+}
+
 function cekReportOpen() {
   let dari = document.getElementById('repDari').value;
   let sampai = document.getElementById('repSampai').value;
   const gh = document.getElementById('repGh').value;
   const withFoto = document.getElementById('repFoto').checked;
+  const mode = document.getElementById('repMode').value;
   if (!dari && !sampai) { showToast('Pilih Tanggal', 'Isi tanggal laporan dulu.', 'error', 3000); return; }
   if (!dari) dari = sampai;
   if (!sampai) sampai = dari;
   if (dari > sampai) { const t = dari; dari = sampai; sampai = t; }
 
   const rows = cekReportRows(dari, sampai, gh);
-  if (!rows.length) { showToast('Tidak Ada Data', 'Belum ada data cek di tanggal itu.', 'error', 3500); return; }
+  if (!rows.length) { showToast('Tidak Ada Data', 'Belum ada data cek di tanggal itu.', 'error', 3000); return; }
 
-  const title = 'Laporan Cek Lebah ' + (gh ? gh.replace(' ', '') + ' ' : '') + (dari === sampai ? dari : dari + '_' + sampai);
-  const html = cekReportHtml(dari, sampai, gh, withFoto, title);
+  const periode = dari === sampai ? repTgl(dari) : repTgl(dari) + ' – ' + repTgl(sampai);
+  const isFoto = mode === 'foto';
+  const title = (isFoto ? 'Foto Cek Lebah ' : 'Laporan Cek Lebah ') + (gh ? gh.replace(' ', '') + ' ' : '') + (dari === sampai ? dari : dari + '_' + sampai);
+  let items = [], html;
+  if (isFoto) {
+    items = cekPhotoItems(dari, sampai, gh);
+    if (!items.some(x => x.kind === 'image')) { showToast('Tidak Ada Foto', 'Belum ada foto (yang sudah terkirim) di tanggal itu.', 'error', 3500); return; }
+    html = cekPhotoHtml(items, dari, sampai, gh, title);
+  } else {
+    html = cekReportHtml(dari, sampai, gh, withFoto, title);
+  }
 
   cekReportClose();
   const ov = document.createElement('div');
@@ -4821,9 +5017,9 @@ function cekReportOpen() {
   const btn = 'border:none;border-radius:6px;padding:8px 10px;font-weight:700;font-size:13px;cursor:pointer;';
   ov.innerHTML = `<div style="display:flex;gap:6px;align-items:center;padding:8px 10px;background:#2d5016;color:#fff;">
       <button type="button" id="repBtnClose" style="${btn}background:#fff;color:#2d5016;">← Tutup</button>
-      <div style="flex:1;font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Pratinjau laporan</div>
+      <div style="flex:1;font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Pratinjau ${isFoto ? 'foto' : 'laporan'}</div>
       <button type="button" id="repBtnTab" style="${btn}background:#e0f2fe;color:#0369a1;">↗ Tab baru</button>
-      <button type="button" id="repBtnPrint" style="${btn}background:#fbbf24;color:#222;">🖨️ Simpan PDF</button>
+      <button type="button" id="repBtnPrint" style="${btn}background:#fbbf24;color:#222;">${isFoto ? '🖼️ Simpan gambar' : '🖨️ Simpan PDF'}</button>
     </div>
     <iframe id="cekReportFrame" style="flex:1;border:0;width:100%;background:#fff;"></iframe>`;
   document.body.appendChild(ov);
@@ -4835,7 +5031,19 @@ function cekReportOpen() {
     const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
     window.open(url, '_blank');
   };
-  document.getElementById('repBtnPrint').onclick = () => {
+  document.getElementById('repBtnPrint').onclick = async function () {
+    if (isFoto) {
+      const b = this;
+      b.disabled = true; const label = b.textContent; b.textContent = 'Menyiapkan…';
+      try {
+        const files = await cekPhotoExport(items, title, periode, gh);
+        cekPhotoShowResult(files, title);
+      } catch (e) {
+        console.warn('Export foto gagal:', e);
+        showToast('Gagal Jadi Gambar', 'Foto Drive tidak bisa dimuat langsung. Pakai "Tab baru" lalu screenshot, atau pilih format Lengkap (PDF).', 'error', 6000);
+      } finally { b.disabled = false; b.textContent = label; }
+      return;
+    }
     const fr = document.getElementById('cekReportFrame');
     if (!fr || !fr.contentWindow) return;
     const old = document.title;

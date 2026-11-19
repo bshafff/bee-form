@@ -1,5 +1,5 @@
 {
-  "version": "1.7.0",
+  "version": "1.7.1",
   "released": "2026-11-18",
-  "notes": "Laporan PDF Cek Koloni (pilih tanggal, lengkap dengan foto) + draft otomatis isian/foto."
+  "notes": "Laporan Cek: mode Foto saja (gambar JPG untuk dibagikan) + format lengkap PDF + draft otomatis."
 }
