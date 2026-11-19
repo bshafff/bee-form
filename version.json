@@ -1,5 +1,5 @@
 {
-  "version": "1.7.1",
+  "version": "1.7.2",
   "released": "2026-11-18",
-  "notes": "Laporan Cek: mode Foto saja (gambar JPG untuk dibagikan) + format lengkap PDF + draft otomatis."
+  "notes": "Laporan Cek: satu laporan lengkap, bisa disimpan sebagai gambar (JPG) atau PDF + draft otomatis."
 }
