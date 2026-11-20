@@ -1,5 +1,5 @@
 {
-  "version": "1.7.2",
+  "version": "1.8.0",
   "released": "2026-11-18",
-  "notes": "Laporan Cek: satu laporan lengkap, bisa disimpan sebagai gambar (JPG) atau PDF + draft otomatis."
+  "notes": "Laporan Tren: satu gambar/PDF (harian, mingguan, bulanan, per batch) + laporan Cek + draft otomatis."
 }

@@ -1004,6 +1004,31 @@ button.btn-delete:hover { background: #c82333; }
     ===================================== -->
     <div id="tab-trend" class="tab-content">
 
+      <details class="bt-box" id="trepBox" style="margin-bottom:12px;">
+        <summary>📄 Laporan Tren: harian / mingguan / bulanan / per batch</summary>
+        <div class="form-group" style="margin-top:12px;">
+          <label for="trepJenis">Jenis laporan</label>
+          <select id="trepJenis" onchange="trepJenisChange()">
+            <option value="harian">Harian</option>
+            <option value="mingguan" selected>Mingguan (7 hari)</option>
+            <option value="bulanan">Bulanan</option>
+            <option value="batch">Per batch koloni</option>
+          </select>
+        </div>
+        <div class="row-inputs">
+          <div class="form-group" id="trepTglWrap"><label for="trepTgl" id="trepTglLbl">Sampai tanggal</label><input type="date" id="trepTgl"></div>
+          <div class="form-group" id="trepGhWrap">
+            <label for="trepGh">Greenhouse</label>
+            <select id="trepGh"><option value="">Semua GH</option><option value="GH 1">GH 1</option><option value="GH 2">GH 2</option></select>
+          </div>
+        </div>
+        <div class="form-group" id="trepBatchWrap" style="display:none;"><label for="trepBatch">Batch</label><select id="trepBatch"></select></div>
+        <div class="qc-hint" id="trepHint"></div>
+        <div class="actions" style="margin-top:8px;">
+          <button type="button" class="btn btn-submit" onclick="trepOpen()">Buat laporan</button>
+        </div>
+      </details>
+
       <div class="filter-bar">
         <div class="filter-group">
           <label>Dari Tanggal</label>
@@ -3660,6 +3685,7 @@ function renderTrendDashboard() {
   renderBarChart(filteredData, ghFilter);
   renderHourChart(filteredData, ghFilter, metric);
   renderWeatherDashboard(filteredData, ghFilter);
+  trepInit();
 }
 
 // ============================================
@@ -5128,6 +5154,679 @@ function cekReportQuick(tgl, gh) {
   document.getElementById('repSampai').value = tgl;
   document.getElementById('repGh').value = gh || '';
   cekReportOpen();
+}
+
+
+// ============================================
+// LAPORAN TREN KUNJUNGAN (satu gambar JPG / PDF)
+// Digambar langsung di canvas: ringkasan, kesimpulan otomatis, grafik tren,
+// tabel Bay × hari/minggu, cuaca, jam, kejadian, dan kondisi koloni (data Cek).
+// ============================================
+const TREP_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const TREP_HINT = {
+  harian: 'Rincian tiap sesi di hari itu + pola jam dan cuaca. Dibandingkan hari sebelumnya.',
+  mingguan: '7 hari sampai tanggal yang dipilih. Dibandingkan 7 hari sebelumnya.',
+  bulanan: 'Seluruh bulan dari tanggal yang dipilih. Dibandingkan bulan sebelumnya.',
+  batch: 'Dari mulai batch sampai selesai (atau hari ini), plus kondisi koloni batch itu. Kunjungan dihitung per GH, tidak bisa dipisah per koloni.'
+};
+
+function trepAdd(iso, n) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function trepMonday(iso) { const d = new Date(iso + 'T00:00:00Z'); return trepAdd(iso, -((d.getUTCDay() + 6) % 7)); }
+function trepMonthRange(iso) {
+  const y = +iso.slice(0, 4), m = +iso.slice(5, 7), last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const mm = String(m).padStart(2, '0');
+  return [`${y}-${mm}-01`, `${y}-${mm}-${String(last).padStart(2, '0')}`];
+}
+function trepKunjungan(dari, sampai, gh) {
+  return (localHistory.kunjungan || []).filter(i => i.tanggal && i.tanggal >= dari && i.tanggal <= sampai && (!gh || i.gh === gh));
+}
+function trepAgg(items) {
+  let total = 0; const days = new Set();
+  items.forEach(it => { total += getTotalPerItem(it); days.add(it.tanggal); });
+  return { sess: items.length, total, days: days.size, avg: items.length ? +(total / items.length).toFixed(1) : 0 };
+}
+
+function trepInit() {
+  const t = document.getElementById('trepTgl');
+  if (!t) return;
+  if (!t.value) { t.value = getLocalDate(); }
+  if (!document.getElementById('trepHint').textContent) trepJenisChange();
+}
+function trepJenisChange() {
+  const j = document.getElementById('trepJenis').value;
+  document.getElementById('trepHint').textContent = TREP_HINT[j];
+  document.getElementById('trepTglLbl').textContent = j === 'harian' ? 'Tanggal' : (j === 'mingguan' ? 'Sampai tanggal' : 'Bulan (pilih tanggal mana saja)');
+  document.getElementById('trepTglWrap').style.display = j === 'batch' ? 'none' : '';
+  document.getElementById('trepGhWrap').style.display = j === 'batch' ? 'none' : '';
+  document.getElementById('trepBatchWrap').style.display = j === 'batch' ? '' : 'none';
+  if (j === 'batch') {
+    const map = {};
+    buildBatches().forEach(b => {
+      if (!b.batch || !b.start) return;
+      const k = b.gh + '|' + b.batch;
+      const o = map[k] || (map[k] = { gh: b.gh, batch: b.batch, start: String(b.start).slice(0, 10), n: 0, ongoing: false });
+      o.n++; if (String(b.start).slice(0, 10) < o.start) o.start = String(b.start).slice(0, 10);
+      if (!b.end) o.ongoing = true;
+    });
+    const list = Object.values(map).sort((a, b) => b.start.localeCompare(a.start));
+    const sel = document.getElementById('trepBatch');
+    sel.innerHTML = list.length
+      ? list.map(o => `<option value="${qcEsc(o.gh + '|' + o.batch)}">${qcEsc(o.gh + ' · ' + o.batch + ' (mulai ' + repTgl(o.start) + ', ' + o.n + ' kotak' + (o.ongoing ? ' · berjalan' : '') + ')')}</option>`).join('')
+      : '<option value="">Belum ada data batch</option>';
+  }
+}
+
+// ---- model data ----
+function trepModel(jenis, tgl, ghSel, batchKey) {
+  const today = getLocalDate();
+  const batches = buildBatches();
+  let dari, sampai, gh = ghSel || '', label, prevR = null, kotakSet = null, batchInfo = null;
+  if (jenis === 'harian') {
+    dari = sampai = tgl; label = 'Harian · ' + repTgl(tgl, true);
+    const pd = trepAdd(tgl, -1); prevR = { dari: pd, sampai: pd, label: 'hari sebelumnya (' + repTgl(pd) + ')' };
+  } else if (jenis === 'mingguan') {
+    sampai = tgl; dari = trepAdd(tgl, -6); label = 'Mingguan · ' + repTgl(dari) + ' – ' + repTgl(sampai);
+    prevR = { dari: trepAdd(dari, -7), sampai: trepAdd(dari, -1), label: '7 hari sebelumnya' };
+  } else if (jenis === 'bulanan') {
+    [dari, sampai] = trepMonthRange(tgl);
+    label = 'Bulanan · ' + TREP_BULAN[+dari.slice(5, 7) - 1] + ' ' + dari.slice(0, 4);
+    const pr = trepMonthRange(trepAdd(dari, -1)); prevR = { dari: pr[0], sampai: pr[1], label: 'bulan sebelumnya' };
+  } else {
+    const parts = String(batchKey || '').split('|');
+    const bl = batches.filter(b => b.gh === parts[0] && String(b.batch) === parts[1] && b.start);
+    if (!bl.length) return null;
+    gh = parts[0]; kotakSet = new Set(bl.map(b => Number(b.kotak)));
+    dari = bl.map(b => String(b.start).slice(0, 10)).sort()[0];
+    const ongoing = bl.some(b => !b.end);
+    sampai = ongoing ? today : bl.map(b => String(b.end).slice(0, 10)).sort().slice(-1)[0];
+    if (sampai < dari) sampai = dari;
+    label = 'Per batch · ' + parts[1];
+    batchInfo = { batch: parts[1], n: bl.length, ongoing, umur: daysBetween(dari, sampai) };
+  }
+
+  const set = cekSettings();
+  const items = trepKunjungan(dari, sampai, gh);
+  const agg = trepAgg(items);
+  const prev = prevR ? { ...prevR, ...trepAgg(trepKunjungan(prevR.dari, prevR.sampai, gh)) } : null;
+
+  // cek koloni pada periode
+  const cekRows = (localHistory.cek || []).filter(r => r.tanggal && r.tanggal >= dari && r.tanggal <= sampai && (!gh || r.gh === gh))
+    .sort((a, b) => ((a.tanggal || '') + (a.waktu || '')).localeCompare((b.tanggal || '') + (b.waktu || '')));
+  const popDayList = {}, kol = {};
+  const allPops = [];
+  cekRows.forEach(r => {
+    for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+      if (kotakSet && !kotakSet.has(i)) continue;
+      const pop = cekPop(r['kotak' + i + '_pop']);
+      const gula = cekIsGula(r['kotak' + i + '_gula']);
+      const tanda = String(r['kotak' + i + '_tanda'] || '').split(',').map(x => x.trim()).filter(Boolean);
+      if (pop === null && !gula && !tanda.length) continue;
+      const key = r.gh + '|' + i;
+      const o = kol[key] || (kol[key] = { gh: r.gh, k: i, pops: [], gula: 0, buruk: new Set(), lastBuruk: [], lastTgl: '' });
+      if (pop !== null) { o.pops.push(pop); allPops.push(pop); (popDayList[r.tanggal] = popDayList[r.tanggal] || []).push(pop); }
+      if (gula) o.gula++;
+      tanda.filter(t => CEK_FLAGS_BURUK.includes(t)).forEach(t => o.buruk.add(t));
+      o.lastTgl = r.tanggal;
+    }
+  });
+  const colony = Object.values(kol).sort((a, b) => a.gh.localeCompare(b.gh) || a.k - b.k).map(o => {
+    const b = cekReportBatchAt(batches, o.gh, o.k, o.lastTgl || sampai);
+    const first = o.pops.length ? o.pops[0] : null, last = o.pops.length ? o.pops[o.pops.length - 1] : null;
+    return { gh: o.gh, k: o.k, koloni: b && b.koloni ? b.koloni : '', batch: b ? String(b.batch) : '', first, last, n: o.pops.length,
+      delta: o.pops.length >= 2 ? last - first : null, gula: o.gula, buruk: [...o.buruk] };
+  });
+  const popDays = Object.keys(popDayList).sort();
+  const popAvg = d => Math.round(popDayList[d].reduce((a, b) => a + b, 0) / popDayList[d].length);
+
+  // tren harian
+  const chartFrom = jenis === 'harian' ? trepAdd(dari, -6) : dari;
+  const chartItems = jenis === 'harian' ? trepKunjungan(chartFrom, sampai, gh) : items;
+  const popChart = {};
+  (localHistory.cek || []).filter(r => r.tanggal && r.tanggal >= chartFrom && r.tanggal <= sampai && (!gh || r.gh === gh)).forEach(r => {
+    for (let i = 1; i <= QC_MAX_KOTAK; i++) {
+      if (kotakSet && !kotakSet.has(i)) continue;
+      const pv = cekPop(r['kotak' + i + '_pop']);
+      if (pv !== null) (popChart[r.tanggal] = popChart[r.tanggal] || []).push(pv);
+    }
+  });
+  const chartEnd = sampai > today ? (dari > today ? dari : today) : sampai;
+  const dates = []; for (let d = chartFrom, n = 0; d <= chartEnd && n < 130; d = trepAdd(d, 1), n++) dates.push(d);
+  const byDay = {};
+  chartItems.forEach(it => { const o = byDay[it.tanggal] || (byDay[it.tanggal] = { n: 0, sum: 0 }); o.n++; o.sum += getTotalPerItem(it); });
+  const dayAvg = dates.map(d => byDay[d] ? +(byDay[d].sum / byDay[d].n).toFixed(1) : null);
+  const dayPop = dates.map(d => popChart[d] ? Math.round(popChart[d].reduce((a, b) => a + b, 0) / popChart[d].length) : null);
+  const evMap = {};
+  items.forEach(it => { if (it.kejadian) { const k = it.tanggal + '|' + it.gh + '|' + it.kejadian; evMap[k] = { tgl: it.tanggal, gh: it.gh, text: String(it.kejadian) }; } });
+  const events = Object.values(evMap).sort((a, b) => a.tgl.localeCompare(b.tgl));
+  const evDates = new Set(chartItems.filter(it => it.kejadian).map(it => it.tanggal));
+
+  // matriks bay × kolom
+  const nBay = gh === 'GH 1' ? 10 : BAY_MAX;
+  let cols = [], bucketOf = null;
+  if (jenis === 'mingguan') {
+    cols = dates.map(d => ({ key: d, l1: d.slice(8), l2: REP_BULAN[+d.slice(5, 7) - 1] }));
+    bucketOf = d => d;
+  } else if (jenis !== 'harian') {
+    const first = trepMonday(dari), last = trepMonday(chartEnd);
+    for (let m = first; m <= last; m = trepAdd(m, 7)) {
+      const a = m < dari ? dari : m, bb = trepAdd(m, 6) > chartEnd ? chartEnd : trepAdd(m, 6);
+      cols.push({ key: m, l1: a.slice(8) + '–' + bb.slice(8), l2: jenis === 'batch' ? 'hari ' + (daysBetween(dari, a) + 1) + '–' + (daysBetween(dari, bb) + 1) : REP_BULAN[+bb.slice(5, 7) - 1] });
+    }
+    bucketOf = d => trepMonday(d);
+    if (cols.length > 12) cols = cols.slice(-12);
+  }
+  const cell = {}; // bay -> colKey -> {s,n}
+  const bayAll = Array.from({ length: nBay }, () => ({ s: 0, n: 0 }));
+  const colSess = {}, colTot = {};
+  items.forEach(it => {
+    const ck = bucketOf ? bucketOf(it.tanggal) : null;
+    if (ck) { colSess[ck] = (colSess[ck] || 0) + 1; colTot[ck] = (colTot[ck] || 0) + getTotalPerItem(it); }
+    for (let i = 1; i <= nBay; i++) {
+      if (i > (GH_BAY_COUNT[it.gh] || 10)) continue;
+      const v = bayNum(it['bay' + i]);
+      bayAll[i - 1].s += v; bayAll[i - 1].n++;
+      if (ck) { const o = (cell[i] = cell[i] || {})[ck] || (cell[i][ck] = { s: 0, n: 0 }); o.s += v; o.n++; }
+    }
+  });
+  const bayAvg = bayAll.map(o => o.n ? +(o.s / o.n).toFixed(1) : null);
+
+  // per jam
+  const hr = {};
+  items.forEach(it => { const h = parseInt(String(it.waktu || '').split(':')[0], 10); if (!isNaN(h) && h >= 0 && h < 24) (hr[h] = hr[h] || []).push(getTotalPerItem(it)); });
+  const hrs = Object.keys(hr).map(Number).sort((a, b) => a - b);
+  const hours = [];
+  if (hrs.length) for (let h = hrs[0]; h <= hrs[hrs.length - 1]; h++) {
+    const a = hr[h];
+    hours.push({ label: String(h).padStart(2, '0') + '–' + String((h + 1) % 24).padStart(2, '0'), avg: a ? +(a.reduce((x, y) => x + y, 0) / a.length).toFixed(1) : null, n: a ? a.length : 0 });
+  }
+
+  // cuaca
+  const wx = {};
+  items.forEach(it => {
+    const w = String(it.cuaca || '').toLowerCase().trim(); if (!w) return;
+    const o = wx[w] || (wx[w] = { w, n: 0, sum: 0, list: [], suhu: [] });
+    const t = getTotalPerItem(it); o.n++; o.sum += t; o.list.push(t);
+    const sv = parseFloat(normalizeSuhu(it.suhu)); if (!isNaN(sv)) o.suhu.push(sv);
+  });
+  const weather = [...WEATHER_ORDER.filter(w => wx[w]), ...Object.keys(wx).filter(w => !WEATHER_ORDER.includes(w))].map(w => {
+    const o = wx[w];
+    return { w, label: WEATHER_LABEL[w] || w, n: o.n, sum: o.sum, avg: +(o.sum / o.n).toFixed(1), sd: sdOf(o.list), suhu: o.suhu.length ? +(o.suhu.reduce((a, b) => a + b, 0) / o.suhu.length).toFixed(1) : null };
+  });
+
+  // rincian sesi (harian)
+  const sessions = jenis === 'harian'
+    ? items.slice().sort((a, b) => String(a.waktu || '').localeCompare(String(b.waktu || ''))).map(it => ({
+      waktu: it.waktu || '', gh: it.gh, cuaca: WEATHER_LABEL[String(it.cuaca || '').toLowerCase().trim()] || it.cuaca || '', suhu: normalizeSuhu(it.suhu),
+      total: getTotalPerItem(it), bays: Array.from({ length: nBay }, (_, i) => (i + 1) > (GH_BAY_COUNT[it.gh] || 10) ? null : bayNum(it['bay' + (i + 1)]))
+    })) : [];
+
+  // kesimpulan otomatis
+  const ins = [];
+  if (agg.sess) ins.push(`${agg.total} kunjungan dalam ${agg.sess} sesi (${agg.days} hari); rata² ${agg.avg} per sesi.`);
+  else ins.push('Tidak ada sesi kunjungan lebah pada periode ini.');
+  if (prev) {
+    if (prev.sess && prev.avg > 0 && agg.sess) {
+      const d = (agg.avg - prev.avg) / prev.avg * 100;
+      ins.push(`Dibanding ${prev.label} (rata² ${prev.avg}/sesi, ${prev.sess} sesi), kunjungan ${d >= 0 ? 'naik' : 'turun'} ${Math.abs(d).toFixed(0)}%` + (Math.min(agg.sess, prev.sess) < 3 ? ', tapi sesinya masih sedikit sehingga belum kuat untuk disimpulkan.' : '.'));
+    } else if (agg.sess) ins.push(`Belum ada data ${prev.label} untuk dibandingkan.`);
+  }
+  const bv = bayAvg.map((v, i) => ({ v, i: i + 1 })).filter(x => x.v !== null);
+  if (bv.length >= 2) {
+    const hi = bv.reduce((a, b) => b.v > a.v ? b : a), lo = bv.reduce((a, b) => b.v < a.v ? b : a);
+    if (hi.v > lo.v) ins.push(`Bay teramai: Bay ${hi.i} (${hi.v}/sesi); tersepi: Bay ${lo.i} (${lo.v}/sesi).`);
+  }
+  const hv = hours.filter(h => h.avg !== null);
+  if (hv.length >= 2) {
+    const pk = hv.reduce((a, b) => b.avg > a.avg ? b : a);
+    ins.push(`Jam teraktif: ${pk.label} (rata² ${pk.avg}/sesi, ${pk.n} sesi)` + (pk.n < 5 ? ', belum cukup untuk disimpulkan.' : '.'));
+  }
+  if (weather.length >= 2) {
+    const hi = weather.reduce((a, b) => b.avg > a.avg ? b : a), lo = weather.reduce((a, b) => b.avg < a.avg ? b : a);
+    if (hi.avg > lo.avg) ins.push(`Cuaca terbaik: ${hi.label} (${hi.avg}/sesi, ${hi.n} sesi); terendah: ${lo.label} (${lo.avg}/sesi, ${lo.n} sesi)` + (Math.min(hi.n, lo.n) < 5 ? ', sesi masih sedikit.' : '.'));
+  }
+  if (popDays.length >= 2) {
+    const a = popAvg(popDays[0]), b = popAvg(popDays[popDays.length - 1]), d = b - a;
+    ins.push(`Populasi koloni rata² ${a}% (${repTgl(popDays[0])}) → ${b}% (${repTgl(popDays[popDays.length - 1])}), ${d === 0 ? 'tidak berubah' : (d > 0 ? 'naik ' : 'turun ') + Math.abs(d) + ' poin'}.`);
+  } else if (popDays.length === 1) ins.push(`Populasi koloni rata² ${popAvg(popDays[0])}% (cek ${repTgl(popDays[0])}).`);
+  const lowCol = colony.filter(c => (c.last !== null && c.last <= set.waspada) || c.buruk.length);
+  if (lowCol.length) ins.push('Kotak perlu perhatian: ' + lowCol.map(c => `${c.gh} K${c.k}${c.koloni ? ' (' + c.koloni + ')' : ''}${c.last !== null ? ' ' + c.last + '%' : ''}`).join(', ') + '.');
+  if (batchInfo) ins.unshift(`Batch ${batchInfo.batch} (${gh}): ${batchInfo.n} kotak, umur ${batchInfo.umur} hari${batchInfo.ongoing ? ', masih berjalan' : ', sudah selesai'}.`);
+
+  const allPopAvg = allPops.length ? Math.round(allPops.reduce((a, b) => a + b, 0) / allPops.length) : null;
+  const delta = (prev && prev.sess && prev.avg > 0 && agg.sess) ? (agg.avg - prev.avg) / prev.avg * 100 : null;
+  const now = new Date();
+  return {
+    jenis, dari, sampai, gh, label, batchInfo, set, agg, prev, delta, items, nBay, cols, cell, colSess, colTot, bayAvg, hours, weather, sessions,
+    dates, dayAvg, dayPop, evDates, events, colony, ins, allPopAvg, hasCek: cekRows.length > 0,
+    sub: 'PT. Agri Wangi Berry · ' + (gh || 'GH 1 & GH 2') + ' · ' + (dari === sampai ? repTgl(dari, true) : repTgl(dari) + ' – ' + repTgl(sampai)),
+    stamp: repTgl(today) + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0')
+  };
+}
+
+// ---- alat gambar ----
+function trepNice(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))), n = v / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
+function trepFmt(v) { return String(parseFloat(v.toFixed(2))); }
+
+function trepChart(ctx, F, x, y, w, h, o) {
+  const padL = 58, padR = o.right ? 58 : 18, padT = 14, padB = 70;
+  const px = x + padL, py = y + padT, pw = w - padL - padR, ph = h - padT - padB;
+  const n = o.labels.length;
+  const xAt = i => n === 1 ? px + pw / 2 : px + pw * i / (n - 1);
+  const lvals = o.series.filter(s => s.axis !== 'r').flatMap(s => s.data.filter(v => v !== null));
+  const lmax = trepNice(Math.max(1, ...lvals) * (o.events && o.events.length ? 1.15 : 1.05));
+  const yL = v => py + ph - ph * v / lmax;
+  const yR = v => py + ph - ph * v / 100;
+  ctx.lineWidth = 1; ctx.font = F(15); ctx.fillStyle = '#666'; ctx.strokeStyle = '#e6e6e6';
+  for (let t = 0; t <= 4; t++) {
+    const yy = py + ph - ph * t / 4;
+    ctx.beginPath(); ctx.moveTo(px, yy); ctx.lineTo(px + pw, yy); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.fillText(trepFmt(lmax * t / 4), px - 8, yy + 5);
+    if (o.right) { ctx.textAlign = 'left'; ctx.fillText(String(25 * t), px + pw + 8, yy + 5); }
+  }
+  ctx.textAlign = 'center';
+  const step = Math.max(1, Math.ceil(n / 10));
+  o.labels.forEach((lb, i) => { if (i % step === 0 || i === n - 1) ctx.fillText(lb, xAt(i), py + ph + 24); });
+  ctx.strokeStyle = '#999'; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py + ph); ctx.lineTo(px + pw, py + ph); ctx.stroke();
+  o.series.forEach(s => {
+    const Y = s.axis === 'r' ? yR : yL;
+    ctx.strokeStyle = s.color; ctx.fillStyle = s.color; ctx.lineWidth = s.axis === 'r' ? 2.5 : 3;
+    ctx.setLineDash(s.dash ? [8, 6] : []);
+    ctx.beginPath(); let started = false;
+    s.data.forEach((v, i) => { if (v === null) return; if (!started) { ctx.moveTo(xAt(i), Y(v)); started = true; } else ctx.lineTo(xAt(i), Y(v)); });
+    ctx.stroke(); ctx.setLineDash([]);
+    s.data.forEach((v, i) => { if (v === null) return; ctx.beginPath(); ctx.arc(xAt(i), Y(v), s.axis === 'r' ? 6 : 5, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); });
+  });
+  if (o.events) o.events.forEach(i => {
+    const cx = xAt(i), cy = py + 12;
+    ctx.fillStyle = '#7c3aed'; ctx.beginPath(); ctx.moveTo(cx, cy - 9); ctx.lineTo(cx + 8, cy + 6); ctx.lineTo(cx - 8, cy + 6); ctx.closePath(); ctx.fill();
+  });
+  // legenda
+  let lx = px, ly = y + h - 8;
+  ctx.textAlign = 'left'; ctx.font = F(16);
+  const leg = o.series.map(s => ({ c: s.color, t: s.name, dash: s.dash })).concat(o.events && o.events.length ? [{ c: '#7c3aed', t: 'Kejadian (semprot/pruning/koloni)', tri: true }] : []);
+  leg.forEach(l => {
+    ctx.fillStyle = l.c; ctx.strokeStyle = l.c; ctx.lineWidth = 3;
+    if (l.tri) { ctx.beginPath(); ctx.moveTo(lx + 8, ly - 14); ctx.lineTo(lx + 16, ly - 1); ctx.lineTo(lx, ly - 1); ctx.closePath(); ctx.fill(); }
+    else { ctx.setLineDash(l.dash ? [6, 4] : []); ctx.beginPath(); ctx.moveTo(lx, ly - 7); ctx.lineTo(lx + 22, ly - 7); ctx.stroke(); ctx.setLineDash([]); }
+    ctx.fillStyle = '#444'; ctx.fillText(l.t, lx + 28, ly - 1);
+    lx += 28 + ctx.measureText(l.t).width + 26;
+  });
+}
+
+function trepBars(ctx, F, x, y, w, h, o) {
+  const padL = 50, padT = 22, padB = 34, padR = 10;
+  const px = x + padL, py = y + padT, pw = w - padL - padR, ph = h - padT - padB;
+  const vals = o.values.filter(v => v !== null);
+  const max = trepNice(Math.max(1, ...vals) * 1.1);
+  ctx.lineWidth = 1; ctx.font = F(15); ctx.strokeStyle = '#e6e6e6'; ctx.fillStyle = '#666';
+  for (let t = 0; t <= 4; t++) {
+    const yy = py + ph - ph * t / 4;
+    ctx.beginPath(); ctx.moveTo(px, yy); ctx.lineTo(px + pw, yy); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.fillText(trepFmt(max * t / 4), px - 8, yy + 5);
+  }
+  const n = o.labels.length, slot = pw / n, bw = Math.min(64, slot * 0.66);
+  o.values.forEach((v, i) => {
+    const cx = px + slot * i + slot / 2;
+    if (v !== null) {
+      const bh = ph * v / max;
+      ctx.fillStyle = o.colors[i]; ctx.fillRect(cx - bw / 2, py + ph - bh, bw, bh);
+      ctx.fillStyle = '#333'; ctx.font = F(15, true); ctx.textAlign = 'center'; ctx.fillText(trepFmt(v), cx, py + ph - bh - 6);
+    }
+    ctx.fillStyle = '#555'; ctx.font = F(15); ctx.textAlign = 'center'; ctx.fillText(o.labels[i], cx, py + ph + 22);
+  });
+  ctx.strokeStyle = '#999'; ctx.beginPath(); ctx.moveTo(px, py + ph); ctx.lineTo(px + pw, py + ph); ctx.stroke();
+}
+
+// ---- susun blok laporan ----
+function trepBlocks(m, ck) {
+  const { F, wrap, fit } = ck;
+  const W = 1080, PAD = 28, CW = W - PAD * 2, G = '#2d5016';
+  const blocks = [];
+  const info = ck.info;
+  const section = t => blocks.push({ h: 44, keep: true, draw(ctx, y) {
+    ctx.fillStyle = G; ctx.fillRect(PAD, y + 4, 7, 30);
+    ctx.font = F(26, true); ctx.fillText(t, PAD + 18, y + 29);
+  } });
+
+  blocks.push({ h: 118, draw(ctx, y) {
+    ctx.fillStyle = G; ctx.font = F(38, true); ctx.fillText('Laporan Tren Kunjungan Lebah' + (info.total > 1 ? '  (' + info.n + '/' + info.total + ')' : ''), PAD, y + 40);
+    ctx.fillStyle = '#222'; ctx.font = F(24, true); ctx.fillText(fit(ctx, m.label, CW), PAD, y + 74);
+    ctx.fillStyle = '#555'; ctx.font = F(20); ctx.fillText(fit(ctx, m.sub, CW), PAD, y + 100);
+    ctx.fillStyle = G; ctx.fillRect(PAD, y + 110, CW, 4);
+  } });
+
+  const dl = m.delta === null ? '-' : (m.delta >= 0 ? '▲ ' : '▼ ') + Math.abs(m.delta).toFixed(0) + '%';
+  const cards = [
+    { n: String(m.agg.total), l: 'total kunjungan' }, { n: String(m.agg.avg), l: 'rata² / sesi' },
+    { n: String(m.agg.sess), l: 'sesi pengamatan' }, { n: String(m.agg.days), l: 'hari teramati' },
+    { n: dl, l: m.prev ? 'vs ' + (m.jenis === 'harian' ? 'kemarin' : m.jenis === 'mingguan' ? '7 hari lalu' : 'bulan lalu') : 'vs periode lalu', c: m.delta === null ? '#222' : (m.delta >= 0 ? '#2e7d32' : '#e65100') },
+    { n: m.allPopAvg === null ? '-' : m.allPopAvg + '%', l: 'populasi koloni rata²' }
+  ];
+  blocks.push({ h: 96, draw(ctx, y) {
+    const gap = 10, bw = (CW - gap * 5) / 6;
+    cards.forEach((c, i) => {
+      const x = PAD + i * (bw + gap);
+      ctx.fillStyle = '#f6faf0'; ctx.fillRect(x, y, bw, 88);
+      ctx.strokeStyle = '#d7e3c8'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, bw - 1, 87);
+      ctx.textAlign = 'center'; ctx.fillStyle = c.c || G; ctx.font = F(30, true); ctx.fillText(fit(ctx, c.n, bw - 8), x + bw / 2, y + 38);
+      ctx.fillStyle = '#555'; ctx.font = F(15); ctx.fillText(fit(ctx, c.l, bw - 6), x + bw / 2, y + 66);
+      ctx.textAlign = 'left';
+    });
+  } });
+
+  // kesimpulan otomatis
+  {
+    const lines = m.ins.map(t => wrap('• ' + t, CW - 40, F(20)));
+    const h = 22 + 34 + lines.reduce((a, l) => a + l.length * 27, 0) + 10;
+    blocks.push({ h, draw(ctx, y) {
+      ctx.fillStyle = '#fff8e1'; ctx.fillRect(PAD, y, CW, h);
+      ctx.strokeStyle = '#f0b429'; ctx.lineWidth = 2; ctx.strokeRect(PAD + 1, y + 1, CW - 2, h - 2);
+      ctx.fillStyle = '#222'; ctx.font = F(22, true); ctx.fillText('Kesimpulan otomatis', PAD + 18, y + 36);
+      ctx.font = F(20); let yy = y + 42;
+      lines.forEach(l => l.forEach(t => { yy += 27; ctx.fillText(t, PAD + 18, yy - 4); }));
+    } });
+  }
+
+  // tren harian
+  if (m.dates.length && m.agg.sess) {
+    section(m.jenis === 'harian' ? 'Konteks 7 hari terakhir' : 'Tren harian');
+    const series = [{ name: 'Rata² kunjungan / sesi', color: '#2d5016', data: m.dayAvg }];
+    if (m.dayPop.some(v => v !== null)) series.push({ name: 'Populasi koloni rata² (%)', color: '#f59e0b', data: m.dayPop, axis: 'r', dash: true });
+    const evIdx = []; m.dates.forEach((d, i) => { if (m.evDates.has(d)) evIdx.push(i); });
+    blocks.push({ h: 390, draw(ctx, y) {
+      trepChart(ctx, F, PAD, y, CW, 390, { labels: m.dates.map(d => d.slice(8) + '/' + d.slice(5, 7)), series, right: series.length > 1, events: evIdx });
+    } });
+  }
+
+  // matriks bay / rincian sesi
+  if (m.agg.sess) {
+    if (m.jenis === 'harian') {
+      section('Rincian sesi');
+      const cw0 = [84, 120, 84, 84], rest = CW - cw0.reduce((a, b) => a + b, 0), bw = rest / m.nBay;
+      const rowH = 38;
+      blocks.push({ h: 36 + m.sessions.length * rowH + 4, draw(ctx, y) {
+        const heads = ['JAM', 'CUACA', 'SUHU', 'TOTAL'].concat(Array.from({ length: m.nBay }, (_, i) => 'B' + (i + 1)));
+        const wd = cw0.concat(Array(m.nBay).fill(bw));
+        let x = PAD; ctx.strokeStyle = '#cccccc'; ctx.lineWidth = 1;
+        heads.forEach((t, i) => { ctx.fillStyle = '#eef3e6'; ctx.fillRect(x, y, wd[i], 36); ctx.strokeRect(x + 0.5, y + 0.5, wd[i] - 1, 35); ctx.fillStyle = '#222'; ctx.font = F(15, true); ctx.textAlign = 'center'; ctx.fillText(t, x + wd[i] / 2, y + 24); x += wd[i]; });
+        m.sessions.forEach((s, r) => {
+          const yy = y + 36 + r * rowH; x = PAD;
+          const vals = [s.waktu, fit(ctx, String(s.cuaca), 112), s.suhu === '' ? '-' : s.suhu + '°', s.total].concat(s.bays.map(v => v === null ? '' : v));
+          vals.forEach((v, i) => {
+            ctx.strokeStyle = '#cccccc'; ctx.strokeRect(x + 0.5, yy + 0.5, wd[i] - 1, rowH - 1);
+            ctx.fillStyle = i === 3 ? G : '#222'; ctx.font = F(i === 3 ? 20 : 19, i === 3); ctx.textAlign = 'center'; ctx.fillText(String(v), x + wd[i] / 2, yy + 26); x += wd[i];
+          });
+        });
+        ctx.textAlign = 'left';
+      } });
+    } else {
+      section('Kunjungan per bay · rata² per sesi');
+      const nc = m.cols.length, firstW = 100, lastW = 120, cwid = (CW - firstW - lastW) / Math.max(1, nc);
+      let maxV = 0;
+      for (let i = 1; i <= m.nBay; i++) m.cols.forEach(c => { const o = m.cell[i] && m.cell[i][c.key]; if (o && o.n) maxV = Math.max(maxV, o.s / o.n); });
+      const rowH = 40, headH = 56;
+      blocks.push({ h: headH + m.nBay * rowH + 2 * rowH + 4, draw(ctx, y) {
+        ctx.strokeStyle = '#cccccc'; ctx.lineWidth = 1;
+        const box = (x, yy, w, h, fill) => { if (fill) { ctx.fillStyle = fill; ctx.fillRect(x, yy, w, h); } ctx.strokeRect(x + 0.5, yy + 0.5, w - 1, h - 1); };
+        box(PAD, y, firstW, headH, '#eef3e6'); ctx.fillStyle = '#222'; ctx.font = F(16, true); ctx.textAlign = 'center'; ctx.fillText('BAY', PAD + firstW / 2, y + 34);
+        m.cols.forEach((c, j) => {
+          const x = PAD + firstW + j * cwid; box(x, y, cwid, headH, '#eef3e6');
+          ctx.fillStyle = '#222'; ctx.font = F(nc > 8 ? 15 : 17, true); ctx.fillText(c.l1, x + cwid / 2, y + 24);
+          ctx.fillStyle = '#666'; ctx.font = F(14); ctx.fillText(c.l2, x + cwid / 2, y + 44);
+        });
+        box(PAD + firstW + nc * cwid, y, lastW, headH, '#eef3e6'); ctx.fillStyle = '#222'; ctx.font = F(16, true); ctx.fillText('RATA²', PAD + firstW + nc * cwid + lastW / 2, y + 34);
+        for (let i = 1; i <= m.nBay; i++) {
+          const yy = y + headH + (i - 1) * rowH;
+          box(PAD, yy, firstW, rowH, '#ffffff'); ctx.fillStyle = '#222'; ctx.font = F(19, true); ctx.fillText('Bay ' + i, PAD + firstW / 2, yy + 27);
+          m.cols.forEach((c, j) => {
+            const x = PAD + firstW + j * cwid, o = m.cell[i] && m.cell[i][c.key];
+            if (o && o.n) {
+              const v = o.s / o.n, t = maxV ? v / maxV : 0;
+              box(x, yy, cwid, rowH, `rgb(${Math.round(246 - t * 172)},${Math.round(250 - t * 126)},${Math.round(240 - t * 196)})`);
+              ctx.fillStyle = t > 0.6 ? '#fff' : '#222'; ctx.font = F(nc > 8 ? 17 : 19); ctx.fillText(v >= 10 ? String(Math.round(v)) : v.toFixed(1), x + cwid / 2, yy + 27);
+            } else { box(x, yy, cwid, rowH, '#fafafa'); ctx.fillStyle = '#aaa'; ctx.font = F(19); ctx.fillText('-', x + cwid / 2, yy + 27); }
+          });
+          const av = m.bayAvg[i - 1], xl = PAD + firstW + nc * cwid;
+          box(xl, yy, lastW, rowH, '#f6faf0'); ctx.fillStyle = G; ctx.font = F(20, true); ctx.fillText(av === null ? '-' : String(av), xl + lastW / 2, yy + 27);
+        }
+        const fy = y + headH + m.nBay * rowH;
+        [['Total / sesi', c => m.colSess[c.key] ? (m.colTot[c.key] / m.colSess[c.key]).toFixed(1) : '-', m.agg.avg], ['Jumlah sesi', c => m.colSess[c.key] || '-', m.agg.sess]].forEach((rw, k) => {
+          const yy = fy + k * rowH;
+          box(PAD, yy, firstW, rowH, '#eef3e6'); ctx.fillStyle = '#222'; ctx.font = F(15, true); ctx.fillText(rw[0], PAD + firstW / 2, yy + 26);
+          m.cols.forEach((c, j) => { const x = PAD + firstW + j * cwid; box(x, yy, cwid, rowH, '#f6faf0'); ctx.fillStyle = '#222'; ctx.font = F(18, true); ctx.fillText(String(rw[1](c)), x + cwid / 2, yy + 27); });
+          const xl = PAD + firstW + nc * cwid; box(xl, yy, lastW, rowH, '#eef3e6'); ctx.fillStyle = G; ctx.font = F(19, true); ctx.fillText(String(rw[2]), xl + lastW / 2, yy + 27);
+        });
+        ctx.textAlign = 'left';
+      } });
+    }
+  }
+
+  // cuaca
+  if (m.weather.length) {
+    section('Berdasarkan cuaca');
+    const cw = [170, 90, 110, 454, 200], rowH = 46;
+    const maxAvg = Math.max(...m.weather.map(w => w.avg), 1);
+    blocks.push({ h: 38 + m.weather.length * rowH + 28, draw(ctx, y) {
+      const heads = ['CUACA', 'SESI', 'TOTAL', 'RATA² / SESI', 'SUHU RATA²']; let x = PAD;
+      ctx.strokeStyle = '#cccccc'; ctx.lineWidth = 1;
+      heads.forEach((t, i) => { ctx.fillStyle = '#eef3e6'; ctx.fillRect(x, y, cw[i], 36); ctx.strokeRect(x + 0.5, y + 0.5, cw[i] - 1, 35); ctx.fillStyle = '#222'; ctx.font = F(15, true); ctx.fillText(t, x + 10, y + 24); x += cw[i]; });
+      m.weather.forEach((w, r) => {
+        const yy = y + 36 + r * rowH; x = PAD;
+        cw.forEach((c, i) => { ctx.strokeStyle = '#cccccc'; ctx.strokeRect(x + 0.5, yy + 0.5, c - 1, rowH - 1); x += c; });
+        ctx.fillStyle = WEATHER_COLOR[w.w] || G; ctx.fillRect(PAD + 10, yy + 14, 16, 18);
+        ctx.fillStyle = '#222'; ctx.font = F(20, true); ctx.fillText(w.label, PAD + 34, yy + 30);
+        ctx.font = F(20); ctx.fillText(w.n + (w.n < 5 ? ' ⚠' : ''), PAD + cw[0] + 10, yy + 30);
+        ctx.fillText(String(w.sum), PAD + cw[0] + cw[1] + 10, yy + 30);
+        const bx = PAD + cw[0] + cw[1] + cw[2] + 10, maxBw = cw[3] - 150, bwid = Math.max(3, maxBw * w.avg / maxAvg);
+        ctx.fillStyle = WEATHER_COLOR[w.w] || G; ctx.fillRect(bx, yy + 12, bwid, 22);
+        ctx.fillStyle = '#222'; ctx.font = F(19, true); ctx.fillText(String(w.avg), bx + bwid + 10, yy + 30);
+        if (w.sd !== '–') { ctx.font = F(15); ctx.fillStyle = '#888'; ctx.fillText('±' + w.sd, bx + bwid + 10 + ctx.measureText(String(w.avg)).width + 14, yy + 30); }
+        ctx.fillStyle = '#222'; ctx.font = F(20); ctx.fillText(w.suhu === null ? '-' : w.suhu + '°C', PAD + cw[0] + cw[1] + cw[2] + cw[3] + 10, yy + 30);
+      });
+      ctx.fillStyle = '#888'; ctx.font = F(15); ctx.fillText('⚠ = kurang dari 5 sesi, belum cukup untuk disimpulkan.', PAD, y + 36 + m.weather.length * rowH + 22);
+    } });
+  }
+
+  // jam
+  if (m.hours.some(h => h.avg !== null)) {
+    section('Berdasarkan jam');
+    const mx = Math.max(...m.hours.filter(h => h.avg !== null).map(h => h.avg));
+    const colors = m.hours.map(h => h.avg === mx ? '#f59e0b' : (h.n < 5 ? 'rgba(74,124,44,0.45)' : '#4a7c2c'));
+    blocks.push({ h: 290, draw(ctx, y) {
+      trepBars(ctx, F, PAD, y, CW, 262, { labels: m.hours.map(h => h.label), values: m.hours.map(h => h.avg), colors });
+      ctx.fillStyle = '#888'; ctx.font = F(15); ctx.textAlign = 'left';
+      ctx.fillText('Rata² kunjungan per sesi per jam. Oranye = teraktif; bar pudar = kurang dari 5 sesi.', PAD, y + 284);
+    } });
+  }
+
+  // kejadian
+  if (m.events.length) {
+    section('Kejadian di greenhouse');
+    const ev = m.events.slice(0, 14).map(e => wrap(repTgl(e.tgl) + ' · ' + e.gh + ': ' + e.text, CW - 24, F(19)));
+    const h = 14 + ev.reduce((a, l) => a + l.length * 26, 0) + 6;
+    blocks.push({ h, draw(ctx, y) {
+      ctx.fillStyle = '#f3e8ff'; ctx.fillRect(PAD, y, CW, h); ctx.strokeStyle = '#d8b4fe'; ctx.lineWidth = 1; ctx.strokeRect(PAD + 0.5, y + 0.5, CW - 1, h - 1);
+      ctx.fillStyle = '#222'; ctx.font = F(19); let yy = y + 10;
+      ev.forEach(l => l.forEach(t => { yy += 26; ctx.fillText(t, PAD + 12, yy - 6); }));
+    } });
+  }
+
+  // koloni
+  if (m.colony.length) {
+    section(m.batchInfo ? 'Kondisi koloni batch ' + m.batchInfo.batch : 'Kondisi koloni (data Cek)');
+    const cw = [80, 250, 110, 110, 110, 80, 284], rowsC = m.colony.slice(0, 24).map(c => {
+      const tg = c.buruk.length ? wrap(c.buruk.join(', '), cw[6] - 18, F(17, true)) : [];
+      return { c, tg, h: Math.max(46, 12 + 26 + Math.max(0, tg.length - 1) * 22 + 10) };
+    });
+    blocks.push({ h: 38 + rowsC.reduce((a, r) => a + r.h, 0) + 4, draw(ctx, y) {
+      const heads = ['KOTAK', 'KOLONI · BATCH', 'POP AWAL', 'POP AKHIR', 'PERUBAHAN', 'GULA', 'TANDA BURUK']; let x = PAD;
+      ctx.strokeStyle = '#cccccc'; ctx.lineWidth = 1;
+      heads.forEach((t, i) => { ctx.fillStyle = '#eef3e6'; ctx.fillRect(x, y, cw[i], 36); ctx.strokeRect(x + 0.5, y + 0.5, cw[i] - 1, 35); ctx.fillStyle = '#222'; ctx.font = F(14, true); ctx.fillText(t, x + 9, y + 24); x += cw[i]; });
+      let yy = y + 36;
+      rowsC.forEach(({ c, tg, h }) => {
+        x = PAD; cw.forEach(w => { ctx.strokeStyle = '#cccccc'; ctx.strokeRect(x + 0.5, yy + 0.5, w - 1, h - 1); x += w; });
+        const ty = yy + 31; x = PAD;
+        ctx.fillStyle = '#222'; ctx.font = F(19, true); ctx.fillText(c.gh.replace('GH ', 'G') + ' K' + c.k, x + 9, ty); x += cw[0];
+        ctx.font = F(18); ctx.fillText(fit(ctx, (c.koloni || '-') + (c.batch ? ' · ' + c.batch : ''), cw[1] - 16), x + 9, ty); x += cw[1];
+        ctx.font = F(19); ctx.fillText(c.first === null ? '-' : c.first + '%', x + 9, ty); x += cw[2];
+        ctx.fillStyle = c.last === null ? '#222' : (c.last <= m.set.ganti ? '#c62828' : (c.last <= m.set.waspada ? '#e65100' : '#2e7d32')); ctx.font = F(19, true);
+        ctx.fillText(c.last === null ? '-' : c.last + '%', x + 9, ty); x += cw[3];
+        const big = c.delta !== null && c.delta <= -CEK_TURUN_POIN;
+        ctx.fillStyle = c.delta === null ? '#888' : (big ? '#c62828' : (c.delta < 0 ? '#e65100' : '#2e7d32')); ctx.font = F(19, true);
+        ctx.fillText(c.delta === null ? '-' : (c.delta > 0 ? '+' : '') + c.delta + ' poin', x + 9, ty); x += cw[4];
+        ctx.fillStyle = '#222'; ctx.font = F(19); ctx.fillText(c.gula ? c.gula + '×' : '-', x + 9, ty); x += cw[5];
+        if (tg.length) { ctx.fillStyle = '#c62828'; ctx.font = F(17, true); tg.forEach((t, k) => ctx.fillText(t, x + 9, ty + k * 22 - 1)); } else { ctx.fillStyle = '#222'; ctx.font = F(19); ctx.fillText('-', x + 9, ty); }
+        yy += h;
+      });
+    } });
+    blocks.push({ h: 24, draw(ctx, y) { ctx.fillStyle = '#888'; ctx.font = F(15); ctx.fillText('Populasi awal/akhir = cek pertama dan terakhir dalam periode. Penurunan ≥ ' + CEK_TURUN_POIN + ' poin ditandai merah.', PAD, y + 16); } });
+  }
+
+  const fl = wrap('Catatan: ' + (m.batchInfo ? 'kunjungan lebah dihitung per greenhouse selama periode batch, tidak bisa dipisah per koloni. ' : '') + 'Angka rata² adalah kunjungan per sesi pengamatan (sudah menyesuaikan jumlah sesi). Hubungan antar grafik bersifat pengamatan, bukan bukti sebab-akibat. Dibuat dari aplikasi bee-form · ' + m.stamp, CW, F(15));
+  blocks.push({ h: 18 + fl.length * 21, draw(ctx, y) {
+    ctx.fillStyle = '#cccccc'; ctx.fillRect(PAD, y, CW, 1);
+    ctx.fillStyle = '#777'; ctx.font = F(15); fl.forEach((t, i) => ctx.fillText(t, PAD, y + 22 + i * 21));
+  } });
+  return blocks;
+}
+
+function trepKit() {
+  const F = (px, bold) => (bold ? 'bold ' : '') + px + 'px Arial, sans-serif';
+  const mc = document.createElement('canvas').getContext('2d');
+  const wrap = (text, maxW, font) => {
+    mc.font = font; const out = []; let cur = '';
+    const brk = w => { let part = ''; for (const ch of w) { if (mc.measureText(part + ch).width > maxW && part) { out.push(part); part = ch; } else part += ch; } return part; };
+    String(text).split(/\s+/).filter(Boolean).forEach(w => {
+      const t = cur ? cur + ' ' + w : w;
+      if (mc.measureText(t).width <= maxW) { cur = t; return; }
+      if (cur) { out.push(cur); cur = ''; }
+      cur = mc.measureText(w).width <= maxW ? w : brk(w);
+    });
+    if (cur) out.push(cur);
+    return out.length ? out : [''];
+  };
+  const fit = (ctx, text, maxW) => { if (ctx.measureText(text).width <= maxW) return text; let t = String(text); while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1); return t + '…'; };
+  return { F, wrap, fit, info: { n: 1, total: 1 } };
+}
+
+// mode: 'image' (satu gambar panjang, dipecah hanya kalau > 6000 px) atau 'a4' (halaman A4 untuk PDF)
+async function trepRender(m, title, mode) {
+  const W = 1080, PAD = 28, GAPB = 16, TOP = 26;
+  const A4H = Math.round(W * 297 / 210);
+  const PAGE_MAX = mode === 'a4' ? A4H - TOP - 30 : 6000;
+  const ck = trepKit();
+  const blocks = trepBlocks(m, ck);
+  const mini = () => ({ h: 40, draw(ctx, y) { ctx.fillStyle = '#2d5016'; ctx.font = ck.F(20, true); ctx.fillText(ck.fit(ctx, 'Laporan Tren Kunjungan Lebah · ' + m.label + '  (' + ck.info.n + '/' + ck.info.total + ')', W - PAD * 2), PAD, y + 26); } });
+  const pages = []; let page = [], ph = TOP, content = false;
+  const start = () => { page = []; ph = TOP; content = false; if (pages.length) { const b = mini(); page.push(b); ph += b.h + GAPB; } };
+  start();
+  blocks.forEach((b, i) => {
+    // judul seksi selalu ikut blok setelahnya
+    const need = b.keep && blocks[i + 1] ? b.h + GAPB + blocks[i + 1].h : b.h;
+    if (content && ph + need > PAGE_MAX) { pages.push(page); start(); }
+    page.push(b); ph += b.h + GAPB; content = true;
+  });
+  pages.push(page);
+  ck.info.total = pages.length;
+
+  const out = [];
+  for (let pg = 0; pg < pages.length; pg++) {
+    ck.info.n = pg + 1;
+    const used = pages[pg].reduce((a, b) => a + b.h + GAPB, TOP) + 8;
+    const hh = mode === 'a4' ? A4H : used;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = hh;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, hh);
+    ctx.fillStyle = '#2d5016'; ctx.fillRect(0, 0, W, 6);
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+    let y = TOP;
+    pages[pg].forEach(b => { ctx.save(); b.draw(ctx, y); ctx.restore(); y += b.h + GAPB; });
+    const name = title.replace(/\s+/g, '_') + (pages.length > 1 ? '_' + (pg + 1) : '') + '.jpg';
+    if (mode === 'a4') { out.push({ name, dataUrl: canvas.toDataURL('image/jpeg', 0.9) }); continue; }
+    const blob = await new Promise((resolve, reject) => canvas.toBlob(x => x ? resolve(x) : reject(new Error('toBlob')), 'image/jpeg', 0.9));
+    out.push({ name, url: URL.createObjectURL(blob), file: new File([blob], name, { type: 'image/jpeg' }) });
+  }
+  return out;
+}
+
+function trepClose() {
+  const ov = document.getElementById('trepOv'); if (ov) ov.remove();
+  const fr = document.getElementById('trepPrintFrame'); if (fr) fr.remove();
+  document.body.style.overflow = '';
+}
+
+async function trepOpen() {
+  const jenis = document.getElementById('trepJenis').value;
+  const tgl = document.getElementById('trepTgl').value || getLocalDate();
+  const gh = document.getElementById('trepGh').value;
+  const batchKey = document.getElementById('trepBatch').value;
+  if (jenis === 'batch' && !batchKey) { showToast('Pilih Batch', 'Belum ada batch yang bisa dipilih.', 'error', 3000); return; }
+  const m = trepModel(jenis, tgl, gh, batchKey);
+  if (!m) { showToast('Batch Tidak Ditemukan', 'Data batch tidak ada.', 'error', 3000); return; }
+  if (!m.agg.sess && !m.hasCek) { showToast('Tidak Ada Data', 'Belum ada data kunjungan maupun cek di periode itu.', 'error', 3500); return; }
+
+  const title = 'Laporan Tren Lebah ' + (m.gh ? m.gh.replace(' ', '') + ' ' : '') + (jenis === 'batch' ? 'Batch_' + m.batchInfo.batch : (m.dari === m.sampai ? m.dari : m.dari + '_' + m.sampai));
+  trepClose();
+  const ov = document.createElement('div');
+  ov.id = 'trepOv';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:10001;background:#e5e7eb;display:flex;flex-direction:column;';
+  const btn = 'border:none;border-radius:6px;padding:8px 9px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;';
+  ov.innerHTML = `<div style="display:flex;gap:5px;align-items:center;padding:8px;background:#2d5016;">
+      <button type="button" id="trepBtnClose" style="${btn}background:#fff;color:#2d5016;">← Tutup</button>
+      <div style="flex:1;"></div>
+      <button type="button" id="trepBtnShare" style="${btn}background:#fbbf24;color:#222;" disabled>📤 Bagikan</button>
+      <button type="button" id="trepBtnDl" style="${btn}background:#fff;color:#2d5016;" disabled>⬇ Unduh</button>
+      <button type="button" id="trepBtnPdf" style="${btn}background:#e0f2fe;color:#0369a1;" disabled>🖨️ PDF</button>
+    </div>
+    <div id="trepBody" style="flex:1;overflow:auto;padding:10px;"><div style="text-align:center;color:#555;padding:40px 0;">Menyiapkan laporan…</div></div>`;
+  document.body.appendChild(ov);
+  document.body.style.overflow = 'hidden';
+  document.getElementById('trepBtnClose').onclick = trepClose;
+
+  try {
+    await new Promise(r => setTimeout(r, 40));
+    const files = await trepRender(m, title, 'image');
+    const body = document.getElementById('trepBody');
+    if (!body) return;
+    body.innerHTML = files.map(f => `<img src="${f.url}" alt="" style="width:100%;max-width:760px;display:block;margin:0 auto 10px;border-radius:6px;background:#fff;">`).join('') +
+      `<div style="text-align:center;font-size:12px;color:#555;margin-bottom:8px;">Tekan-tahan gambar untuk menyimpan, atau pakai tombol di atas.</div>`;
+    ['trepBtnShare', 'trepBtnDl', 'trepBtnPdf'].forEach(id => { document.getElementById(id).disabled = false; });
+    document.getElementById('trepBtnShare').onclick = () => {
+      const fl = files.map(f => f.file);
+      if (navigator.canShare && navigator.canShare({ files: fl })) navigator.share({ files: fl, title }).catch(() => {});
+      else showToast('Tidak Bisa Bagikan', 'Perangkat belum mendukung. Pakai Unduh atau tekan-tahan gambar.', 'error', 4000);
+    };
+    document.getElementById('trepBtnDl').onclick = () => files.forEach((f, i) => setTimeout(() => {
+      const a = document.createElement('a'); a.href = f.url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+    }, i * 400));
+    document.getElementById('trepBtnPdf').onclick = async function () {
+      const b = this; b.disabled = true; const label = b.textContent; b.textContent = 'Menyiapkan…';
+      try {
+        const pages = await trepRender(m, title, 'a4');
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${qcEsc(title)}</title><style>@page{size:A4;margin:0}html,body{margin:0;padding:0}img{display:block;width:210mm;height:297mm;page-break-after:always}img:last-child{page-break-after:auto}</style></head><body>${pages.map(p => `<img src="${p.dataUrl}" alt="">`).join('')}</body></html>`;
+        const old = document.getElementById('trepPrintFrame'); if (old) old.remove();
+        const fr = document.createElement('iframe');
+        fr.id = 'trepPrintFrame';
+        fr.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;height:1000px;border:0;';
+        fr.onload = () => setTimeout(() => {
+          const oldT = document.title; document.title = title;
+          const restore = () => { document.title = oldT; window.removeEventListener('afterprint', restore); };
+          window.addEventListener('afterprint', restore); setTimeout(restore, 90000);
+          try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { showToast('Gagal Cetak', 'Pakai tombol Unduh untuk menyimpan gambar.', 'error', 4000); }
+        }, 300);
+        document.body.appendChild(fr);
+        fr.srcdoc = html;
+      } catch (e) {
+        console.warn('PDF gagal:', e);
+        showToast('Gagal Membuat PDF', 'Pakai tombol Unduh untuk menyimpan gambar.', 'error', 4000);
+      } finally { b.disabled = false; b.textContent = label; }
+    };
+  } catch (e) {
+    console.warn('Laporan tren gagal:', e);
+    const body = document.getElementById('trepBody');
+    if (body) body.innerHTML = '<div style="text-align:center;color:#c62828;padding:40px 0;">Gagal membuat laporan. Coba lagi.</div>';
+  }
 }
 
 // ============================================
