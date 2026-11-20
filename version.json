@@ -1,5 +1,5 @@
 {
-  "version": "1.8.0",
+  "version": "1.9.0",
   "released": "2026-11-18",
-  "notes": "Laporan Tren: satu gambar/PDF (harian, mingguan, bulanan, per batch) + laporan Cek + draft otomatis."
+  "notes": "Trend: data bunga mekar bisa diisi sendiri, populasi koloni di grafik, kunjungan per rentang suhu. Plus laporan Tren, laporan Cek, draft otomatis."
 }

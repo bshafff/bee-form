@@ -1029,6 +1029,21 @@ button.btn-delete:hover { background: #c82333; }
         </div>
       </details>
 
+      <details class="bt-box" id="floBox" style="margin-bottom:12px;">
+        <summary>🌸 Data bunga mekar (tim fertigasi)<span id="floStale"></span></summary>
+        <div class="qc-hint" id="floNote" style="margin-top:10px;"></div>
+        <div class="row-inputs">
+          <div class="form-group"><label for="floGh">Greenhouse</label><select id="floGh"><option value="GH 1">GH 1</option><option value="GH 2">GH 2</option></select></div>
+          <div class="form-group"><label for="floPct">Bunga mekar (%)</label><input type="number" id="floPct" min="0" max="100" step="0.1" inputmode="decimal" placeholder="mis. 12"></div>
+        </div>
+        <div class="row-inputs">
+          <div class="form-group"><label for="floFrom">Dari</label><input type="date" id="floFrom"></div>
+          <div class="form-group"><label for="floTo">Sampai</label><input type="date" id="floTo"></div>
+        </div>
+        <div class="actions" style="margin-top:6px;"><button type="button" class="btn btn-submit" onclick="floAdd()">Simpan</button></div>
+        <div id="floList" style="overflow-x:auto;"></div>
+      </details>
+
       <div class="filter-bar">
         <div class="filter-group">
           <label>Dari Tanggal</label>
@@ -3665,12 +3680,20 @@ function renderTrendDashboard() {
   });
 
   const flo = allDates.map(dt => {
-    const v = (ghFilter ? [ghFilter] : Object.keys(FLOWERING_REF)).map(g => floweringPct(g, dt)).filter(x => x !== null);
+    const v = (ghFilter ? [ghFilter] : FLO_GHS).map(g => floweringPct(g, dt)).filter(x => x !== null);
     return v.length ? +(v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : null;
   });
-  if (flo.some(v => v !== null)) {
-    trendChartInstance.data.datasets.push({ label: 'Bunga mekar % (tim fertigasi)', data: flo, yAxisID: 'y2', borderColor: '#e11d48', borderDash: [5, 4], backgroundColor: 'transparent', stepped: true, pointRadius: 0, borderWidth: 2 });
-    trendChartInstance.options.scales.y2 = { position: 'right', beginAtZero: true, title: { display: true, text: 'Bunga mekar (%)', font: { weight: 'bold' } }, grid: { drawOnChartArea: false } };
+  const popBy = {};
+  (localHistory.cek || []).forEach(r => {
+    if (!r.tanggal || (ghFilter && r.gh !== ghFilter)) return;
+    for (let i = 1; i <= QC_MAX_KOTAK; i++) { const pv = cekPop(r['kotak' + i + '_pop']); if (pv !== null) (popBy[r.tanggal] = popBy[r.tanggal] || []).push(pv); }
+  });
+  const popData = allDates.map(dt => popBy[dt] ? Math.round(popBy[dt].reduce((a, b) => a + b, 0) / popBy[dt].length) : null);
+  const hasFlo = flo.some(v => v !== null), hasPop = popData.some(v => v !== null);
+  if (hasFlo) trendChartInstance.data.datasets.push({ label: 'Bunga mekar % (tim fertigasi)', data: flo, yAxisID: 'y2', borderColor: '#e11d48', borderDash: [5, 4], backgroundColor: 'transparent', stepped: true, pointRadius: 0, borderWidth: 2 });
+  if (hasPop) trendChartInstance.data.datasets.push({ label: 'Populasi koloni rata² (%)', data: popData, yAxisID: 'y2', borderColor: '#f59e0b', backgroundColor: '#f59e0b', borderDash: [6, 4], spanGaps: true, pointRadius: 4, pointStyle: 'rectRot', borderWidth: 2, tension: 0 });
+  if (hasFlo || hasPop) {
+    trendChartInstance.options.scales.y2 = { position: 'right', beginAtZero: true, suggestedMax: 100, title: { display: true, text: hasFlo && hasPop ? 'Bunga mekar / Populasi (%)' : (hasFlo ? 'Bunga mekar (%)' : 'Populasi koloni (%)'), font: { weight: 'bold' } }, grid: { drawOnChartArea: false } };
     trendChartInstance.options.plugins.legend = { display: true, position: 'bottom' };
   }
   const evByDate = {};
@@ -3685,7 +3708,9 @@ function renderTrendDashboard() {
   renderBarChart(filteredData, ghFilter);
   renderHourChart(filteredData, ghFilter, metric);
   renderWeatherDashboard(filteredData, ghFilter);
+  renderSuhuBins(filteredData);
   trepInit();
+  floRender();
 }
 
 // ============================================
@@ -3843,11 +3868,78 @@ const FLOWERING_REF = {
   'GH 1': [['2026-08-17','2026-08-22',19],['2026-08-23','2026-08-29',18],['2026-08-30','2026-09-06',25],['2026-09-07','2026-09-12',17],['2026-09-14','2026-09-19',13],['2026-09-21','2026-09-26',14],['2026-09-27','2026-10-03',9],['2026-10-04','2026-10-10',7],['2026-10-12','2026-10-17',4],['2026-10-18','2026-10-24',6],['2026-10-25','2026-10-31',9.8]],
   'GH 2': [['2026-09-21','2026-09-26',18],['2026-09-28','2026-10-03',18],['2026-10-04','2026-10-10',12],['2026-10-12','2026-10-17',12],['2026-10-18','2026-10-24',12],['2026-10-25','2026-10-31',18]]
 };
+const FLO_GHS = ['GH 1', 'GH 2'];
+function floUser() { try { const a = JSON.parse(localStorage.getItem('bee_flowering_user') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function floList(gh) {
+  const m = {};
+  (FLOWERING_REF[gh] || []).forEach(r => { m[r[0]] = { from: r[0], to: r[1], pct: r[2], user: false }; });
+  floUser().filter(u => u.gh === gh).forEach(u => { m[u.from] = { from: u.from, to: u.to, pct: u.pct, user: true, id: u.id }; });
+  return Object.values(m).sort((a, b) => a.from.localeCompare(b.from));
+}
 function floweringPct(gh, date) {
-  const L = FLOWERING_REF[gh]; if (!L) return null;
-  let r = null;
-  for (let i = 0; i < L.length; i++) { if (L[i][0] <= date) { r = L[i]; if (i === L.length - 1 && date > L[i][1]) r = null; } }
-  return r ? r[2] : null;
+  const L = floList(gh); let r = null, idx = -1;
+  for (let i = 0; i < L.length; i++) if (L[i].from <= date) { r = L[i]; idx = i; }
+  if (!r) return null;
+  if (date > r.to && idx === L.length - 1) return null;
+  return r.pct;
+}
+function floRender() {
+  const box = document.getElementById('floList'); if (!box) return;
+  const today = getLocalDate();
+  const stale = [];
+  FLO_GHS.forEach(g => {
+    const L = floList(g), last = L.length ? L[L.length - 1].to : null, age = last ? daysBetween(last, today) : null;
+    if (age === null || age > 7) stale.push(g + (last ? ': terakhir s/d ' + repTgl(last) + ' (' + age + ' hari lalu)' : ': belum ada data'));
+  });
+  document.getElementById('floStale').textContent = stale.length ? ' ⚠️' : '';
+  document.getElementById('floNote').innerHTML = (stale.length ? '⚠️ <b>Perlu diperbarui</b>: ' + stale.map(qcEsc).join(' · ') : '✓ Data bunga mekar sudah terbaru.') +
+    '<br><span style="color:#888;">Data tambahan disimpan di HP ini saja (belum sinkron ke Sheet).</span>';
+  const fF = document.getElementById('floFrom'), fT = document.getElementById('floTo');
+  if (!fF.value) { const mon = trepMonday(today); fF.value = mon; fT.value = trepAdd(mon, 5); }
+  const all = [];
+  FLO_GHS.forEach(g => floList(g).forEach(e => all.push({ ...e, gh: g })));
+  all.sort((a, b) => b.from.localeCompare(a.from));
+  box.innerHTML = '<table class="weather-table" style="margin-top:10px;"><thead><tr><th>GH</th><th>Periode</th><th>Mekar</th><th></th></tr></thead><tbody>' +
+    all.slice(0, 12).map(e => `<tr><td>${qcEsc(e.gh)}</td><td>${qcEsc(repTgl(e.from) + ' – ' + repTgl(e.to))}</td><td><b>${e.pct}%</b></td><td>${e.user ? `<button type="button" class="history-btn" onclick="floDel('${e.id}')">🗑️</button>` : '<span style="color:#aaa;">bawaan</span>'}</td></tr>`).join('') +
+    '</tbody></table>' + (all.length > 12 ? '<div style="font-size:11px;color:#888;margin-top:4px;">Menampilkan 12 periode terbaru.</div>' : '');
+}
+function floAdd() {
+  const gh = document.getElementById('floGh').value;
+  const from = document.getElementById('floFrom').value, to = document.getElementById('floTo').value;
+  const pct = parseFloat(document.getElementById('floPct').value);
+  if (!from || !to || to < from) { showToast('Periode Salah', 'Isi tanggal dari dan sampai dengan benar.', 'error', 3000); return; }
+  if (isNaN(pct) || pct < 0 || pct > 100) { showToast('Persen Salah', 'Bunga mekar harus 0–100%.', 'error', 3000); return; }
+  const arr = floUser().filter(u => !(u.gh === gh && u.from === from));
+  arr.push({ id: String(Date.now()), gh, from, to, pct: +pct.toFixed(1) });
+  localStorage.setItem('bee_flowering_user', JSON.stringify(arr));
+  document.getElementById('floPct').value = '';
+  const nextFrom = trepAdd(from, 7); document.getElementById('floFrom').value = nextFrom; document.getElementById('floTo').value = trepAdd(nextFrom, 5);
+  showToast('Tersimpan 🌸', gh + ' ' + pct + '% (' + repTgl(from) + ')', 'success', 2500);
+  floRender(); renderTrendDashboard();
+}
+function floDel(id) {
+  localStorage.setItem('bee_flowering_user', JSON.stringify(floUser().filter(u => String(u.id) !== String(id))));
+  floRender(); renderTrendDashboard();
+}
+
+// ===== Kunjungan per rentang suhu =====
+const SUHU_BINS = [{ l: '≤ 24°C', ok: v => v < 25 }, { l: '25–28°C', ok: v => v >= 25 && v < 29 }, { l: '29–32°C', ok: v => v >= 29 && v < 33 }, { l: '≥ 33°C', ok: v => v >= 33 }];
+function suhuBinsOf(items) {
+  return SUHU_BINS.map(b => {
+    const a = [];
+    items.forEach(it => { const sv = parseFloat(normalizeSuhu(it.suhu)); if (!isNaN(sv) && b.ok(sv)) a.push(getTotalPerItem(it)); });
+    const sum = a.reduce((x, y) => x + y, 0);
+    return { label: b.l, n: a.length, sum, avg: a.length ? +(sum / a.length).toFixed(1) : null, sd: sdOf(a) };
+  }).filter(b => b.n > 0);
+}
+function renderSuhuBins(data) {
+  const card = document.getElementById('weatherTableBody').closest('.chart-card');
+  let box = document.getElementById('suhuBinBox');
+  if (!box) { box = document.createElement('div'); box.id = 'suhuBinBox'; box.style.cssText = 'margin-top:14px;overflow-x:auto;'; card.appendChild(box); }
+  const bins = suhuBinsOf(data);
+  box.innerHTML = '<div style="font-size:12px;font-weight:700;color:#2d5016;margin-bottom:8px;text-transform:uppercase;">🌡️ Kunjungan per rentang suhu (rata²/sesi)</div><table class="weather-table"><thead><tr><th>Suhu</th><th>Sesi</th><th>Total</th><th>Rata²/Sesi</th></tr></thead><tbody>' +
+    (bins.length ? bins.map(b => `<tr><td>${b.label}</td><td>${b.n}${b.n < 5 ? ' ⚠️' : ''}</td><td>${b.sum}</td><td><b>${b.avg}</b> <small style="color:#888">±${b.sd}</small></td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;color:#999;">Belum ada data suhu</td></tr>') +
+    '</tbody></table><div style="font-size:11px;color:#888;margin-top:6px;">⚠️ n &lt; 5 sesi: belum cukup untuk disimpulkan.</div>';
 }
 
 function renderWeatherTime(data) {
@@ -5294,6 +5386,7 @@ function trepModel(jenis, tgl, ghSel, batchKey) {
   const byDay = {};
   chartItems.forEach(it => { const o = byDay[it.tanggal] || (byDay[it.tanggal] = { n: 0, sum: 0 }); o.n++; o.sum += getTotalPerItem(it); });
   const dayAvg = dates.map(d => byDay[d] ? +(byDay[d].sum / byDay[d].n).toFixed(1) : null);
+  const dayFlo = dates.map(d => { const v = (gh ? [gh] : FLO_GHS).map(g => floweringPct(g, d)).filter(x => x !== null); return v.length ? +(v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : null; });
   const dayPop = dates.map(d => popChart[d] ? Math.round(popChart[d].reduce((a, b) => a + b, 0) / popChart[d].length) : null);
   const evMap = {};
   items.forEach(it => { if (it.kejadian) { const k = it.tanggal + '|' + it.gh + '|' + it.kejadian; evMap[k] = { tgl: it.tanggal, gh: it.gh, text: String(it.kejadian) }; } });
@@ -5353,6 +5446,8 @@ function trepModel(jenis, tgl, ghSel, batchKey) {
     return { w, label: WEATHER_LABEL[w] || w, n: o.n, sum: o.sum, avg: +(o.sum / o.n).toFixed(1), sd: sdOf(o.list), suhu: o.suhu.length ? +(o.suhu.reduce((a, b) => a + b, 0) / o.suhu.length).toFixed(1) : null };
   });
 
+  const suhuBins = suhuBinsOf(items);
+
   // rincian sesi (harian)
   const sessions = jenis === 'harian'
     ? items.slice().sort((a, b) => String(a.waktu || '').localeCompare(String(b.waktu || ''))).map(it => ({
@@ -5384,6 +5479,10 @@ function trepModel(jenis, tgl, ghSel, batchKey) {
     const hi = weather.reduce((a, b) => b.avg > a.avg ? b : a), lo = weather.reduce((a, b) => b.avg < a.avg ? b : a);
     if (hi.avg > lo.avg) ins.push(`Cuaca terbaik: ${hi.label} (${hi.avg}/sesi, ${hi.n} sesi); terendah: ${lo.label} (${lo.avg}/sesi, ${lo.n} sesi)` + (Math.min(hi.n, lo.n) < 5 ? ', sesi masih sedikit.' : '.'));
   }
+  if (suhuBins.length >= 2) {
+    const hi = suhuBins.reduce((a, b) => b.avg > a.avg ? b : a), lo = suhuBins.reduce((a, b) => b.avg < a.avg ? b : a);
+    if (hi.avg > lo.avg) ins.push(`Rentang suhu paling ramai: ${hi.label} (${hi.avg}/sesi, ${hi.n} sesi); paling sepi: ${lo.label} (${lo.avg}/sesi, ${lo.n} sesi)` + (Math.min(hi.n, lo.n) < 5 ? ', sesi masih sedikit.' : '.'));
+  }
   if (popDays.length >= 2) {
     const a = popAvg(popDays[0]), b = popAvg(popDays[popDays.length - 1]), d = b - a;
     ins.push(`Populasi koloni rata² ${a}% (${repTgl(popDays[0])}) → ${b}% (${repTgl(popDays[popDays.length - 1])}), ${d === 0 ? 'tidak berubah' : (d > 0 ? 'naik ' : 'turun ') + Math.abs(d) + ' poin'}.`);
@@ -5397,7 +5496,7 @@ function trepModel(jenis, tgl, ghSel, batchKey) {
   const now = new Date();
   return {
     jenis, dari, sampai, gh, label, batchInfo, set, agg, prev, delta, items, nBay, cols, cell, colSess, colTot, bayAvg, hours, weather, sessions,
-    dates, dayAvg, dayPop, evDates, events, colony, ins, allPopAvg, hasCek: cekRows.length > 0,
+    dates, dayAvg, dayPop, dayFlo, suhuBins, evDates, events, colony, ins, allPopAvg, hasCek: cekRows.length > 0,
     sub: 'PT. Agri Wangi Berry · ' + (gh || 'GH 1 & GH 2') + ' · ' + (dari === sampai ? repTgl(dari, true) : repTgl(dari) + ' – ' + repTgl(sampai)),
     stamp: repTgl(today) + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0')
   };
@@ -5408,7 +5507,11 @@ function trepNice(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(M
 function trepFmt(v) { return String(parseFloat(v.toFixed(2))); }
 
 function trepChart(ctx, F, x, y, w, h, o) {
-  const padL = 58, padR = o.right ? 58 : 18, padT = 14, padB = 70;
+  const leg = o.series.map(s => ({ c: s.color, t: s.name, dash: s.dash })).concat(o.events && o.events.length ? [{ c: '#7c3aed', t: 'Kejadian (semprot/pruning/koloni)', tri: true }] : []);
+  ctx.font = F(16);
+  let rows = 1, cx0 = 0;
+  leg.forEach(l => { const iw = 28 + ctx.measureText(l.t).width + 26; if (cx0 + iw > w - 58 && cx0 > 0) { rows++; cx0 = 0; } cx0 += iw; });
+  const padL = 58, padR = o.right ? 58 : 18, padT = 14, padB = 46 + rows * 24;
   const px = x + padL, py = y + padT, pw = w - padL - padR, ph = h - padT - padB;
   const n = o.labels.length;
   const xAt = i => n === 1 ? px + pw / 2 : px + pw * i / (n - 1);
@@ -5431,25 +5534,32 @@ function trepChart(ctx, F, x, y, w, h, o) {
     const Y = s.axis === 'r' ? yR : yL;
     ctx.strokeStyle = s.color; ctx.fillStyle = s.color; ctx.lineWidth = s.axis === 'r' ? 2.5 : 3;
     ctx.setLineDash(s.dash ? [8, 6] : []);
-    ctx.beginPath(); let started = false;
-    s.data.forEach((v, i) => { if (v === null) return; if (!started) { ctx.moveTo(xAt(i), Y(v)); started = true; } else ctx.lineTo(xAt(i), Y(v)); });
+    ctx.beginPath(); let started = false, prevY = null;
+    s.data.forEach((v, i) => {
+      if (v === null) return;
+      if (!started) { ctx.moveTo(xAt(i), Y(v)); started = true; }
+      else if (s.step) { ctx.lineTo(xAt(i), prevY); ctx.lineTo(xAt(i), Y(v)); }
+      else ctx.lineTo(xAt(i), Y(v));
+      prevY = Y(v);
+    });
     ctx.stroke(); ctx.setLineDash([]);
-    s.data.forEach((v, i) => { if (v === null) return; ctx.beginPath(); ctx.arc(xAt(i), Y(v), s.axis === 'r' ? 6 : 5, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); });
+    if (!s.noDots) s.data.forEach((v, i) => { if (v === null) return; ctx.beginPath(); ctx.arc(xAt(i), Y(v), s.axis === 'r' ? 6 : 5, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); });
   });
   if (o.events) o.events.forEach(i => {
     const cx = xAt(i), cy = py + 12;
     ctx.fillStyle = '#7c3aed'; ctx.beginPath(); ctx.moveTo(cx, cy - 9); ctx.lineTo(cx + 8, cy + 6); ctx.lineTo(cx - 8, cy + 6); ctx.closePath(); ctx.fill();
   });
-  // legenda
-  let lx = px, ly = y + h - 8;
+  // legenda (bisa lebih dari satu baris)
+  let lx = px, ly = y + h - 8 - (rows - 1) * 24;
   ctx.textAlign = 'left'; ctx.font = F(16);
-  const leg = o.series.map(s => ({ c: s.color, t: s.name, dash: s.dash })).concat(o.events && o.events.length ? [{ c: '#7c3aed', t: 'Kejadian (semprot/pruning/koloni)', tri: true }] : []);
   leg.forEach(l => {
+    const iw = 28 + ctx.measureText(l.t).width + 26;
+    if (lx + iw > x + w - 6 && lx > px) { lx = px; ly += 24; }
     ctx.fillStyle = l.c; ctx.strokeStyle = l.c; ctx.lineWidth = 3;
     if (l.tri) { ctx.beginPath(); ctx.moveTo(lx + 8, ly - 14); ctx.lineTo(lx + 16, ly - 1); ctx.lineTo(lx, ly - 1); ctx.closePath(); ctx.fill(); }
     else { ctx.setLineDash(l.dash ? [6, 4] : []); ctx.beginPath(); ctx.moveTo(lx, ly - 7); ctx.lineTo(lx + 22, ly - 7); ctx.stroke(); ctx.setLineDash([]); }
     ctx.fillStyle = '#444'; ctx.fillText(l.t, lx + 28, ly - 1);
-    lx += 28 + ctx.measureText(l.t).width + 26;
+    lx += iw;
   });
 }
 
@@ -5532,6 +5642,7 @@ function trepBlocks(m, ck) {
     section(m.jenis === 'harian' ? 'Konteks 7 hari terakhir' : 'Tren harian');
     const series = [{ name: 'Rata² kunjungan / sesi', color: '#2d5016', data: m.dayAvg }];
     if (m.dayPop.some(v => v !== null)) series.push({ name: 'Populasi koloni rata² (%)', color: '#f59e0b', data: m.dayPop, axis: 'r', dash: true });
+    if (m.dayFlo.some(v => v !== null)) series.push({ name: 'Bunga mekar % (fertigasi)', color: '#e11d48', data: m.dayFlo, axis: 'r', dash: true, noDots: true, step: true });
     const evIdx = []; m.dates.forEach((d, i) => { if (m.evDates.has(d)) evIdx.push(i); });
     blocks.push({ h: 390, draw(ctx, y) {
       trepChart(ctx, F, PAD, y, CW, 390, { labels: m.dates.map(d => d.slice(8) + '/' + d.slice(5, 7)), series, right: series.length > 1, events: evIdx });
@@ -5624,6 +5735,29 @@ function trepBlocks(m, ck) {
         ctx.fillStyle = '#222'; ctx.font = F(20); ctx.fillText(w.suhu === null ? '-' : w.suhu + '°C', PAD + cw[0] + cw[1] + cw[2] + cw[3] + 10, yy + 30);
       });
       ctx.fillStyle = '#888'; ctx.font = F(15); ctx.fillText('⚠ = kurang dari 5 sesi, belum cukup untuk disimpulkan.', PAD, y + 36 + m.weather.length * rowH + 22);
+    } });
+  }
+
+  // suhu
+  if (m.suhuBins.length) {
+    section('Berdasarkan rentang suhu');
+    const cw = [200, 100, 120, 604], rowH = 46, maxAvg = Math.max(...m.suhuBins.map(b => b.avg), 1);
+    blocks.push({ h: 38 + m.suhuBins.length * rowH + 28, draw(ctx, y) {
+      const heads = ['SUHU', 'SESI', 'TOTAL', 'RATA² / SESI']; let x = PAD;
+      ctx.strokeStyle = '#cccccc'; ctx.lineWidth = 1;
+      heads.forEach((t, i) => { ctx.fillStyle = '#eef3e6'; ctx.fillRect(x, y, cw[i], 36); ctx.strokeRect(x + 0.5, y + 0.5, cw[i] - 1, 35); ctx.fillStyle = '#222'; ctx.font = F(15, true); ctx.fillText(t, x + 10, y + 24); x += cw[i]; });
+      m.suhuBins.forEach((b, r) => {
+        const yy = y + 36 + r * rowH; x = PAD;
+        cw.forEach(c => { ctx.strokeStyle = '#cccccc'; ctx.strokeRect(x + 0.5, yy + 0.5, c - 1, rowH - 1); x += c; });
+        ctx.fillStyle = '#222'; ctx.font = F(20, true); ctx.fillText(b.label, PAD + 10, yy + 30);
+        ctx.font = F(20); ctx.fillText(b.n + (b.n < 5 ? ' ⚠' : ''), PAD + cw[0] + 10, yy + 30);
+        ctx.fillText(String(b.sum), PAD + cw[0] + cw[1] + 10, yy + 30);
+        const bx = PAD + cw[0] + cw[1] + cw[2] + 10, bwid = Math.max(3, (cw[3] - 170) * b.avg / maxAvg);
+        ctx.fillStyle = '#d97706'; ctx.fillRect(bx, yy + 12, bwid, 22);
+        ctx.fillStyle = '#222'; ctx.font = F(19, true); ctx.fillText(String(b.avg), bx + bwid + 10, yy + 30);
+        if (b.sd !== '–') { ctx.font = F(15); ctx.fillStyle = '#888'; ctx.fillText('±' + b.sd, bx + bwid + 10 + ctx.measureText(String(b.avg)).width + 14, yy + 30); }
+      });
+      ctx.fillStyle = '#888'; ctx.font = F(15); ctx.fillText('⚠ = kurang dari 5 sesi, belum cukup untuk disimpulkan.', PAD, y + 36 + m.suhuBins.length * rowH + 22);
     } });
   }
 
