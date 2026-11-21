@@ -1,5 +1,5 @@
 {
-  "version": "2.1.0",
+  "version": "2.1.1",
   "released": "2026-11-18",
-  "notes": "Tab Polinasi baru: flowering per bay (Sheet, Apps Script v10), impor Excel, analisis per bay + panen/reject, laporan. Trend tidak lagi memuat flowering."
+  "notes": "Polinasi: penjelasan cara hitung, peringatan data kurang/jumlah bay beda, bay tanpa data disembunyikan."
 }

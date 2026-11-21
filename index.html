@@ -1169,7 +1169,8 @@ button.btn-delete:hover { background: #c82333; }
           <div class="form-group"><label for="polLag">Jeda flowering → panen</label><select id="polLag" onchange="polRender()"><option value="2">2 minggu</option><option value="3" selected>3 minggu</option><option value="4">4 minggu</option></select></div>
         </div>
         <div class="form-group"><label for="polMode">Nilai GH dari semua bay</label><select id="polMode" onchange="polRender()"><option value="avg" selected>Rata-rata per bay</option><option value="sum">Jumlah semua bay</option></select></div>
-        <div class="actions" style="margin-bottom:10px;"><button type="button" class="btn btn-submit" onclick="polReportOpen()">📄 Laporan (gambar / PDF)</button></div>
+        <div class="qc-hint">Kunjungan dihitung sebagai <b>rata² per sesi</b> di tiap bay (bukan total), supaya adil walau jumlah sesi berbeda antar minggu. Pilihan rata²/jumlah hanya memengaruhi nilai GH; korelasinya sama selama jumlah bay yang terisi sama tiap minggu.</div>
+        <div class="actions" style="margin:8px 0 10px;"><button type="button" class="btn btn-submit" onclick="polReportOpen()">📄 Laporan (gambar / PDF)</button></div>
         <div id="polOut" style="overflow-x:auto;"></div>
       </details>
 
@@ -4285,10 +4286,18 @@ function polCaveat(c) { return c.n < 6 ? 'n=' + c.n + ' masih kecil, anggap petu
 function polFmtR(v) { return v === null || v === undefined ? '-' : (v > 0 ? '+' : '') + v.toFixed(2); }
 function polF1(n) { return n === null || n === undefined ? '-' : (Math.abs(n) >= 100 ? String(Math.round(n)) : String(parseFloat(n.toFixed(1)))); }
 
+function polBayCountVaries(W) {
+  const c = W.filter(w => w.bays.some(x => x !== null)).map(w => w.bays.filter(x => x !== null).length);
+  return new Set(c).size > 1;
+}
+function polPairedWeeks(A) { return A.W.filter(w => w.sess > 0 && w.nPairs > 0).length; }
+
 function polInsights(A) {
   const out = [], L = A.lag, W = A.W, b = A.bay, c = A.c;
   const nB = W.filter(w => w.bays.some(x => x !== null)).length;
   out.push(`${W.length} minggu data (${nB} dengan flowering per bay). Nilai GH = ${A.mode === 'sum' ? 'jumlah semua bay' : 'rata² per bay'}.`);
+  if (polPairedWeeks(A) < 3) out.push(`Baru ${polPairedWeeks(A)} minggu yang punya pasangan flowering + kunjungan. Korelasi per bay butuh minimal 3 minggu (idealnya 6–8).`);
+  if (A.mode === 'sum' && polBayCountVaries(W)) out.push('Jumlah bay yang terisi berbeda antar minggu, jadi mode "jumlah" tidak sebanding. Pakai "rata² per bay" atau lengkapi semua bay.');
   if (b.spatial.r !== null) out.push(`Antar bay di minggu yang sama: r=${polFmtR(b.spatial.r)}, hubungan ${polStrength(b.spatial.r)} (${b.npts} titik bay-minggu). ` + (b.spatial.r >= 0.3 ? 'Bay yang bunganya lebih banyak cenderung lebih sering dikunjungi lebah.' : (b.spatial.r <= -0.3 ? 'Bay dengan bunga banyak justru lebih sepi kunjungan: sebaran koloni mungkin tidak sesuai sebaran bunga.' : 'Sebaran kunjungan tidak mengikuti sebaran bunga antar bay.')));
   if (b.temporal.r !== null) out.push(`Dalam bay yang sama antar minggu: r=${polFmtR(b.temporal.r)}, hubungan ${polStrength(b.temporal.r)}. ` + (b.temporal.r >= 0.3 ? 'Saat bunga di suatu bay naik, kunjungan ke bay itu ikut naik.' : (b.temporal.r <= -0.3 ? 'Saat bunga di suatu bay naik, kunjungan ke bay itu justru turun.' : 'Perubahan bunga di bay tidak diikuti perubahan kunjungan yang jelas.')));
   const pb = b.perBay.filter(x => x.r !== null && x.n >= 4);
@@ -4338,7 +4347,11 @@ function polRender() {
   }).join('');
   const cr = (label, c) => `<tr><td>${label}</td><td>${c.n}</td><td><b>${polFmtR(c.r)}</b></td><td>${polFmtR(c.rho)}</td><td style="font-size:11px;">${c.r === null ? 'data belum cukup' : polStrength(c.r) + '<br>' + polCaveat(c)}</td></tr>`;
   const b = A.bay;
+  const warn = [];
+  if (polPairedWeeks(A) < 3) warn.push(`Baru <b>${polPairedWeeks(A)} minggu</b> yang punya pasangan flowering + kunjungan. Korelasi per bay (kolom r) baru muncul setelah <b>minimal 3 minggu</b>, dan baru bisa dipercaya sekitar 6–8 minggu.`);
+  if (A.mode === 'sum' && polBayCountVaries(A.W)) warn.push('Jumlah bay yang terisi <b>berbeda antar minggu</b>, jadi mode "jumlah" tidak sebanding. Pakai "rata² per bay" atau lengkapi semua bay.');
   box.innerHTML =
+    (warn.length ? '<div style="background:#fff3e0;border:1px solid #fb8c00;border-radius:8px;padding:8px 10px;font-size:12px;margin-bottom:6px;">⚠️ ' + warn.join('<br>⚠️ ') + '</div>' : '') +
     head('Ringkasan GH per minggu · ' + gh) +
     '<table class="weather-table"><thead><tr><th>Minggu</th><th>Flower</th><th>Sesi</th><th>Kunj</th><th>Dibobot</th><th>Cocok</th><th>Panen +' + lag + '</th><th>Reject +' + lag + '</th></tr></thead><tbody>' + wk + '</tbody></table>' +
     `<div style="font-size:11px;color:#888;margin:4px 0;">Flower &amp; Kunj = ${A.mode === 'sum' ? 'jumlah semua bay' : 'rata² per bay'} (kunjungan per sesi). <b>Dibobot</b> = kunjungan yang dirasakan bunga (dibobot flowering tiap bay). <b>Cocok</b> = korelasi sebaran bunga vs kunjungan antar bay. Panen/Reject = di minggu +${lag} (reject ${A.useRate ? 'dalam % dari panen' : 'dalam jumlah; isi total panen supaya jadi %'}). ⚠️ = kurang dari 3 sesi.</div>` +
@@ -4346,7 +4359,8 @@ function polRender() {
     head('Kunjungan lebah per bay (rata² per sesi)') + polHeatHtml(A, 'V') +
     head('Per bay: kunjungan vs flowering antar minggu') +
     `<table class="weather-table"><thead><tr><th>Bay</th><th>Bunga rata²</th><th>Kunj rata²</th><th>n</th><th>r</th></tr></thead><tbody>` +
-    b.perBay.map(x => `<tr><td><b>${x.bay}</b></td><td>${polF1(x.f)}</td><td>${polF1(x.v)}</td><td>${x.n}${x.n < 6 ? ' ⚠️' : ''}</td><td><b>${polFmtR(x.r)}</b></td></tr>`).join('') + '</tbody></table>' +
+    b.perBay.filter(x => x.n > 0).map(x => `<tr><td><b>${x.bay}</b></td><td>${polF1(x.f)}</td><td>${polF1(x.v)}</td><td>${x.n}${x.n < 6 ? ' ⚠️' : ''}</td><td><b>${polFmtR(x.r)}</b></td></tr>`).join('') + '</tbody></table>' +
+    '<div style="font-size:11px;color:#888;margin:4px 0;">n = jumlah minggu yang punya bunga + kunjungan di bay itu. r muncul kalau n ≥ 3. Bay tanpa data bunga disembunyikan.</div>' +
     `<table class="weather-table" style="margin-top:8px;"><thead><tr><th>Seluruh bay</th><th>n</th><th>r</th><th>ρ</th><th>Arti</th></tr></thead><tbody>` +
     cr('Semua titik bay-minggu', b.pooled) + cr('Antar bay (minggu sama)', b.spatial) + cr('Dalam bay (antar minggu)', b.temporal) + '</tbody></table>' +
     head('Hubungan dengan panen & reject GH (jeda ' + lag + ' minggu)') +
@@ -4489,7 +4503,7 @@ function polBlocks(m, ck) {
 
   // korelasi per bay
   { section('Per bay: kunjungan vs flowering antar minggu');
-    const cw = [100, 160, 160, 90, 130, 384], rowH = 40, pb = A.bay.perBay;
+    const cw = [100, 160, 160, 90, 130, 384], rowH = 40, pb = A.bay.perBay.filter(x => x.n > 0);
     blocks.push({ h: 38 + pb.length * rowH + 4, draw(ctx, y) {
       const heads = ['BAY', 'BUNGA RATA²', 'KUNJ RATA²', 'n', 'r', 'ARTI']; let x = PAD;
       ctx.strokeStyle = '#cccccc'; ctx.lineWidth = 1;
