@@ -1030,18 +1030,36 @@ button.btn-delete:hover { background: #c82333; }
       </details>
 
       <details class="bt-box" id="floBox" style="margin-bottom:12px;">
-        <summary>🌸 Data bunga mekar (tim fertigasi)<span id="floStale"></span></summary>
+        <summary>🌸 Flowering mingguan &amp; reject polinasi<span id="floStale"></span></summary>
         <div class="qc-hint" id="floNote" style="margin-top:10px;"></div>
+        <div id="floEditBanner" style="display:none;background:#fff8e1;border:1px solid #f0b429;border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:8px;"></div>
         <div class="row-inputs">
-          <div class="form-group"><label for="floGh">Greenhouse</label><select id="floGh"><option value="GH 1">GH 1</option><option value="GH 2">GH 2</option></select></div>
-          <div class="form-group"><label for="floPct">Bunga mekar (%)</label><input type="number" id="floPct" min="0" max="100" step="0.1" inputmode="decimal" placeholder="mis. 12"></div>
+          <div class="form-group"><label for="floGh">Greenhouse</label><select id="floGh" onchange="floDefaults()"><option value="GH 1">GH 1</option><option value="GH 2">GH 2</option></select></div>
+          <div class="form-group"><label for="floPct">Flowering (%)</label><input type="number" id="floPct" min="0" max="100" step="0.1" inputmode="decimal" placeholder="mis. 12"></div>
         </div>
         <div class="row-inputs">
-          <div class="form-group"><label for="floFrom">Dari</label><input type="date" id="floFrom"></div>
+          <div class="form-group"><label for="floFrom">Minggu dari</label><input type="date" id="floFrom"></div>
           <div class="form-group"><label for="floTo">Sampai</label><input type="date" id="floTo"></div>
         </div>
-        <div class="actions" style="margin-top:6px;"><button type="button" class="btn btn-submit" onclick="floAdd()">Simpan</button></div>
+        <div class="row-inputs">
+          <div class="form-group"><label for="floReject">Reject polinasi (opsional)</label><input type="number" id="floReject" min="0" step="any" inputmode="decimal" placeholder="isi nanti"></div>
+          <div class="form-group"><label for="floPanen">Total panen (opsional)</label><input type="number" id="floPanen" min="0" step="any" inputmode="decimal" placeholder="isi nanti"></div>
+        </div>
+        <div class="qc-hint">Flowering diisi tiap minggu (hitungan tim fertigasi). Reject &amp; total panen diisi belakangan lewat ✏️, sekitar 3 minggu setelah minggu flowering-nya. Satuan reject dan panen harus sama (mis. kg). Kalau total panen diisi, analisis memakai <b>reject %</b>.</div>
+        <div class="actions" style="margin-top:6px;display:flex;gap:8px;">
+          <button type="button" class="btn btn-submit" id="floSaveBtn" onclick="floSave()">Simpan</button>
+          <button type="button" class="btn" id="floCancelBtn" style="display:none;" onclick="floCancelEdit()">Batal edit</button>
+        </div>
         <div id="floList" style="overflow-x:auto;"></div>
+      </details>
+
+      <details class="bt-box" id="polBox" style="margin-bottom:12px;">
+        <summary>🔬 Analisis polinasi: kunjungan × flowering × reject</summary>
+        <div class="row-inputs" style="margin-top:12px;">
+          <div class="form-group"><label for="polGh">Greenhouse</label><select id="polGh" onchange="polRender()"><option value="GH 1">GH 1</option><option value="GH 2">GH 2</option></select></div>
+          <div class="form-group"><label for="polLag">Jeda flowering → panen</label><select id="polLag" onchange="polRender()"><option value="2">2 minggu</option><option value="3" selected>3 minggu</option><option value="4">4 minggu</option></select></div>
+        </div>
+        <div id="polOut" style="overflow-x:auto;"></div>
       </details>
 
       <div class="filter-bar">
@@ -1180,7 +1198,7 @@ button.btn-delete:hover { background: #c82333; }
 // ============================================
 // 🔧 KONFIGURASI AUTO-CONNECT
 // ============================================
-const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwCpIHZQiQwXA2nuIqC_ijApFk3PPnH103O5tCEhNKktHMzzHN_vCHiOQo0manKDCnvdA/exec';
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6PaB2HmuuhiWpmKuNbdhq8SuD0jBfzfUZu5maEMDsFhI-Xr00NKRTgAXWqIJ7ttHOng/exec';
 
 // ============================================
 // STATE
@@ -1194,7 +1212,8 @@ let localHistory = {
   kunjungan: [],
   qc: [],
   akhir: [],
-  cek: []
+  cek: [],
+  flowering: []
 };
 
 let currentEditId = null;
@@ -1582,6 +1601,7 @@ async function syncQueuedData() {
   for (const item of queued) {
     try {
       if (item.type === 'cek' && (await ensureServerVersion()) < 5) throw new Error('Apps Script belum v5');
+      if (item.type === 'flo' && !(await ensureApi(FLO_MIN_API))) throw new Error('Apps Script belum v9');
       if (mediaNeedsNewApi(item.data) && !(await mediaApiOk())) throw new Error(MEDIA_API_ERR);
       const res = await fetch(scriptUrl, {
         method: 'POST',
@@ -1591,6 +1611,7 @@ async function syncQueuedData() {
       const result = await res.json();
       if (result.status === 'error') throw new Error(result.message || 'Gagal');
       await deleteFromQueue(item.id);
+      if (item.type === 'flo') floAfterQueueSent(item.data);
       synced++;
     } catch (e) {
       console.error('Sync error:', e);
@@ -1619,6 +1640,7 @@ function loadLocalHistory() {
   if (!localHistory.qc) localHistory.qc = [];
   if (!localHistory.akhir) localHistory.akhir = [];
   if (!localHistory.cek) localHistory.cek = [];
+  if (!localHistory.flowering) localHistory.flowering = [];
   delete localHistory.mortalitas;
 
   if (!localStorage.getItem('bee_waktu_fix_v1')) {
@@ -1734,6 +1756,7 @@ async function autoSync() {
     for (const item of queued) {
       try {
         if (item.type === 'cek' && (await ensureServerVersion()) < 5) continue; // Apps Script lama: jangan kirim, nanti salah masuk sheet
+        if (item.type === 'flo' && !(await ensureApi(FLO_MIN_API))) continue;    // Apps Script < v9: jangan kirim (bisa salah masuk sheet kunjungan)
         const res = await fetch(scriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
@@ -1742,6 +1765,7 @@ async function autoSync() {
         const result = await res.json();
         if (result.status !== 'error') {
           await deleteFromQueue(item.id);
+          if (item.type === 'flo') floAfterQueueSent(item.data);
           pushedCount++;
         }
       } catch (e) { }
@@ -1777,6 +1801,7 @@ async function autoSync() {
         localHistory.qc = mergeData(localHistory.qc, sheetQc);
         mergeAkhirFromServer(result);
         mergeCekFromServer(result);
+        mergeFloFromServer(result);
         saveLocalHistory();
         checkServerVersion(result, false);
 
@@ -3491,6 +3516,7 @@ async function fetchAllDataFromSheet() {
     localHistory.qc = mergeData(localHistory.qc, sheetQc);
     mergeAkhirFromServer(result);
         mergeCekFromServer(result);
+        mergeFloFromServer(result);
     saveLocalHistory();
     checkServerVersion(result, true);
 
@@ -3711,6 +3737,7 @@ function renderTrendDashboard() {
   renderSuhuBins(filteredData);
   trepInit();
   floRender();
+  polRender();
 }
 
 // ============================================
@@ -3864,27 +3891,88 @@ function renderWeatherDashboard(filteredData, ghFilter) {
 
 function sdOf(a) { if (a.length < 2) return '–'; const m = a.reduce((x, y) => x + y, 0) / a.length; return Math.sqrt(a.reduce((t, v) => t + (v - m) * (v - m), 0) / (a.length - 1)).toFixed(1); }
 
-const FLOWERING_REF = {
-  'GH 1': [['2026-08-17','2026-08-22',19],['2026-08-23','2026-08-29',18],['2026-08-30','2026-09-06',25],['2026-09-07','2026-09-12',17],['2026-09-14','2026-09-19',13],['2026-09-21','2026-09-26',14],['2026-09-27','2026-10-03',9],['2026-10-04','2026-10-10',7],['2026-10-12','2026-10-17',4],['2026-10-18','2026-10-24',6],['2026-10-25','2026-10-31',9.8]],
-  'GH 2': [['2026-09-21','2026-09-26',18],['2026-09-28','2026-10-03',18],['2026-10-04','2026-10-10',12],['2026-10-12','2026-10-17',12],['2026-10-18','2026-10-24',12],['2026-10-25','2026-10-31',18]]
-};
+// ============================================
+// FLOWERING MINGGUAN + REJECT POLINASI (tersimpan di Google Sheet "flowering", Apps Script v9)
+// Satu baris = satu minggu per GH. Tanpa data bawaan: semua diisi dari app.
+// ============================================
 const FLO_GHS = ['GH 1', 'GH 2'];
-function floUser() { try { const a = JSON.parse(localStorage.getItem('bee_flowering_user') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+const FLO_MIN_API = 9;
+let floEdit = null;   // {gh, dari} saat sedang edit
+
+async function ensureApi(min) {
+  if (serverApiVersion >= min) return true;
+  try { const res = await fetch(scriptUrl); const j = await res.json(); serverApiVersion = Number(j.qcVersion) || 0; } catch (e) { /* biarkan */ }
+  return serverApiVersion >= min;
+}
+const FLO_API_ERR = 'Apps Script belum versi 9 (sheet flowering). Ganti script lalu deploy New version.';
+
+function floNum(v) { if (v === '' || v === null || v === undefined) return null; const n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? null : n; }
+function floRows(gh) { return (localHistory.flowering || []).filter(r => r.gh === gh && r.dari).sort((a, b) => a.dari.localeCompare(b.dari)); }
+// bentuk seragam: from/to/pct/reject/panen
 function floList(gh) {
-  const m = {};
-  (FLOWERING_REF[gh] || []).forEach(r => { m[r[0]] = { from: r[0], to: r[1], pct: r[2], user: false }; });
-  floUser().filter(u => u.gh === gh).forEach(u => { m[u.from] = { from: u.from, to: u.to, pct: u.pct, user: true, id: u.id }; });
-  return Object.values(m).sort((a, b) => a.from.localeCompare(b.from));
+  return floRows(gh).map(r => ({ gh: r.gh, from: r.dari, to: r.sampai || r.dari, pct: floNum(r.pct), reject: floNum(r.reject), panen: floNum(r.panen), id: r._localId, synced: !!r._syncedToSheet }));
 }
 function floweringPct(gh, date) {
-  const L = floList(gh); let r = null, idx = -1;
+  const L = floList(gh).filter(x => x.pct !== null); let r = null, idx = -1;
   for (let i = 0; i < L.length; i++) if (L[i].from <= date) { r = L[i]; idx = i; }
   if (!r) return null;
   if (date > r.to && idx === L.length - 1) return null;
   return r.pct;
 }
+
+function mergeFloFromServer(result) {
+  if (!result || !Array.isArray(result.flowering)) return;
+  const sheet = result.flowering.map(d => ({ gh: d.gh, dari: d.dari, sampai: d.sampai, pct: d.pct, reject: d.reject, panen: d.panen, _localId: 'sheet_flo_' + d._sheetRow, _syncedToSheet: true }));
+  const pending = (localHistory.flowering || []).filter(l => !l._syncedToSheet && !String(l._localId || '').startsWith('sheet_'));
+  const keys = new Set(pending.map(l => l.gh + '|' + l.dari));
+  localHistory.flowering = [...sheet.filter(x => !keys.has(x.gh + '|' + x.dari)), ...pending];
+}
+function floAfterQueueSent(d) {
+  if (!d || d.action === 'delete-row') return;
+  const e = (localHistory.flowering || []).find(r => r.gh === d.gh && r.dari === d.dari);
+  if (e) { e._syncedToSheet = true; saveLocalHistory(); }
+}
+async function floDropQueued(gh, dari) {
+  if (!dari) return;
+  try {
+    const q = await getQueuedData();
+    for (const it of q) if (it.type === 'flo' && it.data && it.data.gh === gh && (it.data.dari === dari || it.data.oldDari === dari)) await deleteFromQueue(it.id);
+  } catch (e) { console.error(e); }
+}
+async function floPost(payload) {
+  const res = await fetch(scriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
+  return res.json();
+}
+
+// data lama (versi sebelumnya menyimpan di HP saja) → dipindah ke antrean supaya masuk Sheet
+function floMigrateLegacy() {
+  let old = [];
+  try { old = JSON.parse(localStorage.getItem('bee_flowering_user') || '[]'); } catch (e) { old = []; }
+  if (!Array.isArray(old) || !old.length) { localStorage.removeItem('bee_flowering_user'); return; }
+  old.forEach(u => {
+    if (!u || !u.gh || !u.from) return;
+    const payload = { sheet: 'flowering', action: 'submit', gh: u.gh, dari: u.from, sampai: u.to || u.from, pct: floNum(u.pct) === null ? '' : floNum(u.pct), reject: '', panen: '' };
+    localHistory.flowering = (localHistory.flowering || []).filter(r => !(r.gh === u.gh && r.dari === u.from));
+    localHistory.flowering.push({ gh: u.gh, dari: u.from, sampai: payload.sampai, pct: payload.pct, reject: '', panen: '', _localId: generateLocalId(), _syncedToSheet: false });
+    saveToQueue(payload, 'flo');
+  });
+  saveLocalHistory();
+  localStorage.removeItem('bee_flowering_user');
+  showToast('Data Lama Dipindah 🌸', old.length + ' data flowering dikirim ke antrean untuk masuk Sheet.', 'info', 4500);
+}
+
+function floDefaults() {
+  if (floEdit) return;
+  const gh = document.getElementById('floGh').value;
+  const L = floList(gh), last = L.length ? L[L.length - 1] : null;
+  const from = last ? trepAdd(trepMonday(last.to), 7) : trepMonday(getLocalDate());   // Senin minggu berikutnya
+  document.getElementById('floFrom').value = from;
+  document.getElementById('floTo').value = trepAdd(from, 5);
+}
+
 function floRender() {
   const box = document.getElementById('floList'); if (!box) return;
+  if (!floRender._m) { floRender._m = true; floMigrateLegacy(); }
   const today = getLocalDate();
   const stale = [];
   FLO_GHS.forEach(g => {
@@ -3892,34 +3980,210 @@ function floRender() {
     if (age === null || age > 7) stale.push(g + (last ? ': terakhir s/d ' + repTgl(last) + ' (' + age + ' hari lalu)' : ': belum ada data'));
   });
   document.getElementById('floStale').textContent = stale.length ? ' ⚠️' : '';
-  document.getElementById('floNote').innerHTML = (stale.length ? '⚠️ <b>Perlu diperbarui</b>: ' + stale.map(qcEsc).join(' · ') : '✓ Data bunga mekar sudah terbaru.') +
-    '<br><span style="color:#888;">Data tambahan disimpan di HP ini saja (belum sinkron ke Sheet).</span>';
-  const fF = document.getElementById('floFrom'), fT = document.getElementById('floTo');
-  if (!fF.value) { const mon = trepMonday(today); fF.value = mon; fT.value = trepAdd(mon, 5); }
+  const pendingN = (localHistory.flowering || []).filter(r => !r._syncedToSheet).length;
+  document.getElementById('floNote').innerHTML = (stale.length ? '⚠️ <b>Perlu diisi/diperbarui</b>: ' + stale.map(qcEsc).join(' · ') : '✓ Flowering sudah terbaru.') +
+    '<br><span style="color:#888;">Tersimpan di Google Sheet' + (pendingN ? ' · ⏳ ' + pendingN + ' belum terkirim' : '') + '.</span>';
+  if (!document.getElementById('floFrom').value) floDefaults();
   const all = [];
-  FLO_GHS.forEach(g => floList(g).forEach(e => all.push({ ...e, gh: g })));
-  all.sort((a, b) => b.from.localeCompare(a.from));
-  box.innerHTML = '<table class="weather-table" style="margin-top:10px;"><thead><tr><th>GH</th><th>Periode</th><th>Mekar</th><th></th></tr></thead><tbody>' +
-    all.slice(0, 12).map(e => `<tr><td>${qcEsc(e.gh)}</td><td>${qcEsc(repTgl(e.from) + ' – ' + repTgl(e.to))}</td><td><b>${e.pct}%</b></td><td>${e.user ? `<button type="button" class="history-btn" onclick="floDel('${e.id}')">🗑️</button>` : '<span style="color:#aaa;">bawaan</span>'}</td></tr>`).join('') +
-    '</tbody></table>' + (all.length > 12 ? '<div style="font-size:11px;color:#888;margin-top:4px;">Menampilkan 12 periode terbaru.</div>' : '');
+  FLO_GHS.forEach(g => floList(g).forEach(e => all.push(e)));
+  all.sort((a, b) => b.from.localeCompare(a.from) || a.gh.localeCompare(b.gh));
+  const fmt = n => n === null ? '-' : String(parseFloat(n.toFixed(2)));
+  box.innerHTML = all.length
+    ? '<table class="weather-table" style="margin-top:10px;"><thead><tr><th>GH</th><th>Periode</th><th>Flower</th><th>Reject</th><th></th></tr></thead><tbody>' +
+      all.slice(0, 16).map(e => {
+        const rej = e.reject === null ? '<span style="color:#aaa;">-</span>' : fmt(e.reject) + (e.panen ? ' <small style="color:#888;">(' + (e.reject / e.panen * 100).toFixed(1) + '%)</small>' : '');
+        return `<tr><td>${qcEsc(e.gh)}</td><td>${qcEsc(repTgl(e.from).replace(/ 20\d\d$/, '') + ' – ' + repTgl(e.to).replace(/ 20\d\d$/, ''))}</td><td><b>${e.pct === null ? '-' : e.pct + '%'}</b></td><td>${rej}</td>` +
+          `<td style="white-space:nowrap;">${e.synced ? '' : '⏳ '}<button type="button" class="history-btn history-btn-edit" onclick="floEditLoad('${e.id}')">✏️</button> <button type="button" class="history-btn" onclick="floDel('${e.id}')">🗑️</button></td></tr>`;
+      }).join('') + '</tbody></table>' + (all.length > 16 ? '<div style="font-size:11px;color:#888;margin-top:4px;">Menampilkan 16 periode terbaru.</div>' : '')
+    : '<div style="text-align:center;color:#999;padding:14px 0;font-size:13px;">Belum ada data flowering. Isi minggu pertama di atas.</div>';
 }
-function floAdd() {
-  const gh = document.getElementById('floGh').value;
-  const from = document.getElementById('floFrom').value, to = document.getElementById('floTo').value;
-  const pct = parseFloat(document.getElementById('floPct').value);
-  if (!from || !to || to < from) { showToast('Periode Salah', 'Isi tanggal dari dan sampai dengan benar.', 'error', 3000); return; }
-  if (isNaN(pct) || pct < 0 || pct > 100) { showToast('Persen Salah', 'Bunga mekar harus 0–100%.', 'error', 3000); return; }
-  const arr = floUser().filter(u => !(u.gh === gh && u.from === from));
-  arr.push({ id: String(Date.now()), gh, from, to, pct: +pct.toFixed(1) });
-  localStorage.setItem('bee_flowering_user', JSON.stringify(arr));
-  document.getElementById('floPct').value = '';
-  const nextFrom = trepAdd(from, 7); document.getElementById('floFrom').value = nextFrom; document.getElementById('floTo').value = trepAdd(nextFrom, 5);
-  showToast('Tersimpan 🌸', gh + ' ' + pct + '% (' + repTgl(from) + ')', 'success', 2500);
-  floRender(); renderTrendDashboard();
+
+function floEditLoad(id) {
+  const e = (localHistory.flowering || []).find(r => r._localId === id); if (!e) return;
+  floEdit = { gh: e.gh, dari: e.dari };
+  const $ = x => document.getElementById(x);
+  $('floGh').value = e.gh; $('floGh').disabled = true;
+  $('floFrom').value = e.dari; $('floTo').value = e.sampai || e.dari;
+  $('floPct').value = floNum(e.pct) === null ? '' : floNum(e.pct);
+  $('floReject').value = floNum(e.reject) === null ? '' : floNum(e.reject);
+  $('floPanen').value = floNum(e.panen) === null ? '' : floNum(e.panen);
+  $('floEditBanner').style.display = ''; $('floEditBanner').textContent = '✏️ Mode edit: ' + e.gh + ' · ' + repTgl(e.dari) + ' – ' + repTgl(e.sampai || e.dari) + '. Isi reject & total panen kalau sudah ada.';
+  $('floSaveBtn').textContent = 'Update'; $('floCancelBtn').style.display = '';
+  document.getElementById('floBox').open = true;
+  $('floBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
-function floDel(id) {
-  localStorage.setItem('bee_flowering_user', JSON.stringify(floUser().filter(u => String(u.id) !== String(id))));
-  floRender(); renderTrendDashboard();
+function floCancelEdit() {
+  floEdit = null;
+  const $ = x => document.getElementById(x);
+  $('floGh').disabled = false; $('floEditBanner').style.display = 'none';
+  $('floSaveBtn').textContent = 'Simpan'; $('floCancelBtn').style.display = 'none';
+  ['floPct', 'floReject', 'floPanen'].forEach(x => { $(x).value = ''; });
+  $('floFrom').value = ''; floDefaults();
+}
+
+async function floSave() {
+  const $ = x => document.getElementById(x);
+  const gh = $('floGh').value, dari = $('floFrom').value, sampai = $('floTo').value;
+  const raw = id => String($(id).value).trim().replace(',', '.');
+  const pct = raw('floPct') === '' ? NaN : parseFloat(raw('floPct'));
+  const rj = raw('floReject') === '' ? '' : parseFloat(raw('floReject'));
+  const pn = raw('floPanen') === '' ? '' : parseFloat(raw('floPanen'));
+  if (!dari || !sampai || sampai < dari) { showToast('Periode Salah', 'Isi tanggal dari dan sampai dengan benar.', 'error', 3000); return; }
+  if (isNaN(pct) || pct < 0 || pct > 100) { showToast('Flowering Salah', 'Flowering harus 0–100%.', 'error', 3000); return; }
+  if ((rj !== '' && (isNaN(rj) || rj < 0)) || (pn !== '' && (isNaN(pn) || pn < 0))) { showToast('Angka Salah', 'Reject dan total panen harus angka 0 atau lebih.', 'error', 3000); return; }
+  if (rj !== '' && pn !== '' && rj > pn) { showToast('Reject Terlalu Besar', 'Reject tidak boleh lebih besar dari total panen.', 'error', 3500); return; }
+
+  const sameEdit = floEdit && floEdit.gh === gh && floEdit.dari === dari;
+  const clash = floRows(gh).some(r => r.dari === dari);
+  if (clash && !sameEdit && !confirm('Minggu ' + repTgl(dari) + ' (' + gh + ') sudah ada. Timpa dengan data baru?')) return;
+
+  const payload = { sheet: 'flowering', action: 'submit', gh, dari, sampai, pct: +pct.toFixed(1), reject: rj, panen: pn };
+  if (floEdit && floEdit.dari !== dari) payload.oldDari = floEdit.dari;
+  await floDropQueued(gh, dari); if (payload.oldDari) await floDropQueued(gh, payload.oldDari);
+
+  const btn = $('floSaveBtn'); btn.disabled = true;
+  let synced = false, msg = '';
+  try {
+    if (isAuthenticated && scriptUrl && navigator.onLine) {
+      if (!(await ensureApi(FLO_MIN_API))) throw new Error(FLO_API_ERR);
+      const result = await floPost(payload);
+      if (result.status === 'error') throw new Error(result.message || 'Gagal');
+      if (result.sheet !== 'flowering') throw new Error(FLO_API_ERR);
+      synced = true;
+    } else { await saveToQueue(payload, 'flo'); msg = 'Tersimpan lokal, akan dikirim otomatis saat online.'; }
+  } catch (err) {
+    console.error(err);
+    await saveToQueue(payload, 'flo');
+    msg = 'Belum masuk Sheet: ' + friendlyErr(err) + ' (tersimpan lokal)';
+  }
+  btn.disabled = false;
+
+  localHistory.flowering = (localHistory.flowering || []).filter(r => !(r.gh === gh && (r.dari === dari || (payload.oldDari && r.dari === payload.oldDari))));
+  localHistory.flowering.push({ gh, dari, sampai, pct: payload.pct, reject: rj, panen: pn, _localId: generateLocalId(), _syncedToSheet: synced });
+  saveLocalHistory(); updateQueueBadge();
+  showToast(synced ? 'Tersimpan di Sheet 🌸' : 'Tersimpan Lokal 📥', synced ? gh + ' · ' + payload.pct + '% (' + repTgl(dari) + ')' : msg, synced ? 'success' : 'error', synced ? 2800 : 6000);
+  floCancelEdit();
+  renderTrendDashboard();
+}
+
+async function floDel(id) {
+  const e = (localHistory.flowering || []).find(r => r._localId === id); if (!e) return;
+  if (!confirm('Hapus data ' + e.gh + ' · ' + repTgl(e.dari) + '?')) return;
+  if (!e._syncedToSheet) {
+    await floDropQueued(e.gh, e.dari);
+    localHistory.flowering = localHistory.flowering.filter(r => r._localId !== id);
+    saveLocalHistory(); updateQueueBadge(); renderTrendDashboard(); return;
+  }
+  if (!isAuthenticated || !scriptUrl || !navigator.onLine) { showToast('Perlu Online', 'Data ini sudah ada di Sheet. Hapus saat online.', 'error', 4500); return; }
+  try {
+    if (!(await ensureApi(FLO_MIN_API))) throw new Error(FLO_API_ERR);
+    const result = await floPost({ sheet: 'flowering', action: 'delete-row', gh: e.gh, dari: e.dari });
+    if (result.status === 'error') throw new Error(result.message || 'Gagal menghapus.');
+    localHistory.flowering = localHistory.flowering.filter(r => r._localId !== id);
+    saveLocalHistory(); renderTrendDashboard();
+    showToast('Dihapus 🗑️', 'Data flowering dihapus dari Sheet.', 'success', 2500);
+  } catch (err) { showToast('Gagal Hapus', friendlyErr(err), 'error', 5000); }
+}
+
+// ============================================
+// ANALISIS POLINASI: kunjungan lebah × flowering × reject (jeda ±3 minggu)
+// ============================================
+function polMean(a) { return a.reduce((x, y) => x + y, 0) / a.length; }
+function polPearson(xs, ys) {
+  const n = xs.length; if (n < 3) return null;
+  const mx = polMean(xs), my = polMean(ys); let sxx = 0, syy = 0, sxy = 0;
+  for (let i = 0; i < n; i++) { sxx += (xs[i] - mx) ** 2; syy += (ys[i] - my) ** 2; sxy += (xs[i] - mx) * (ys[i] - my); }
+  return (sxx === 0 || syy === 0) ? null : sxy / Math.sqrt(sxx * syy);
+}
+function polRanks(a) {
+  const idx = a.map((v, i) => [v, i]).sort((p, q) => p[0] - q[0]); const r = new Array(a.length);
+  for (let i = 0; i < idx.length;) { let j = i; while (j + 1 < idx.length && idx[j + 1][0] === idx[i][0]) j++; const avg = (i + j) / 2 + 1; for (let k = i; k <= j; k++) r[idx[k][1]] = avg; i = j + 1; }
+  return r;
+}
+const POL_T95 = [0, 12.71, 4.30, 3.18, 2.78, 2.57, 2.45, 2.36, 2.31, 2.26, 2.23, 2.20, 2.18, 2.16, 2.14, 2.13, 2.12, 2.11, 2.10, 2.09, 2.09];
+function polSig(r, n) { if (r === null || n < 4) return false; const df = n - 2, t = Math.abs(r) * Math.sqrt(df / Math.max(1e-9, 1 - r * r)); return t > (df <= 20 ? POL_T95[df] : (df <= 30 ? 2.04 : 1.98)); }
+function polCorr(pairs) {
+  const xs = pairs.map(p => p[0]), ys = pairs.map(p => p[1]), n = pairs.length;
+  const r = polPearson(xs, ys);
+  return { n, r, rho: n >= 3 ? polPearson(polRanks(xs), polRanks(ys)) : null, sig: polSig(r, n) };
+}
+
+// mingguan: flowering + kunjungan di minggu itu (Minggu/hari luar rentang ikut minggu sebelumnya)
+function polWeeks(gh) {
+  const L = floList(gh);
+  return L.map((w, i) => {
+    const visEnd = L[i + 1] ? trepAdd(L[i + 1].from, -1) : w.to;
+    const agg = trepAgg(trepKunjungan(w.from, visEnd < w.to ? w.to : visEnd, gh));
+    const vis = agg.sess ? agg.avg : null;
+    return { ...w, sess: agg.sess, vis, ratio: (vis !== null && w.pct) ? +(vis / w.pct).toFixed(1) : null };
+  });
+}
+function polUseRate(W) { const r = W.filter(x => x.reject !== null); return r.length > 0 && r.every(x => x.panen > 0); }
+function polRejVal(x, useRate) { return x.reject === null ? null : (useRate ? x.reject / x.panen * 100 : x.reject); }
+// reject yang jatuh `lag` minggu setelah minggu i
+function polRejAt(W, i, lag, useRate) {
+  let best = null, bd = 99;
+  W.forEach(x => { const d = Math.abs(daysBetween(W[i].from, x.from) - lag * 7); if (d <= 3 && d < bd && x.reject !== null && (!useRate || x.panen > 0)) { best = x; bd = d; } });
+  return best;
+}
+function polPairs(W, lag, xKey, useRate) {
+  const out = [];
+  W.forEach((w, i) => { const x = xKey === 'pct' ? w.pct : w[xKey]; const y = polRejAt(W, i, lag, useRate); if (x !== null && x !== undefined && y) out.push([x, polRejVal(y, useRate)]); });
+  return out;
+}
+function polAnalyze(gh, lag) {
+  const W = polWeeks(gh), useRate = polUseRate(W);
+  const rows = W.map((w, i) => { const y = polRejAt(W, i, lag, useRate); return { ...w, rej: y ? polRejVal(y, useRate) : null, rejWeek: y ? y.from : null }; });
+  const c = {
+    vf: polCorr(W.filter(w => w.vis !== null && w.pct !== null).map(w => [w.vis, w.pct])),
+    vr: polCorr(polPairs(W, lag, 'vis', useRate)),
+    fr: polCorr(polPairs(W, lag, 'pct', useRate)),
+    rr: polCorr(polPairs(W, lag, 'ratio', useRate))
+  };
+  const scan = [0, 1, 2, 3, 4, 5].map(L => ({ lag: L, ...polCorr(polPairs(W, L, 'vis', useRate)) }));
+  return { gh, lag, W, rows, useRate, c, scan, unit: useRate ? '%' : '' };
+}
+function polStrength(r) { const a = Math.abs(r); return a < 0.3 ? 'lemah / hampir tidak ada' : (a < 0.6 ? 'sedang' : 'kuat'); }
+function polCaveat(c) { return c.n < 6 ? 'n=' + c.n + ' masih kecil, anggap petunjuk saja' : (c.sig ? 'signifikan (95%)' : 'belum signifikan'); }
+function polFmtR(v) { return v === null ? '-' : (v > 0 ? '+' : '') + v.toFixed(2); }
+function polInsights(A) {
+  const out = [], L = A.lag, pairsVR = A.c.vr.n;
+  out.push(`${A.W.length} minggu flowering terisi; ${pairsVR} minggu punya pasangan reject +${L} minggu` + (pairsVR < 6 ? '. Butuh minimal 6–8 minggu berpasangan agar hasilnya bisa dipercaya.' : '.'));
+  if (!A.W.some(w => w.reject !== null)) { out.push('Reject polinasi belum diisi. Isi lewat ✏️ pada minggu panen (sekitar ' + L + ' minggu setelah flowering).'); }
+  const { vf, vr, fr, rr } = A.c;
+  if (vf.r !== null) out.push(`Kunjungan vs flowering (minggu sama): r=${polFmtR(vf.r)}, hubungan ${polStrength(vf.r)} (${polCaveat(vf)}). ${vf.r > 0.3 ? 'Lebah cenderung lebih aktif saat bunga banyak.' : (vf.r < -0.3 ? 'Kunjungan justru turun saat bunga banyak; cek faktor lain seperti jumlah koloni aktif dan cuaca.' : 'Aktivitas lebah tampak tidak mengikuti jumlah bunga.')}`);
+  if (vr.r !== null) out.push(`Kunjungan minggu t vs reject minggu t+${L}: r=${polFmtR(vr.r)}, hubungan ${polStrength(vr.r)} (${polCaveat(vr)}). ${vr.r <= -0.3 ? 'Arah sesuai harapan: kunjungan lebih tinggi cenderung diikuti reject polinasi lebih rendah.' : (vr.r >= 0.3 ? 'Arah berlawanan dari harapan, cek faktor lain (mis. reject jumlah ikut naik saat bunga banyak).' : 'Belum terlihat pengaruh kunjungan terhadap reject.')}`);
+  if (rr.r !== null) out.push(`Kunjungan per 1% flowering vs reject +${L} minggu: r=${polFmtR(rr.r)} (${polCaveat(rr)}). Ini mengukur kecukupan lebah terhadap jumlah bunga.`);
+  if (fr.r !== null) out.push(`Flowering vs reject +${L} minggu: r=${polFmtR(fr.r)} (${polCaveat(fr)}).` + (!A.useRate && fr.r > 0.3 ? ' Reject dalam jumlah memang ikut naik saat bunga banyak; isi total panen supaya dibandingkan sebagai %.' : ''));
+  const sc = A.scan.filter(x => x.r !== null && x.n >= 4);
+  if (sc.length >= 2) { const b = sc.reduce((a, x) => Math.abs(x.r) > Math.abs(a.r) ? x : a); out.push(`Jeda dengan hubungan terkuat (kunjungan → reject): ${b.lag} minggu (r=${polFmtR(b.r)}, n=${b.n}), indikatif.`); }
+  out.push('Korelasi bukan bukti sebab-akibat: cuaca, hama, varietas, dan perawatan juga memengaruhi reject.');
+  return out;
+}
+
+function polRender() {
+  const box = document.getElementById('polOut'); if (!box) return;
+  const gh = document.getElementById('polGh').value, lag = parseInt(document.getElementById('polLag').value, 10);
+  const A = polAnalyze(gh, lag);
+  if (!A.W.length) { box.innerHTML = '<div style="text-align:center;color:#999;padding:16px 0;font-size:13px;">Belum ada data flowering untuk ' + gh + '. Isi dulu di kotak 🌸 di atas.</div>'; return; }
+  const rejAvg = A.rows.filter(r => r.rej !== null).map(r => r.rej), mean = rejAvg.length ? polMean(rejAvg) : null;
+  const f1 = n => n === null || n === undefined ? '-' : String(parseFloat(n.toFixed(1)));
+  const rowsHtml = A.rows.slice().reverse().slice(0, 14).map(r => {
+    const col = (r.rej !== null && mean !== null && rejAvg.length >= 3) ? (r.rej > mean * 1.2 ? '#c62828' : (r.rej < mean * 0.8 ? '#2e7d32' : '#222')) : '#222';
+    return `<tr><td>${qcEsc(repTgl(r.from).replace(/ 20\d\d$/, ''))}</td><td><b>${r.pct === null ? '-' : r.pct + '%'}</b></td><td>${r.sess}${r.sess && r.sess < 3 ? ' ⚠️' : ''}</td><td>${f1(r.vis)}</td><td>${f1(r.ratio)}</td>` +
+      `<td style="color:${col};font-weight:700;">${r.rej === null ? '<span style="color:#aaa;font-weight:400;">-</span>' : f1(r.rej) + A.unit}${r.rejWeek ? '<br><small style="color:#888;font-weight:400;">' + qcEsc(repTgl(r.rejWeek).replace(/ 20\d\d$/, '')) + '</small>' : ''}</td></tr>`;
+  }).join('');
+  const cr = (label, c) => `<tr><td>${label}</td><td>${c.n}</td><td><b>${polFmtR(c.r)}</b></td><td>${polFmtR(c.rho)}</td><td style="font-size:11px;">${c.r === null ? 'data belum cukup' : polStrength(c.r) + '<br>' + polCaveat(c)}</td></tr>`;
+  box.innerHTML =
+    `<div style="font-size:12px;font-weight:700;color:#2d5016;margin:4px 0 6px;text-transform:uppercase;">Per minggu · ${gh}</div>` +
+    '<table class="weather-table"><thead><tr><th>Minggu</th><th>Flower</th><th>Sesi</th><th>Kunj/Sesi</th><th>per 1%</th><th>Reject +' + lag + ' mgg</th></tr></thead><tbody>' + rowsHtml + '</tbody></table>' +
+    `<div style="font-size:11px;color:#888;margin:4px 0 10px;">Reject ${A.useRate ? 'dalam % dari total panen' : 'dalam jumlah (isi total panen supaya jadi %)'}; angka kecil di bawahnya = minggu panen. Merah/hijau = di atas/bawah rata² reject. ⚠️ = kurang dari 3 sesi.</div>` +
+    '<div style="font-size:12px;font-weight:700;color:#2d5016;margin:4px 0 6px;text-transform:uppercase;">Korelasi</div>' +
+    '<table class="weather-table"><thead><tr><th>Hubungan</th><th>n</th><th>r</th><th>ρ</th><th>Arti</th></tr></thead><tbody>' +
+    cr('Kunjungan ↔ flowering (minggu sama)', A.c.vf) + cr('Kunjungan → reject +' + lag + ' mgg', A.c.vr) + cr('Kunj per 1% → reject +' + lag + ' mgg', A.c.rr) + cr('Flowering → reject +' + lag + ' mgg', A.c.fr) + '</tbody></table>' +
+    '<div style="font-size:12px;font-weight:700;color:#2d5016;margin:12px 0 6px;text-transform:uppercase;">Kunjungan → reject menurut jeda</div>' +
+    '<table class="weather-table"><thead><tr><th>Jeda</th>' + A.scan.map(x => `<th>${x.lag} mgg</th>`).join('') + '</tr></thead><tbody><tr><td>r</td>' + A.scan.map(x => `<td>${x.n >= 3 ? polFmtR(x.r) : '-'}</td>`).join('') + '</tr><tr><td>n</td>' + A.scan.map(x => `<td>${x.n}</td>`).join('') + '</tr></tbody></table>' +
+    '<div style="background:#fff8e1;border:1px solid #f0b429;border-radius:8px;padding:10px 12px;margin-top:12px;font-size:13px;"><b>Kesimpulan otomatis</b><ul style="margin:6px 0 0 18px;padding:0;">' + polInsights(A).map(t => `<li style="margin-bottom:4px;">${qcEsc(t)}</li>`).join('') + '</ul></div>';
 }
 
 // ===== Kunjungan per rentang suhu =====
@@ -5447,6 +5711,7 @@ function trepModel(jenis, tgl, ghSel, batchKey) {
   });
 
   const suhuBins = suhuBinsOf(items);
+  const polList = (gh ? [gh] : FLO_GHS).filter(g => floList(g).length).map(g => polAnalyze(g, 3));
 
   // rincian sesi (harian)
   const sessions = jenis === 'harian'
@@ -5496,7 +5761,7 @@ function trepModel(jenis, tgl, ghSel, batchKey) {
   const now = new Date();
   return {
     jenis, dari, sampai, gh, label, batchInfo, set, agg, prev, delta, items, nBay, cols, cell, colSess, colTot, bayAvg, hours, weather, sessions,
-    dates, dayAvg, dayPop, dayFlo, suhuBins, evDates, events, colony, ins, allPopAvg, hasCek: cekRows.length > 0,
+    dates, dayAvg, dayPop, dayFlo, suhuBins, polList, evDates, events, colony, ins, allPopAvg, hasCek: cekRows.length > 0,
     sub: 'PT. Agri Wangi Berry · ' + (gh || 'GH 1 & GH 2') + ' · ' + (dari === sampai ? repTgl(dari, true) : repTgl(dari) + ' – ' + repTgl(sampai)),
     stamp: repTgl(today) + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0')
   };
@@ -5772,6 +6037,55 @@ function trepBlocks(m, ck) {
       ctx.fillText('Rata² kunjungan per sesi per jam. Oranye = teraktif; bar pudar = kurang dari 5 sesi.', PAD, y + 284);
     } });
   }
+
+  // polinasi: flowering x kunjungan x reject
+  m.polList.forEach(A => {
+    const rows = A.rows.filter(r => r.from <= m.sampai).slice(-10);
+    if (!rows.length) return;
+    section('Polinasi ' + A.gh + ': flowering × kunjungan × reject');
+    const useRate = A.useRate;
+    const hasLine = rows.length >= 2;
+    if (hasLine) {
+      const labels = rows.map(r => r.from.slice(8) + '/' + r.from.slice(5, 7));
+      const series = [{ name: 'Kunjungan / sesi', color: '#2d5016', data: rows.map(r => r.vis) }, { name: 'Flowering (%)', color: '#e11d48', data: rows.map(r => r.pct), axis: 'r', dash: true }];
+      if (useRate && rows.some(r => r.rej !== null)) series.push({ name: 'Reject polinasi (%) di minggu panen', color: '#f59e0b', data: rows.map(r => r.rej), axis: 'r', dash: true });
+      blocks.push({ h: 330, draw(ctx, y) { trepChart(ctx, F, PAD, y, CW, 330, { labels, series, right: true }); } });
+    }
+    const cw = [200, 120, 90, 150, 130, 334], rowH = 46;
+    blocks.push({ h: 38 + rows.length * rowH + 28, draw(ctx, y) {
+      const heads = ['MINGGU', 'FLOWERING', 'SESI', 'KUNJ / SESI', 'PER 1%', 'REJECT +' + A.lag + ' MGG' + (useRate ? ' (%)' : '')]; let x = PAD;
+      ctx.strokeStyle = '#cccccc'; ctx.lineWidth = 1;
+      heads.forEach((t, i) => { ctx.fillStyle = '#eef3e6'; ctx.fillRect(x, y, cw[i], 36); ctx.strokeRect(x + 0.5, y + 0.5, cw[i] - 1, 35); ctx.fillStyle = '#222'; ctx.font = F(14, true); ctx.fillText(t, x + 10, y + 24); x += cw[i]; });
+      const rv = rows.filter(r => r.rej !== null).map(r => r.rej), mean = rv.length ? rv.reduce((a, b) => a + b, 0) / rv.length : null;
+      rows.forEach((r, k) => {
+        const yy = y + 36 + k * rowH; x = PAD;
+        cw.forEach(c => { ctx.strokeStyle = '#cccccc'; ctx.strokeRect(x + 0.5, yy + 0.5, c - 1, rowH - 1); x += c; });
+        const f1 = n => n === null || n === undefined ? '-' : String(parseFloat(n.toFixed(1)));
+        ctx.fillStyle = '#222'; ctx.font = F(19, true); ctx.fillText(repTgl(r.from).replace(/ 20\d\d$/, ''), PAD + 10, yy + 30);
+        ctx.font = F(20, true); ctx.fillStyle = '#e11d48'; ctx.fillText(r.pct === null ? '-' : r.pct + '%', PAD + cw[0] + 10, yy + 30);
+        ctx.fillStyle = '#222'; ctx.font = F(19); ctx.fillText(r.sess + (r.sess && r.sess < 3 ? ' ⚠' : ''), PAD + cw[0] + cw[1] + 10, yy + 30);
+        ctx.font = F(20, true); ctx.fillStyle = G; ctx.fillText(f1(r.vis), PAD + cw[0] + cw[1] + cw[2] + 10, yy + 30);
+        ctx.font = F(19); ctx.fillStyle = '#222'; ctx.fillText(f1(r.ratio), PAD + cw[0] + cw[1] + cw[2] + cw[3] + 10, yy + 30);
+        const rx = PAD + cw[0] + cw[1] + cw[2] + cw[3] + cw[4] + 10;
+        if (r.rej === null) { ctx.fillStyle = '#aaa'; ctx.font = F(19); ctx.fillText('-', rx, yy + 30); }
+        else {
+          ctx.fillStyle = (mean !== null && rv.length >= 3) ? (r.rej > mean * 1.2 ? '#c62828' : (r.rej < mean * 0.8 ? '#2e7d32' : '#222')) : '#222';
+          ctx.font = F(20, true); const t = f1(r.rej) + (useRate ? '%' : ''); ctx.fillText(t, rx, yy + 30);
+          ctx.fillStyle = '#888'; ctx.font = F(15); ctx.fillText('panen ' + repTgl(r.rejWeek).replace(/ 20\d\d$/, ''), rx + ctx.measureText(t).width + 40, yy + 30);
+        }
+      });
+      ctx.fillStyle = '#888'; ctx.font = F(15);
+      ctx.fillText('Merah/hijau = di atas/bawah rata² reject. ⚠ = kurang dari 3 sesi. Kunjungan Minggu dihitung ke minggu sebelumnya.', PAD, y + 36 + rows.length * rowH + 22);
+    } });
+    const ins = polInsights(A).map(t => wrap('• ' + t, CW - 40, F(19)));
+    const hh = 20 + 34 + ins.reduce((a, l) => a + l.length * 26, 0) + 10;
+    blocks.push({ h: hh, draw(ctx, y) {
+      ctx.fillStyle = '#fff8e1'; ctx.fillRect(PAD, y, CW, hh); ctx.strokeStyle = '#f0b429'; ctx.lineWidth = 2; ctx.strokeRect(PAD + 1, y + 1, CW - 2, hh - 1);
+      ctx.fillStyle = '#222'; ctx.font = F(21, true); ctx.fillText('Kesimpulan polinasi (jeda ' + A.lag + ' minggu)', PAD + 18, y + 34);
+      ctx.font = F(19); let yy = y + 40;
+      ins.forEach(l => l.forEach(t => { yy += 26; ctx.fillText(t, PAD + 18, yy - 4); }));
+    } });
+  });
 
   // kejadian
   if (m.events.length) {

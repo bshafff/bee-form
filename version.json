@@ -1,5 +1,5 @@
 {
-  "version": "1.9.0",
+  "version": "2.0.0",
   "released": "2026-11-18",
-  "notes": "Trend: data bunga mekar bisa diisi sendiri, populasi koloni di grafik, kunjungan per rentang suhu. Plus laporan Tren, laporan Cek, draft otomatis."
+  "notes": "Flowering mingguan + reject polinasi tersimpan di Sheet (Apps Script v9), analisis polinasi, laporan Tren/Cek, draft otomatis."
 }
