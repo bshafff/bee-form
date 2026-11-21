@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0",
+  "version": "2.1.0",
   "released": "2026-11-18",
-  "notes": "Flowering mingguan + reject polinasi tersimpan di Sheet (Apps Script v9), analisis polinasi, laporan Tren/Cek, draft otomatis."
+  "notes": "Tab Polinasi baru: flowering per bay (Sheet, Apps Script v10), impor Excel, analisis per bay + panen/reject, laporan. Trend tidak lagi memuat flowering."
 }
